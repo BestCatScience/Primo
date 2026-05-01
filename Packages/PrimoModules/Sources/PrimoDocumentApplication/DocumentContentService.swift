@@ -31,15 +31,18 @@ public struct SelectionTransformCommit: Equatable, Sendable {
 
 public struct DocumentContentService: Sendable {
     package let documentQueryGateway: DocumentQueryGateway
+    package let documentRenderGateway: DocumentRenderGateway
     package let documentMutationGateway: DocumentMutationGateway
     package let textLayerGateway: TextLayerGateway
 
     public init(
         documentQueryGateway: DocumentQueryGateway,
+        documentRenderGateway: DocumentRenderGateway,
         documentMutationGateway: DocumentMutationGateway,
         textLayerGateway: TextLayerGateway
     ) {
         self.documentQueryGateway = documentQueryGateway
+        self.documentRenderGateway = documentRenderGateway
         self.documentMutationGateway = documentMutationGateway
         self.textLayerGateway = textLayerGateway
     }
@@ -57,7 +60,7 @@ public struct DocumentContentService: Sendable {
     }
 
     public func pixelDataForLayer(_ layerIndex: Int) -> Data {
-        documentQueryGateway.pixelDataForLayer(layerIndex)
+        documentRenderGateway.pixelDataForLayer(layerIndex)
     }
 
     public func replaceLayerPixels(

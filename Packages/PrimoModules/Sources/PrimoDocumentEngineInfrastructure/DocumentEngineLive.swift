@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import os
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
@@ -11,6 +12,8 @@ import PrimoDocumentInfrastructure
 
 public struct DocumentEngineLive: Sendable {
     public let queryGateway: DocumentQueryGateway
+    public let renderGateway: DocumentRenderGateway
+    public let dirtyUpdateQueue: DocumentDirtyUpdateQueue
     public let mutationGateway: DocumentMutationGateway
     public let strokeGateway: StrokeInputGateway
     public let historyGateway: DocumentHistoryGateway
@@ -20,12 +23,12 @@ public struct DocumentEngineLive: Sendable {
 
     public let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
     public let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
-    public let createFolder: @Sendable (String, Int) -> DocumentIndexedMutationResult
+    public let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult
     public let deleteFolder: @Sendable (Int) -> DocumentMutationResult
     public let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
     public let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
     public let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let assignLayerToFolder: @Sendable (Int, Int) -> DocumentMutationResult
+    public let assignLayerToFolder: @Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult
     public let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
     public let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
     public let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
@@ -67,7 +70,9 @@ public enum DocumentEngineFactory {
 
         let queryGateway = DocumentQueryGateway(
             lightweightPresentation: { runtimeBox.withRuntime { $0.lightweightPresentation() } },
-            presentation: { runtimeBox.withRuntime { $0.presentation() } },
+            presentation: { runtimeBox.withRuntime { $0.presentation() } }
+        )
+        let renderGateway = DocumentRenderGateway(
             compositePixelData: {
                 let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeSurface(
@@ -82,7 +87,9 @@ public enum DocumentEngineFactory {
                     gpuServices: gpuServices
                 )
             },
-            pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } },
+            pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } }
+        )
+        let dirtyUpdateQueue = DocumentDirtyUpdateQueue(
             consumeDirtyUpdate: { runtimeBox.withRuntime { $0.consumeDirtyUpdate() } }
         )
 
@@ -223,6 +230,8 @@ public enum DocumentEngineFactory {
 
         return DocumentEngineLive(
             queryGateway: queryGateway,
+            renderGateway: renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue,
             mutationGateway: mutationGateway,
             strokeGateway: strokeGateway,
             historyGateway: historyGateway,
@@ -231,7 +240,7 @@ public enum DocumentEngineFactory {
             textLayerGateway: textLayerGateway,
             duplicateLayer: { index, name in runtimeBox.withRuntime { $0.duplicateLayer(index: index, name: name) } },
             moveLayer: { index, destination in runtimeBox.withRuntime { $0.moveLayer(from: index, to: destination) } },
-            createFolder: { name, layerIndex in runtimeBox.withRuntime { $0.createFolder(name: name, layerIndex: layerIndex) } },
+            createFolder: { name, anchor in runtimeBox.withRuntime { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
             deleteFolder: { folderID in runtimeBox.withRuntime { $0.deleteFolder(folderID: folderID) } },
             setFolderVisibility: { folderID, isVisible in
                 runtimeBox.withRuntime { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) }

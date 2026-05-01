@@ -41,6 +41,7 @@ public struct DocumentCanvasCommandService: Sendable {
 
     public init(
         queryGateway: DocumentQueryGateway,
+        renderGateway: DocumentRenderGateway,
         mutationGateway: DocumentMutationGateway,
         persistenceGateway: DocumentPersistenceGateway
     ) {
@@ -65,7 +66,7 @@ public struct DocumentCanvasCommandService: Sendable {
                 }
                 return mutationGateway.setActiveLayer(0)
             },
-            compositeSurface: queryGateway.compositeSurface
+            compositeSurface: renderGateway.compositeSurface
         )
     }
 }

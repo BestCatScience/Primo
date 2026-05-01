@@ -72,10 +72,6 @@ public struct LayerAnchorIndex: Hashable, Sendable {
     package init(_ layerIndex: ExistingLayerIndex?) {
         self.rawValue = layerIndex?.rawValue
     }
-
-    public var rawValueOrSentinel: Int {
-        rawValue ?? -1
-    }
 }
 
 public struct ValidatedLayerOpacity: Equatable, Sendable {

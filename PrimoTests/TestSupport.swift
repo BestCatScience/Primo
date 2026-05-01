@@ -301,7 +301,17 @@ extension WorkspaceItemID {
 
 extension DocumentQueryGateway {
     static func stub(
-        presentation: PaintDocumentPresentation = .testValue(),
+        presentation: PaintDocumentPresentation = .testValue()
+    ) -> Self {
+        Self(
+            lightweightPresentation: { presentation },
+            presentation: { presentation }
+        )
+    }
+}
+
+extension DocumentRenderGateway {
+    static func stub(
         compositePixelData: @escaping @Sendable () -> Data = { Data() },
         compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface = {
             DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
@@ -309,12 +319,9 @@ extension DocumentQueryGateway {
         pixelDataForLayer: @escaping @Sendable (Int) -> Data = { _ in Data() }
     ) -> Self {
         Self(
-            lightweightPresentation: { presentation },
-            presentation: { presentation },
             compositePixelData: compositePixelData,
             compositeSurface: compositeSurface,
-            pixelDataForLayer: pixelDataForLayer,
-            consumeDirtyUpdate: { nil }
+            pixelDataForLayer: pixelDataForLayer
         )
     }
 }

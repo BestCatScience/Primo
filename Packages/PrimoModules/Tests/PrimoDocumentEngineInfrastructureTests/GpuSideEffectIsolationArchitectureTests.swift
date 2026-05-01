@@ -616,6 +616,106 @@ struct GpuSideEffectIsolationArchitectureTests {
         for token in banned {
             #expect(!body.contains(token), "Layer mutation gateways should accept validated value objects instead of \(token)")
         }
+        #expect(!body.contains("rawValueOrSentinel"), "LayerAnchorIndex should not expose a public sentinel conversion")
+    }
+
+    @Test
+    func runtimeLayerMutationGatewayKeepsTypedFolderBoundaries() throws {
+        let repoRoot = try Self.repoRoot()
+        let engineLive = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        #expect(engineLive.contains("@Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult"))
+        #expect(engineLive.contains("@Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult"))
+
+        let runtimeComposition = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        for token in [
+            "anchorLayerIndex.rawValueOrSentinel",
+            "folderID?.rawValue ?? -1",
+            "runtime.assignLayerToFolder(index.rawValue"
+        ] {
+            #expect(!runtimeComposition.contains(token), "Runtime composition should keep folder mutation identifiers typed instead of \(token)")
+        }
+    }
+
+    @Test
+    func canvasEditingTransformWorkflowUsesApplicationServiceBoundary() throws {
+        let repoRoot = try Self.repoRoot()
+        let reducer = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        #expect(reducer.contains("@Dependency(\\.canvasEditingWorkflowService)"))
+        for dependency in [
+            "@Dependency(\\.documentContentService)",
+            "@Dependency(\\.layerTransformProcessor)",
+            "@Dependency(\\.textLayerGateway)"
+        ] {
+            #expect(!reducer.contains(dependency), "CanvasEditingWorkflowReducer should delegate transform details to CanvasEditingWorkflowService")
+        }
+
+        let transformWorkflow = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        for token in [
+            "pixelDataForLayer",
+            "replaceLayerPixels",
+            "setTextLayer",
+            "transformedLayerPixels"
+        ] {
+            #expect(!transformWorkflow.contains(token), "App transform workflow should not perform low-level document mutation or GPU processing")
+        }
+    }
+
+    @Test
+    func documentReadGatewayStaysPureFromRenderAndDirtyUpdateEffects() throws {
+        let repoRoot = try Self.repoRoot()
+        let contracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRenderingContracts/DocumentRenderingRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let readGateway = try #require(Self.typeBody(named: "DocumentReadGateway", in: contracts))
+        for token in [
+            "compositePixelData",
+            "compositeSurface",
+            "pixelDataForLayer",
+            "consumeDirtyUpdate"
+        ] {
+            #expect(!readGateway.contains(token), "DocumentReadGateway should expose presentation reads only")
+        }
+        #expect(contracts.contains("public struct DocumentRenderGateway"))
+        #expect(contracts.contains("public struct DocumentDirtyUpdateQueue"))
+
+        let composition = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        #expect(composition.contains("public let queryGateway: DocumentQueryGateway"))
+        #expect(composition.contains("public let renderGateway: DocumentRenderGateway"))
+        #expect(composition.contains("public let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
     }
 
     @Test

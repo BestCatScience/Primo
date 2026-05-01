@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
@@ -130,7 +131,12 @@ struct PaintDocumentMutationContractTests {
     @Test
     func assignLayerRejectsInvalidFolderID() {
         let runtime = DocumentEngineFactory.live()
-        expectFailure(runtime.assignLayerToFolder(0, 999), .invalidFolderID(999))
+        switch runtime.makeEditingGateway().execute(.structure(.assignLayerToFolder(index: 0, folderID: 999))) {
+        case let .failure(failure):
+            #expect(failure == .invalidFolderID(999))
+        case .success:
+            Issue.record("Expected invalid folder failure")
+        }
     }
 
     @Test
@@ -182,7 +188,7 @@ struct PaintDocumentMutationContractTests {
 
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
-            let output = runtime.queryGateway.pixelDataForLayer(0)
+            let output = runtime.renderGateway.pixelDataForLayer(0)
             #expect(output.count == width * height * 4)
             #expect(output[0] == 10)
             #expect(output[1] == 20)
@@ -215,7 +221,7 @@ struct PaintDocumentMutationContractTests {
             let result = runtime.mergeLayerDown(index)
             if PrimoMetalDocumentProcessingClient.shared.isAvailable {
                 expectSuccess(result)
-                let merged = runtime.queryGateway.pixelDataForLayer(0)
+                let merged = runtime.renderGateway.pixelDataForLayer(0)
                 #expect(merged.count == width * height * 4)
                 #expect(merged[2] == 255)
             } else {
@@ -269,7 +275,7 @@ struct PaintDocumentMutationContractTests {
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
         let height = max(Int(presentation.canvasSize.height.rounded()), 1)
 
-        let surface = runtime.queryGateway.compositeSurface()
+        let surface = runtime.renderGateway.compositeSurface()
 
         #expect(surface.width == width)
         #expect(surface.height == height)
@@ -547,7 +553,12 @@ struct PaintDocumentMutationContractTests {
     }
 
     private func createdFolderID(in runtime: DocumentEngineLive, name: String) -> Int? {
-        switch runtime.createFolder(name, 0) {
+        let anchor = DocumentLayerMutationContext(
+            layerCount: 1,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        ).anchorLayerIndex(0)
+        switch runtime.createFolder(name, anchor!) {
         case let .success(folderID):
             return folderID
         case let .failure(failure):

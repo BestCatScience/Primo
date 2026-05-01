@@ -13,16 +13,14 @@ struct CanvasEditingWorkflowReducer: Reducer {
     typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
 
     @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
+    @Dependency(\.canvasEditingWorkflowService) var canvasEditingWorkflowService
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     @Dependency(\.documentLayerCommandService) var documentLayerCommandService
-    @Dependency(\.documentContentService) var documentContentService
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
-    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
     @Dependency(\.selectionWorkflowService) var selectionWorkflowService
-    @Dependency(\.textLayerGateway) var textLayerGateway
 
     enum EditingAction: Equatable {
         case featherSelectionRequested(Int)

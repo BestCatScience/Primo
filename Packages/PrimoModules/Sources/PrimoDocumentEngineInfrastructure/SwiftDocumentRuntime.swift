@@ -1680,9 +1680,17 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
+        createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)
+    }
+
     func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
-        guard layerIndex < 0 || store.snapshot.layers.indices.contains(layerIndex) else {
-            return .failure(.invalidLayerIndex(layerIndex))
+        createFolder(name: name, anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil)
+    }
+
+    private func createFolder(name: String, anchorLayerIndex: Int?) -> DocumentIndexedMutationResult {
+        if let anchorLayerIndex, !store.snapshot.layers.indices.contains(anchorLayerIndex) {
+            return .failure(.invalidLayerIndex(anchorLayerIndex))
         }
         let before = undoSnapshot()
         let id = store.snapshot.nextFolderID
@@ -1693,12 +1701,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 name: name,
                 visible: true,
                 expanded: true,
-                anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil
+                anchorLayerIndex: anchorLayerIndex
             )
         )
         recordMutation(
             before: before,
-            timelapseEvent: .createFolder(folderID: .unchecked(id), name: name, anchorLayerIndex: layerIndex >= 0 ? .unchecked(layerIndex) : nil)
+            timelapseEvent: .createFolder(
+                folderID: .unchecked(id),
+                name: name,
+                anchorLayerIndex: anchorLayerIndex.map { .unchecked($0) }
+            )
         )
         return .success(id)
     }
@@ -1746,14 +1758,28 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
+    func assignLayerToFolder(index: ExistingLayerIndex, folderID: ExistingFolderID?) -> DocumentMutationResult {
+        assignLayerToFolder(index: index.rawValue, folderID: folderID?.rawValue)
+    }
+
     func assignLayerToFolder(index: Int, folderID: Int) -> DocumentMutationResult {
+        assignLayerToFolder(index: index, folderID: folderID >= 0 ? folderID : nil)
+    }
+
+    private func assignLayerToFolder(index: Int, folderID: Int?) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        if folderID >= 0, !store.snapshot.folders.contains(where: { $0.id == folderID }) {
+        if let folderID, !store.snapshot.folders.contains(where: { $0.id == folderID }) {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.layers[index].folderID = folderID >= 0 ? folderID : nil
-        recordMutation(before: before, timelapseEvent: .assignLayerToFolder(index: .unchecked(index), folderID: folderID >= 0 ? .unchecked(folderID) : nil))
+        store.snapshot.layers[index].folderID = folderID
+        recordMutation(
+            before: before,
+            timelapseEvent: .assignLayerToFolder(
+                index: .unchecked(index),
+                folderID: folderID.map { .unchecked($0) }
+            )
+        )
         return .success(())
     }
 

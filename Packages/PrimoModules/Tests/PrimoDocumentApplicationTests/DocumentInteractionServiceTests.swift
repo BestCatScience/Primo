@@ -13,11 +13,12 @@ struct DocumentCommandServiceTests {
         let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
-                presentation: { queryGateway().presentation() },
+                presentation: { queryGateway().presentation() }
+            ),
+            renderGateway: DocumentRenderGateway(
                 compositePixelData: { expected },
                 compositeSurface: { expectedSurface },
-                pixelDataForLayer: { _ in Data() },
-                consumeDirtyUpdate: { nil }
+                pixelDataForLayer: { _ in Data() }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
@@ -33,11 +34,12 @@ struct DocumentCommandServiceTests {
         let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
-                presentation: { queryGateway().presentation() },
+                presentation: { queryGateway().presentation() }
+            ),
+            renderGateway: DocumentRenderGateway(
                 compositePixelData: { Data() },
                 compositeSurface: { expectedSurface },
-                pixelDataForLayer: { _ in Data() },
-                consumeDirtyUpdate: { nil }
+                pixelDataForLayer: { _ in Data() }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
@@ -51,6 +53,7 @@ struct DocumentCommandServiceTests {
         let recorder = CallRecorder()
         let service = DocumentCanvasCommandService(
             queryGateway: queryGateway(),
+            renderGateway: renderGateway(),
             mutationGateway: mutationGateway(recorder: recorder),
             persistenceGateway: persistenceGateway(recorder: recorder)
         )
@@ -124,11 +127,15 @@ private func queryGateway() -> DocumentQueryGateway {
     )
     return DocumentQueryGateway(
         lightweightPresentation: { presentation },
-        presentation: { presentation },
+        presentation: { presentation }
+    )
+}
+
+private func renderGateway() -> DocumentRenderGateway {
+    DocumentRenderGateway(
         compositePixelData: { Data() },
         compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
-        pixelDataForLayer: { _ in Data() },
-        consumeDirtyUpdate: { nil }
+        pixelDataForLayer: { _ in Data() }
     )
 }
 

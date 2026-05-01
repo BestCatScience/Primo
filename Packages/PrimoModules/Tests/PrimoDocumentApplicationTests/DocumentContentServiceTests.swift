@@ -11,6 +11,7 @@ struct DocumentContentServiceTests {
         let recorder = CallRecorder()
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
             documentMutationGateway: mutationGateway(recorder: recorder),
             textLayerGateway: textLayerGateway()
         )
@@ -29,6 +30,7 @@ struct DocumentContentServiceTests {
         let recorder = CallRecorder()
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
             documentMutationGateway: mutationGateway(recorder: recorder),
             textLayerGateway: textLayerGateway()
         )
@@ -49,6 +51,7 @@ struct DocumentContentServiceTests {
         let recorder = CallRecorder()
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 7),
+            documentRenderGateway: renderGateway(),
             documentMutationGateway: DocumentMutationGateway(
                 resizeCanvas: { _, _ in .success(()) },
                 resizeCanvasExtent: { _, _ in .success(()) },
@@ -105,6 +108,7 @@ struct DocumentContentServiceTests {
         let recorder = CallRecorder()
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 1),
+            documentRenderGateway: renderGateway(),
             documentMutationGateway: DocumentMutationGateway(
                 resizeCanvas: { _, _ in .success(()) },
                 resizeCanvasExtent: { _, _ in .success(()) },
@@ -187,11 +191,15 @@ private func queryGateway(activeLayerIndex: Int, layerCount: Int) -> DocumentQue
     )
     return DocumentQueryGateway(
         lightweightPresentation: { presentation },
-        presentation: { presentation },
+        presentation: { presentation }
+    )
+}
+
+private func renderGateway() -> DocumentRenderGateway {
+    DocumentRenderGateway(
         compositePixelData: { Data() },
         compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
-        pixelDataForLayer: { _ in Data() },
-        consumeDirtyUpdate: { nil }
+        pixelDataForLayer: { _ in Data() }
     )
 }
 

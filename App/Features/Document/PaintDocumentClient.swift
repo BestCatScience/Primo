@@ -27,6 +27,7 @@ private enum DocumentCanvasCommandServiceKey: DependencyKey {
         @Dependency(\.documentRuntimeComposition) var composition
         return DocumentCanvasCommandService(
             queryGateway: composition.queryGateway,
+            renderGateway: composition.renderGateway,
             mutationGateway: composition.mutationGateway,
             persistenceGateway: composition.persistenceGateway
         )
@@ -78,8 +79,20 @@ private enum DocumentContentServiceKey: DependencyKey {
         @Dependency(\.documentRuntimeComposition) var composition
         return DocumentContentService(
             documentQueryGateway: composition.queryGateway,
+            documentRenderGateway: composition.renderGateway,
             documentMutationGateway: composition.mutationGateway,
             textLayerGateway: composition.textLayerGateway
+        )
+    }
+}
+
+private enum CanvasEditingWorkflowServiceKey: DependencyKey {
+    static var liveValue: CanvasEditingWorkflowService {
+        @Dependency(\.documentContentService) var documentContentService
+        @Dependency(\.layerTransformProcessor) var layerTransformProcessor
+        return CanvasEditingWorkflowService(
+            documentContentService: documentContentService,
+            layerTransformProcessor: layerTransformProcessor
         )
     }
 }
@@ -156,6 +169,10 @@ private extension DependencyValues {
         self[SelectionWorkflowServiceKey.self] = SelectionWorkflowService(
             gpuOperations: gpuOperationGateway
         )
+        self[CanvasEditingWorkflowServiceKey.self] = CanvasEditingWorkflowService(
+            documentContentService: self[DocumentContentServiceKey.self],
+            layerTransformProcessor: layerTransformProcessor
+        )
     }
 
     mutating func setDocumentRuntimeCompositionAndRefreshCommandServices(
@@ -164,6 +181,7 @@ private extension DependencyValues {
         self[DocumentRuntimeCompositionKey.self] = composition
         self[DocumentCanvasCommandServiceKey.self] = DocumentCanvasCommandService(
             queryGateway: composition.queryGateway,
+            renderGateway: composition.renderGateway,
             mutationGateway: composition.mutationGateway,
             persistenceGateway: composition.persistenceGateway
         )
@@ -187,6 +205,7 @@ private extension DependencyValues {
         )
         self[DocumentContentServiceKey.self] = DocumentContentService(
             documentQueryGateway: composition.queryGateway,
+            documentRenderGateway: composition.renderGateway,
             documentMutationGateway: composition.mutationGateway,
             textLayerGateway: composition.textLayerGateway
         )
@@ -205,6 +224,24 @@ extension DependencyValues {
         set {
             setDocumentRuntimeCompositionAndRefreshCommandServices(
                 documentRuntimeComposition.withOverrides(queryGateway: newValue)
+            )
+        }
+    }
+
+    var documentRenderGateway: DocumentRenderGateway {
+        get { documentRuntimeComposition.renderGateway }
+        set {
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(renderGateway: newValue)
+            )
+        }
+    }
+
+    var documentDirtyUpdateQueue: DocumentDirtyUpdateQueue {
+        get { documentRuntimeComposition.dirtyUpdateQueue }
+        set {
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(dirtyUpdateQueue: newValue)
             )
         }
     }
@@ -346,6 +383,11 @@ extension DependencyValues {
     var documentContentService: DocumentContentService {
         get { self[DocumentContentServiceKey.self] }
         set { self[DocumentContentServiceKey.self] = newValue }
+    }
+
+    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
+        get { self[CanvasEditingWorkflowServiceKey.self] }
+        set { self[CanvasEditingWorkflowServiceKey.self] = newValue }
     }
 
     var selectionWorkflowService: SelectionWorkflowService {

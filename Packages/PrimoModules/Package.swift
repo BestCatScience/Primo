@@ -80,6 +80,7 @@ let package = Package(
                 "PrimoBrushDomain",
                 "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
+                "PrimoCanvasPresentationDomain",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMutationContracts",

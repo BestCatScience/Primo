@@ -471,7 +471,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale stroke GPU result to be rejected")
             return
         }
-        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
         #expect(gpu.releasedHandleCount == 1)
     }
 
@@ -496,7 +496,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale fill GPU result to be rejected")
             return
         }
-        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
     }
 
     @Test
@@ -520,7 +520,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale blur GPU result to be rejected")
             return
         }
-        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
     }
 
     @Test
@@ -542,7 +542,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale layer processing GPU result to be rejected")
             return
         }
-        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
     }
 
     @Test
@@ -604,7 +604,7 @@ struct SwiftDocumentRuntimeUndoTests {
         }
         #expect(runtime.queryGateway.lightweightPresentation().canvasSize.width == 2)
         #expect(runtime.queryGateway.lightweightPresentation().canvasSize.height == 2)
-        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
     }
 
     private func sample() -> StylusSample {

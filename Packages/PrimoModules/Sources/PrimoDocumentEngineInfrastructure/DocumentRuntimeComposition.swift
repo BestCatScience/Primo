@@ -10,6 +10,8 @@ import PrimoDocumentStrokeApplication
 
 public struct DocumentRuntimeComposition: Sendable {
     public let queryGateway: DocumentQueryGateway
+    public let renderGateway: DocumentRenderGateway
+    public let dirtyUpdateQueue: DocumentDirtyUpdateQueue
     public let mutationGateway: DocumentMutationGateway
     public let strokeGateway: StrokeInputGateway
     public let historyGateway: DocumentHistoryGateway
@@ -23,6 +25,8 @@ public struct DocumentRuntimeComposition: Sendable {
 
     public init(
         queryGateway: DocumentQueryGateway,
+        renderGateway: DocumentRenderGateway,
+        dirtyUpdateQueue: DocumentDirtyUpdateQueue,
         mutationGateway: DocumentMutationGateway,
         strokeGateway: StrokeInputGateway,
         historyGateway: DocumentHistoryGateway,
@@ -35,6 +39,8 @@ public struct DocumentRuntimeComposition: Sendable {
         gpuOperationGateway: DocumentGpuOperationGateway
     ) {
         self.queryGateway = queryGateway
+        self.renderGateway = renderGateway
+        self.dirtyUpdateQueue = dirtyUpdateQueue
         self.mutationGateway = mutationGateway
         self.strokeGateway = strokeGateway
         self.historyGateway = historyGateway
@@ -49,6 +55,8 @@ public struct DocumentRuntimeComposition: Sendable {
 
     public func withOverrides(
         queryGateway: DocumentQueryGateway? = nil,
+        renderGateway: DocumentRenderGateway? = nil,
+        dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
         mutationGateway: DocumentMutationGateway? = nil,
         strokeGateway: StrokeInputGateway? = nil,
         historyGateway: DocumentHistoryGateway? = nil,
@@ -62,6 +70,8 @@ public struct DocumentRuntimeComposition: Sendable {
     ) -> DocumentRuntimeComposition {
         DocumentRuntimeComposition(
             queryGateway: queryGateway ?? self.queryGateway,
+            renderGateway: renderGateway ?? self.renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue ?? self.dirtyUpdateQueue,
             mutationGateway: mutationGateway ?? self.mutationGateway,
             strokeGateway: strokeGateway ?? self.strokeGateway,
             historyGateway: historyGateway ?? self.historyGateway,
@@ -91,6 +101,8 @@ public enum DocumentRuntimeCompositionFactory {
 
         return DocumentRuntimeComposition(
             queryGateway: runtime.queryGateway,
+            renderGateway: runtime.renderGateway,
+            dirtyUpdateQueue: runtime.dirtyUpdateQueue,
             mutationGateway: runtime.mutationGateway,
             strokeGateway: runtime.strokeGateway,
             historyGateway: runtime.historyGateway,
@@ -170,7 +182,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult {
-        runtime.createFolder(name, anchorLayerIndex.rawValueOrSentinel)
+        runtime.createFolder(name, anchorLayerIndex)
             .mapError(mapRuntimeFailure)
     }
 
@@ -184,7 +196,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult {
-        switch runtime.assignLayerToFolder(index.rawValue, folderID?.rawValue ?? -1) {
+        switch runtime.assignLayerToFolder(index, folderID) {
         case .success:
             return .success(())
         case let .failure(failure):

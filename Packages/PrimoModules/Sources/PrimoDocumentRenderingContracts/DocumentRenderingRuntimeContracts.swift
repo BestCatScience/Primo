@@ -5,29 +5,45 @@ import PrimoDocumentDomain
 @_exported import PrimoDocumentMutationContracts
 @_exported import PrimoDocumentPresentationContracts
 
-public struct DocumentQueryGateway: Sendable {
+public struct DocumentReadGateway: Sendable {
     public let lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     public let presentation: @Sendable () -> PaintDocumentPresentation
+
+    public init(
+        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
+        presentation: @escaping @Sendable () -> PaintDocumentPresentation
+    ) {
+        self.lightweightPresentation = lightweightPresentation
+        self.presentation = presentation
+    }
+}
+
+public typealias DocumentQueryGateway = DocumentReadGateway
+
+public struct DocumentRenderGateway: Sendable {
     /// Legacy convenience retained for callers that still expect raw bytes.
     /// Live query paths should prefer `compositeSurface`.
     public let compositePixelData: @Sendable () -> Data
     public let compositeSurface: @Sendable () -> DocumentCompositeSurface
     public let pixelDataForLayer: @Sendable (Int) -> Data
-    public let consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
     public init(
-        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
-        presentation: @escaping @Sendable () -> PaintDocumentPresentation,
         compositePixelData: @escaping @Sendable () -> Data,
         compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface,
-        pixelDataForLayer: @escaping @Sendable (Int) -> Data,
-        consumeDirtyUpdate: @escaping @Sendable () -> IncrementalLayerUpdate?
+        pixelDataForLayer: @escaping @Sendable (Int) -> Data
     ) {
-        self.lightweightPresentation = lightweightPresentation
-        self.presentation = presentation
         self.compositePixelData = compositePixelData
         self.compositeSurface = compositeSurface
         self.pixelDataForLayer = pixelDataForLayer
+    }
+}
+
+public struct DocumentDirtyUpdateQueue: Sendable {
+    public let consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
+
+    public init(
+        consumeDirtyUpdate: @escaping @Sendable () -> IncrementalLayerUpdate?
+    ) {
         self.consumeDirtyUpdate = consumeDirtyUpdate
     }
 }
