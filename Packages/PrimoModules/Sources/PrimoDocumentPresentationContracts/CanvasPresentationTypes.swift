@@ -11,7 +11,6 @@ public enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifia
     case fill
     case eyedropper
     case select
-    case move
     case shape
     case text
 

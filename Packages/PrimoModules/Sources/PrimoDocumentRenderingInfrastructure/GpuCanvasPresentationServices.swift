@@ -8,7 +8,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import simd
 
-public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
+public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
     private let operations: DocumentCanvasPreviewRenderingOperations
 
     public init(

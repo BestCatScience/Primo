@@ -29,9 +29,7 @@ extension StudioToolKind {
         case .eyedropper:
             return language.localized("スポイト設定")
         case .select:
-            return language.localized("選択")
-        case .move:
-            return language.localized("移動")
+            return language.localized("ブラシ")
         case .shape:
             return language.localized("形状")
         case .text:
@@ -52,9 +50,7 @@ extension StudioToolKind {
         case .eyedropper:
             return "eyedropper"
         case .select:
-            return "lasso"
-        case .move:
-            return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+            return "cursorarrow"
         case .shape:
             return "square.on.circle"
         case .text:
@@ -114,21 +110,6 @@ extension FillThresholdMode {
     }
 }
 
-extension SelectionToolMode {
-    var title: String {
-        localizedTitle(.english)
-    }
-
-    func localizedTitle(_ language: AppLanguage) -> String {
-        switch self {
-        case .lasso:
-            return language.localized("投げ縄")
-        case .auto:
-            return language.localized("自動")
-        }
-    }
-}
-
 extension ShapeToolMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
@@ -161,23 +142,6 @@ extension ShapeToolMode {
             return "pentagon"
         case .hexagon:
             return "hexagon"
-        }
-    }
-}
-
-extension SelectionCombineMode {
-    var title: String {
-        localizedTitle(.english)
-    }
-
-    func localizedTitle(_ language: AppLanguage) -> String {
-        switch self {
-        case .replace:
-            return language.localized("置換")
-        case .add:
-            return language.localized("加算")
-        case .subtract:
-            return language.localized("削る")
         }
     }
 }

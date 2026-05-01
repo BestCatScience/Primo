@@ -12,7 +12,6 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
     public var actionSink: CanvasPresentationActionSink? {
         didSet {
             navigationGestureAdapter.actionSink = actionSink
-            textTransformOverlayView.actionSink = actionSink
             eyedropperLoupeView.onSampledColor = { [weak self] sampledColor in
                 self?.actionSink?.send(.colorSampled(sampledColor))
             }
@@ -20,20 +19,12 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
     }
 
     private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
+    private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
     private let inputHandler = CanvasInputHandler()
     private let previewRenderer: any CanvasPreviewRendering
     private let eyedropperSampler: any CanvasEyedropperSampling
     private let selectionProcessor: any SelectionMaskProcessing
-    private let layerTransformProcessor: any LayerTransformProcessing
     private lazy var selectionOverlayView = CanvasSelectionOverlayView(selectionProcessor: selectionProcessor)
-    private lazy var transformPreviewView = CanvasTransformPreviewView(
-        previewRenderer: previewRenderer,
-        layerTransformProcessor: layerTransformProcessor
-    )
-    private lazy var textTransformOverlayView = CanvasTextTransformOverlayView(
-        previewRenderer: previewRenderer,
-        layerTransformProcessor: layerTransformProcessor
-    )
     private lazy var eyedropperLoupeView = CanvasEyedropperLoupeView(
         previewRenderer: previewRenderer,
         eyedropperSampler: eyedropperSampler
@@ -52,7 +43,6 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         self.previewRenderer = environment.previewRenderer
         self.eyedropperSampler = environment.eyedropperSampler
         self.selectionProcessor = environment.selectionProcessor
-        self.layerTransformProcessor = environment.layerTransformProcessor
         super.init(frame: .zero)
         backgroundColor = .clear
         isMultipleTouchEnabled = true
@@ -66,25 +56,14 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         }
 
         addSubview(canvasRenderSurfaceView)
+        addSubview(shapePreviewSurfaceView)
         addSubview(selectionOverlayView)
-        addSubview(transformPreviewView)
-        addSubview(textTransformOverlayView)
 
         navigationGestureAdapter.actionSink = actionSink
         navigationGestureAdapter.shouldAllowSimultaneousRecognition = { [weak self] gesture, otherGesture in
             guard let self else { return true }
             if self.eyedropperLoupeView.ownsGesture(gesture) || self.eyedropperLoupeView.ownsGesture(otherGesture) {
                 return false
-            }
-            if self.textTransformOverlayView.ownsGesture(gesture) || self.textTransformOverlayView.ownsGesture(otherGesture) {
-                return false
-            }
-            return true
-        }
-        navigationGestureAdapter.shouldReceiveTouch = { [weak self] gesture, touch in
-            guard let self else { return true }
-            if self.textTransformOverlayView.ownsGesture(gesture) {
-                return !self.textTransformOverlayView.containsInteractivePoint(touch.location(in: self))
             }
             return true
         }
@@ -113,9 +92,8 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
     public override func layoutSubviews() {
         super.layoutSubviews()
         canvasRenderSurfaceView.frame = bounds
+        shapePreviewSurfaceView.frame = bounds
         selectionOverlayView.frame = bounds
-        transformPreviewView.frame = bounds
-        textTransformOverlayView.frame = bounds
     }
 
     public func update(_ state: CanvasPresentationState) {
@@ -148,72 +126,19 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         inputHandler.brushColor = state.previewStyle.simdColor
         inputHandler.strokeStabilization = Float(state.previewStyle.stabilization)
 
-        let shouldHideMoveOverlay = state.currentTool == .move && (
-            abs(state.transformPreviewRotationDegrees) > 0.001 ||
-            abs(state.transformPreviewScaleX - 1.0) > 0.001 ||
-            abs(state.transformPreviewScaleY - 1.0) > 0.001
-        )
         selectionOverlayView.update(
             selection: state.selection,
             previewPoints: state.selectionPreviewPoints,
             currentTool: state.currentTool,
-            geometry: geometry,
-            transformQuad: state.currentTool == .move
-                ? { rect in
-                    CanvasTransformGeometry.effectiveTransformQuad(
-                        bounds: rect,
-                        translation: state.transformPreviewOffset,
-                        scaleX: state.transformPreviewScaleX,
-                        scaleY: state.transformPreviewScaleY,
-                        rotationDegrees: state.transformPreviewRotationDegrees,
-                        pivot: state.transformPivot,
-                        mode: state.transformMode,
-                        quadOffsets: state.transformQuadOffsets
-                    ).effective
-                }
-                : nil,
-            hidesTransformedOverlayImage: shouldHideMoveOverlay
+            geometry: geometry
         )
 
-        transformPreviewView.update(
-            snapshot: state.snapshot,
-            activeLayerIndex: state.activeLayerIndex,
-            activeStroke: state.activeStroke,
-            strokePreviewCompositePixelData: nil,
-            adjustmentPreviewPixelData: state.adjustmentPreviewPixelData,
-            selection: state.selection,
-            paperStyle: state.paperStyle,
-            previewStyle: state.previewStyle,
+        updateShapePreview(
+            stroke: state.activeStroke,
+            style: state.previewStyle,
             currentTool: state.currentTool,
-            transformPreviewOffset: state.transformPreviewOffset,
-            transformPreviewScaleX: state.transformPreviewScaleX,
-            transformPreviewScaleY: state.transformPreviewScaleY,
-            transformPreviewRotationDegrees: state.transformPreviewRotationDegrees,
-            transformPivot: state.transformPivot,
-            transformMode: state.transformMode,
-            transformQuadOffsets: state.transformQuadOffsets,
-            activeTextLayer: state.activeTextLayer,
-            geometry: geometry,
-            renderSurfaceView: canvasRenderSurfaceView
-        )
-
-        textTransformOverlayView.update(
-            context: CanvasTextTransformOverlayView.Context(
-                snapshot: state.snapshot,
-                activeLayerIndex: state.activeLayerIndex,
-                currentTool: state.currentTool,
-                selection: state.selection,
-                transformPreviewOffset: state.transformPreviewOffset,
-                transformPreviewScaleX: state.transformPreviewScaleX,
-                transformPreviewScaleY: state.transformPreviewScaleY,
-                transformPreviewRotationDegrees: state.transformPreviewRotationDegrees,
-                transformPivot: state.transformPivot,
-                transformMode: state.transformMode,
-                transformLocksAspectRatio: state.transformLocksAspectRatio,
-                transformQuadOffsets: state.transformQuadOffsets,
-                activeTextLayer: state.activeTextLayer,
-                geometry: geometry
-            )
+            snapshot: state.snapshot,
+            geometry: geometry
         )
 
         eyedropperLoupeView.update(
@@ -223,44 +148,37 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
                 paperStyle: state.paperStyle,
                 source: state.eyedropperSamplingSource,
                 geometry: geometry,
-                shouldBlockSampling: { [weak self] point in
-                    self?.textTransformOverlayView.containsInteractivePoint(point) ?? false
-                }
+                shouldBlockSampling: { _ in false }
             )
         )
 
         navigationGestureAdapter.update(
             context: CanvasNavigationGestureAdapter.Context(
                 currentTool: state.currentTool,
-                transformMode: state.transformMode,
                 geometry: geometry
             )
         )
     }
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if eyedropperLoupeView.isActive { return }
         if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .began) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if eyedropperLoupeView.isActive { return }
         if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .moved) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if eyedropperLoupeView.isActive { return }
         if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .ended) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     public override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if eyedropperLoupeView.isActive { return }
         if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .cancelled) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
@@ -310,18 +228,6 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         actionSink?.send(.textPlacementRequested(point))
     }
 
-    public func didBeginTransform() {
-        actionSink?.send(.transformGestureBegan)
-    }
-
-    public func didUpdateTransform(translation: CGSize) {
-        actionSink?.send(.transformPreviewChanged(translation))
-    }
-
-    public func didEndTransform(translation: CGSize) {
-        actionSink?.send(.transformEnded(translation))
-    }
-
     public func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
         pencilToggleFeedbackGenerator.impactOccurred(intensity: 1.0)
         pencilToggleNotificationFeedbackGenerator.notificationOccurred(.success)
@@ -345,12 +251,29 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         return viewportGeometry.documentPoint(fromViewPoint: local)
     }
 
-    private func shouldRouteTouchesToTransformOverlay(_ touches: Set<UITouch>) -> Bool {
-        guard currentTool == .move else { return false }
-        return touches.contains { touch in
-            let location = touch.location(in: self)
-            return textTransformOverlayView.containsInteractivePoint(location)
+    private func updateShapePreview(
+        stroke: Stroke?,
+        style: PreviewStrokeStyle,
+        currentTool: StudioToolKind,
+        snapshot: MetalDocumentSnapshot?,
+        geometry viewport: CanvasViewportGeometry
+    ) {
+        guard let stroke, currentTool == .shape, stroke.points.count >= 2 else {
+            shapePreviewSurfaceView.update(surface: nil)
+            return
         }
+        guard let snapshot,
+              let surface = previewRenderer.shapePreviewSurface(
+                stroke: stroke,
+                style: style,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height
+              ) else {
+            shapePreviewSurfaceView.update(surface: nil)
+            return
+        }
+        shapePreviewSurfaceView.update(surface: surface)
+        shapePreviewSurfaceView.frame = viewport.contentRect
     }
 }
 

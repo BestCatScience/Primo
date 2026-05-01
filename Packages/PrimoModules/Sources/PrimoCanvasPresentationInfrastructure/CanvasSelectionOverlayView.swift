@@ -49,17 +49,13 @@ final class CanvasSelectionOverlayView: UIView {
         selection: CanvasSelection?,
         previewPoints: [CGPoint],
         currentTool: StudioToolKind,
-        geometry viewport: CanvasViewportGeometry,
-        transformQuad: ((CGRect) -> TransformQuad)?,
-        hidesTransformedOverlayImage: Bool
+        geometry viewport: CanvasViewportGeometry
     ) {
         frame = viewport.bounds
         updateSelectionOverlay(
             selection,
             currentTool: currentTool,
-            geometry: viewport,
-            transformQuad: transformQuad,
-            hidesTransformedOverlayImage: hidesTransformedOverlayImage
+            geometry: viewport
         )
         updateSelectionPreview(previewPoints, currentTool: currentTool, geometry: viewport)
     }
@@ -67,12 +63,10 @@ final class CanvasSelectionOverlayView: UIView {
     private func updateSelectionOverlay(
         _ selection: CanvasSelection?,
         currentTool: StudioToolKind,
-        geometry viewport: CanvasViewportGeometry,
-        transformQuad: ((CGRect) -> TransformQuad)?,
-        hidesTransformedOverlayImage: Bool
+        geometry viewport: CanvasViewportGeometry
     ) {
         guard
-            currentTool == .select || currentTool == .move,
+            currentTool == .select,
             let selection,
             !selection.isEmpty,
             let surface = makeSelectionOverlaySurface(selection)
@@ -83,29 +77,10 @@ final class CanvasSelectionOverlayView: UIView {
             return
         }
 
-        var rect = viewport.viewRect(forDocumentRect: selection.bounds)
-        if currentTool == .move, let transformQuad {
-            rect = transformedRect(for: transformQuad(selection.bounds), geometry: viewport)
-        }
-
-        let shouldHideOverlayImage = currentTool == .move && hidesTransformedOverlayImage
-        selectionOverlayView.update(surface: shouldHideOverlayImage ? nil : surface)
-        selectionOverlayView.frame = shouldHideOverlayImage ? .zero : rect
-
-        if currentTool == .move, shouldHideOverlayImage, let transformQuad {
-            let corners = transformQuad(selection.bounds).points.map(viewport.viewPoint(fromDocumentPoint:))
-            let path = UIBezierPath()
-            if let first = corners.first {
-                path.move(to: first)
-                for corner in corners.dropFirst() {
-                    path.addLine(to: corner)
-                }
-                path.close()
-            }
-            selectionOutlineLayer.path = path.cgPath
-        } else {
-            selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
-        }
+        let rect = viewport.viewRect(forDocumentRect: selection.bounds)
+        selectionOverlayView.update(surface: surface)
+        selectionOverlayView.frame = rect
+        selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
     }
 
     private func updateSelectionPreview(
@@ -128,15 +103,6 @@ final class CanvasSelectionOverlayView: UIView {
             }
         }
         selectionPreviewLayer.path = path.cgPath
-    }
-
-    private func transformedRect(for quad: TransformQuad, geometry viewport: CanvasViewportGeometry) -> CGRect {
-        let corners = quad.points.map(viewport.viewPoint(fromDocumentPoint:))
-        let minX = corners.map(\.x).min() ?? 0
-        let maxX = corners.map(\.x).max() ?? 0
-        let minY = corners.map(\.y).min() ?? 0
-        let maxY = corners.map(\.y).max() ?? 0
-        return CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY))
     }
 
     private func makeSelectionOverlaySurface(_ selection: CanvasSelection) -> DocumentCompositeSurface? {

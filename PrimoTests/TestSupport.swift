@@ -458,7 +458,7 @@ extension DocumentExportGateway {
     }
 }
 
-private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
+private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
     let gateway: DocumentGpuOperationGateway
 
     func eyedropperLoupeSurface(
@@ -636,8 +636,7 @@ extension DocumentRuntime {
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
             eyedropperSampler: GpuCanvasEyedropperSampler(),
-            selectionProcessor: selectionMaskProcessor,
-            layerTransformProcessor: layerTransformProcessor
+            selectionProcessor: selectionMaskProcessor
         )
         return Self(
             execute: { command in

@@ -20,7 +20,6 @@ public enum CanvasInputToolKind: Equatable, Sendable {
     case fill
     case eyedropper
     case select
-    case move
     case shape
     case text
 }
@@ -130,9 +129,6 @@ public enum CanvasInputCommand: Equatable, Sendable {
     case endSelectionPath([CGPoint])
     case requestAutoSelection(StylusSample)
     case requestTextPlacement(CGPoint)
-    case beginTransform
-    case updateTransform(CGSize)
-    case endTransform(CGSize)
 }
 
 public struct CanvasInputConfiguration: Equatable, Sendable {
@@ -170,7 +166,6 @@ public struct CanvasInputReducer: Sendable {
         public var stabilizerAnchor: CanvasStrokePoint?
         public var rawStrokePoints: [CanvasStrokePoint] = []
         public var currentSelectionPoints: [CGPoint] = []
-        public var transformStartPoint: CGPoint?
 
         public init() {}
     }
@@ -188,8 +183,6 @@ public struct CanvasInputReducer: Sendable {
         switch configuration.tool {
         case .select:
             return reduceSelection(phase: phase, sample: sample, coalescedSamples: coalescedSamples, state: &state, configuration: configuration)
-        case .move:
-            return reduceTransform(phase: phase, sample: sample, state: &state)
         case .text:
             guard phase == .began else { return [] }
             resetStrokeState(&state)
@@ -323,25 +316,6 @@ public struct CanvasInputReducer: Sendable {
             let points = state.currentSelectionPoints
             state.currentSelectionPoints.removeAll()
             return [.endSelectionPath(points)]
-        }
-    }
-
-    private func reduceTransform(
-        phase: CanvasInputTouchPhase,
-        sample: CanvasInputSample,
-        state: inout State
-    ) -> [CanvasInputCommand] {
-        switch phase {
-        case .began:
-            state.transformStartPoint = sample.point
-            return [.beginTransform, .updateTransform(.zero)]
-        case .moved, .stationary:
-            guard let start = state.transformStartPoint else { return [] }
-            return [.updateTransform(CGSize(width: sample.point.x - start.x, height: sample.point.y - start.y))]
-        case .ended, .cancelled:
-            guard let start = state.transformStartPoint else { return [] }
-            state.transformStartPoint = nil
-            return [.endTransform(CGSize(width: sample.point.x - start.x, height: sample.point.y - start.y))]
         }
     }
 

@@ -17,18 +17,6 @@ public enum CanvasPresentationAction: Sendable {
     case selectionPathEnded([CGPoint])
     case autoSelectionRequested(StylusSample)
     case textPlacementRequested(CGPoint)
-    case transformGestureBegan
-    case transformPreviewChanged(CGSize)
-    case transformEnded(CGSize)
-    case transformScaleGestureBegan
-    case transformScaleChanged(CGFloat)
-    case transformScaleEnded(CGFloat)
-    case transformScaleSet(x: CGFloat, y: CGFloat)
-    case transformRotationGestureBegan
-    case transformRotationChanged(CGFloat)
-    case transformRotationEnded(CGFloat)
-    case transformPivotSet(CGPoint)
-    case transformQuadOffsetsSet(TransformQuadOffsets)
     case viewportOffsetChanged(CGSize)
     case zoomScaleChanged(CGFloat)
     case requestLocalUndo
@@ -65,14 +53,6 @@ public struct CanvasPresentationState: Sendable {
     public var eyedropperSamplingSource: EyedropperSamplingSource
     public var selection: CanvasSelection?
     public var selectionPreviewPoints: [CGPoint]
-    public var transformPreviewOffset: CGSize
-    public var transformPreviewScaleX: CGFloat
-    public var transformPreviewScaleY: CGFloat
-    public var transformPreviewRotationDegrees: Double
-    public var transformPivot: CGPoint?
-    public var transformMode: CanvasTransformMode
-    public var transformLocksAspectRatio: Bool
-    public var transformQuadOffsets: TransformQuadOffsets
     public var activeTextLayer: TextLayerData?
     public var viewportOffset: CGSize
     public var zoomScale: CGFloat
@@ -94,14 +74,6 @@ public struct CanvasPresentationState: Sendable {
         eyedropperSamplingSource: EyedropperSamplingSource,
         selection: CanvasSelection?,
         selectionPreviewPoints: [CGPoint],
-        transformPreviewOffset: CGSize,
-        transformPreviewScaleX: CGFloat,
-        transformPreviewScaleY: CGFloat,
-        transformPreviewRotationDegrees: Double,
-        transformPivot: CGPoint?,
-        transformMode: CanvasTransformMode,
-        transformLocksAspectRatio: Bool,
-        transformQuadOffsets: TransformQuadOffsets,
         activeTextLayer: TextLayerData?,
         viewportOffset: CGSize,
         zoomScale: CGFloat,
@@ -122,14 +94,6 @@ public struct CanvasPresentationState: Sendable {
         self.eyedropperSamplingSource = eyedropperSamplingSource
         self.selection = selection
         self.selectionPreviewPoints = selectionPreviewPoints
-        self.transformPreviewOffset = transformPreviewOffset
-        self.transformPreviewScaleX = transformPreviewScaleX
-        self.transformPreviewScaleY = transformPreviewScaleY
-        self.transformPreviewRotationDegrees = transformPreviewRotationDegrees
-        self.transformPivot = transformPivot
-        self.transformMode = transformMode
-        self.transformLocksAspectRatio = transformLocksAspectRatio
-        self.transformQuadOffsets = transformQuadOffsets
         self.activeTextLayer = activeTextLayer
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
@@ -141,18 +105,15 @@ public struct CanvasPresentationEnvironment: Sendable {
     public var previewRenderer: any CanvasPreviewRendering
     public var eyedropperSampler: any CanvasEyedropperSampling
     public var selectionProcessor: any SelectionMaskProcessing
-    public var layerTransformProcessor: any LayerTransformProcessing
 
     public init(
         previewRenderer: any CanvasPreviewRendering,
         eyedropperSampler: any CanvasEyedropperSampling,
-        selectionProcessor: any SelectionMaskProcessing,
-        layerTransformProcessor: any LayerTransformProcessing
+        selectionProcessor: any SelectionMaskProcessing
     ) {
         self.previewRenderer = previewRenderer
         self.eyedropperSampler = eyedropperSampler
         self.selectionProcessor = selectionProcessor
-        self.layerTransformProcessor = layerTransformProcessor
     }
 }
 
@@ -286,8 +247,6 @@ public protocol CanvasPreviewRendering: Sendable {
     func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface?
     func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect?
 }
-
-public protocol CanvasTransformPreviewRendering: CanvasPreviewRendering {}
 
 public protocol CanvasEyedropperSampling: Sendable {
     func sampledColor(

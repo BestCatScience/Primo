@@ -33,14 +33,3 @@ extension ColorRangeSelectionSource {
         }
     }
 }
-
-extension CanvasTransformMode {
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .standard:
-            return language.localized("拡大、縮小、回転")
-        case .freeform:
-            return language.localized("自由変形")
-        }
-    }
-}

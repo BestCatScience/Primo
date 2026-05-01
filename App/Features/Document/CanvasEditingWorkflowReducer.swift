@@ -19,7 +19,6 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.documentPresentationReader) var documentPresentationReader
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.selectionWorkflowEnvironment) var selectionWorkflowEnvironment
-    @Dependency(\.transformWorkflowEnvironment) var transformWorkflowEnvironment
 
     enum EditingAction: Equatable {
         case featherSelectionRequested(Int)
@@ -50,14 +49,6 @@ struct CanvasEditingWorkflowReducer: Reducer {
         case .brushPalette(.delegate(.invertSelection)):
             handleInvertSelection(state: &state)
             return .none
-
-        case .brushPalette(.delegate(.cancelTransform)):
-            state.canvas.resetTransformPreview()
-            return .none
-
-        case .brushPalette(.delegate(.applyTransform)),
-             .canvas(.delegate(.applyTransform)):
-            return handleApplyTransform(state: &state)
 
         case let .brushPalette(.delegate(.expandSelection(expansion))):
             handleAdjustSelection(state: &state, expansion: max(expansion, 1))

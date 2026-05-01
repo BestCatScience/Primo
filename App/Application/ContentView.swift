@@ -45,7 +45,6 @@ struct ContentView: View {
     @State var showsContractSelectionSheet = false
     @State var showsFeatherSelectionSheet = false
     @State var showsColorRangeSelectionSheet = false
-    @State var showsTransformNumericSheet = false
     @State var showsLicensesSheet = false
     @State var showsAIImageSettingsSheet = false
     @State var newCanvasWidthText = ""
@@ -67,14 +66,6 @@ struct ContentView: View {
     @State var selectionExpansionText = "4"
     @State var selectionContractionText = "4"
     @State var selectionFeatherRadiusText = "8"
-    @State var transformOffsetXText = "0"
-    @State var transformOffsetYText = "0"
-    @State var transformScaleXText = "100"
-    @State var transformScaleYText = "100"
-    @State var transformRotationText = "0"
-    @State var transformPivotXText = "0"
-    @State var transformPivotYText = "0"
-    @State var transformLocksAspectRatio = true
     @State var colorRangeTolerance = 0.12
     @State var colorRangeMinimumAlpha = 0.05
     @State var colorRangeExpansion = 0.0
@@ -164,9 +155,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsColorRangeSelectionSheet) {
             colorRangeSelectionSheet
-        }
-        .sheet(isPresented: $showsTransformNumericSheet) {
-            transformNumericSheet
         }
         .sheet(isPresented: $showsLicensesSheet) {
             ThirdPartyLicensesView(language: language) {
@@ -375,12 +363,6 @@ struct ContentView: View {
                             ),
                             currentTool: store.document.editing.canvas.currentTool,
                             hasSelection: store.document.editing.canvas.selection != nil,
-                            transformPreviewOffset: store.document.editing.canvas.transformPreviewOffset,
-                            transformPreviewScaleX: store.document.editing.canvas.transformPreviewScaleX,
-                            transformPreviewScaleY: store.document.editing.canvas.transformPreviewScaleY,
-                            transformPreviewRotationDegrees: store.document.editing.canvas.transformPreviewRotationDegrees,
-                            transformMode: store.document.editing.canvas.transformMode,
-                            transformLocksAspectRatio: store.document.editing.canvas.transformLocksAspectRatio,
                             language: language,
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
@@ -394,16 +376,6 @@ struct ContentView: View {
                             onRequestContractSelection: {
                                 selectionContractionText = "4"
                                 showsContractSelectionSheet = true
-                            },
-                            onRequestTransformNumericInput: {
-                                syncTransformNumericDraft()
-                                showsTransformNumericSheet = true
-                            },
-                            onSetTransformMode: { mode in
-                                store.send(.document(.canvas(.transformModeChanged(mode))))
-                            },
-                            onSetTransformAspectRatioLock: { isLocked in
-                                store.send(.document(.canvas(.transformAspectRatioLockChanged(isLocked))))
                             }
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)

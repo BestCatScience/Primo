@@ -583,7 +583,6 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentHistoryCommandServiceKey",
             "DocumentMutationWorkflowServiceKey",
             "DocumentContentServiceKey",
-            "CanvasEditingWorkflowServiceKey",
             "SelectionWorkflowServiceKey",
             "DocumentPresentationReaderKey",
             "DocumentPersistenceGatewayKey",
@@ -593,7 +592,6 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         #expect(body.contains("struct DocumentApplicationEnvironment: Sendable"))
         #expect(body.contains("struct SelectionWorkflowEnvironment: Sendable"))
-        #expect(body.contains("struct TransformWorkflowEnvironment: Sendable"))
         #expect(body.contains("private enum DocumentApplicationEnvironmentKey: DependencyKey"))
         for key in bannedKeys {
             #expect(!body.contains(key), "PaintDocumentClient should derive \(key) from DocumentApplicationEnvironment")
@@ -780,43 +778,6 @@ struct GpuSideEffectIsolationArchitectureTests {
             "runtime.assignLayerToFolder(index.rawValue"
         ] {
             #expect(!runtimeComposition.contains(token), "Runtime composition should keep folder mutation identifiers typed instead of \(token)")
-        }
-    }
-
-    @Test
-    func canvasEditingTransformWorkflowUsesApplicationServiceBoundary() throws {
-        let repoRoot = try Self.repoRoot()
-        let reducer = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/CanvasEditingWorkflowReducer.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
-        #expect(reducer.contains("@Dependency(\\.transformWorkflowEnvironment)"))
-        #expect(!reducer.contains("@Dependency(\\.canvasEditingWorkflowService)"))
-        for dependency in [
-            "@Dependency(\\.documentContentService)",
-            "@Dependency(\\.layerTransformProcessor)",
-            "@Dependency(\\.textLayerGateway)"
-        ] {
-            #expect(!reducer.contains(dependency), "CanvasEditingWorkflowReducer should delegate transform details to CanvasEditingWorkflowService")
-        }
-
-        let transformWorkflow = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
-        for token in [
-            "pixelDataForLayer",
-            "replaceLayerPixels",
-            "setTextLayer",
-            "transformedLayerPixels"
-        ] {
-            #expect(!transformWorkflow.contains(token), "App transform workflow should not perform low-level document mutation or GPU processing")
         }
     }
 

@@ -283,7 +283,7 @@ struct CanvasInputReducerTests {
     }
 
     @Test
-    func selectionAndTransformEmitCommands() {
+    func selectionEmitsCommands() {
         let reducer = CanvasInputReducer()
         var selectionState = CanvasInputReducer.State()
         let selectionCommands = reducer.reduce(
@@ -294,23 +294,6 @@ struct CanvasInputReducerTests {
             configuration: CanvasInputConfiguration(tool: .select)
         )
         #expect(selectionCommands == [CanvasInputCommand.updateSelectionPath([CGPoint(x: 3, y: 4)])])
-
-        var transformState = CanvasInputReducer.State()
-        _ = reducer.reduce(
-            phase: .began,
-            sample: sample(x: 10, y: 10, pressure: 1, time: 0),
-            coalescedSamples: [sample(x: 10, y: 10, pressure: 1, time: 0)],
-            state: &transformState,
-            configuration: CanvasInputConfiguration(tool: .move)
-        )
-        let moveCommands = reducer.reduce(
-            phase: .moved,
-            sample: sample(x: 14, y: 16, pressure: 1, time: 0.1),
-            coalescedSamples: [sample(x: 14, y: 16, pressure: 1, time: 0.1)],
-            state: &transformState,
-            configuration: CanvasInputConfiguration(tool: .move)
-        )
-        #expect(moveCommands == [CanvasInputCommand.updateTransform(CGSize(width: 4, height: 6))])
     }
 
     private func sample(x: CGFloat, y: CGFloat, pressure: Float, time: TimeInterval) -> CanvasInputSample {

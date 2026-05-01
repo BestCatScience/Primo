@@ -594,8 +594,7 @@ public struct DocumentRuntime: Sendable {
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
             eyedropperSampler: GpuCanvasEyedropperSampler(),
-            selectionProcessor: selectionMaskProcessor,
-            layerTransformProcessor: layerTransformProcessor
+            selectionProcessor: selectionMaskProcessor
         )
         let presentationReader = DocumentPresentationReader(
             lightweightPresentation: composition.queryGateway.lightweightPresentation,
@@ -881,7 +880,7 @@ private extension TimelapseExportError {
     }
 }
 
-public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
+public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
     private let renderer: PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer
 
     public init() {

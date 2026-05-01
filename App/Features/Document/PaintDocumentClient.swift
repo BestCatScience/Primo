@@ -31,14 +31,6 @@ struct SelectionWorkflowEnvironment: Sendable {
     }
 }
 
-struct TransformWorkflowEnvironment: Sendable {
-    let workflow: CanvasEditingWorkflowService
-
-    init(workflow: CanvasEditingWorkflowService) {
-        self.workflow = workflow
-    }
-}
-
 struct DocumentApplicationEnvironment: Sendable {
     let runtime: DocumentRuntime
     let presentationReader: DocumentPresentationReader
@@ -48,7 +40,6 @@ struct DocumentApplicationEnvironment: Sendable {
     let canvasStrokeInteractionService: CanvasStrokeInteractionService
     let renderingWorkflow: DocumentRenderingWorkflow
     let canvasPreviewRenderer: any CanvasPreviewRendering
-    let layerTransformProcessor: any LayerTransformProcessing
     let canvasEyedropperSampler: any CanvasEyedropperSampling
     let selectionMaskProcessor: any SelectionMaskProcessing
     let canvasPresentationEnvironment: CanvasPresentationEnvironment
@@ -58,10 +49,8 @@ struct DocumentApplicationEnvironment: Sendable {
     let historyCommandService: DocumentHistoryCommandService
     let mutationWorkflowService: DocumentMutationWorkflowService
     let contentService: DocumentContentService
-    let canvasEditingWorkflowService: CanvasEditingWorkflowService
     let selectionWorkflowService: SelectionWorkflowService
     let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
-    let transformWorkflowEnvironment: TransformWorkflowEnvironment
 
     init(runtime: DocumentRuntime) {
         self.runtime = runtime
@@ -70,7 +59,6 @@ struct DocumentApplicationEnvironment: Sendable {
         self.canvasStrokeInteractionService = runtime.canvasStrokeInteractionService
         self.renderingWorkflow = runtime.renderingWorkflow
         self.canvasPreviewRenderer = runtime.canvasPreviewRenderer
-        self.layerTransformProcessor = runtime.layerTransformProcessor
         self.canvasEyedropperSampler = GpuCanvasEyedropperSampler()
         self.selectionMaskProcessor = runtime.selectionMaskProcessor
         self.canvasPresentationEnvironment = runtime.canvasPresentationEnvironment
@@ -80,10 +68,8 @@ struct DocumentApplicationEnvironment: Sendable {
         self.historyCommandService = runtime.historyCommands
         self.mutationWorkflowService = runtime.mutationWorkflow
         self.contentService = runtime.contentService
-        self.canvasEditingWorkflowService = runtime.canvasEditingWorkflow
         self.selectionWorkflowService = runtime.selectionWorkflow
         self.selectionWorkflowEnvironment = SelectionWorkflowEnvironment(workflow: runtime.selectionWorkflow)
-        self.transformWorkflowEnvironment = TransformWorkflowEnvironment(workflow: runtime.canvasEditingWorkflow)
 
         let persistenceClient = runtime.persistenceClient
         self.persistenceGateway = DocumentPersistenceGateway(
@@ -121,7 +107,7 @@ extension DependencyValues {
     }
 
     var documentRuntime: DocumentRuntime {
-        get { documentApplicationEnvironment.runtime }
+        get { self[DocumentRuntimeKey.self] }
         set {
             self[DocumentRuntimeKey.self] = newValue
             documentApplicationEnvironment = DocumentApplicationEnvironment(runtime: newValue)
@@ -154,10 +140,6 @@ extension DependencyValues {
 
     var canvasPreviewRenderer: any CanvasPreviewRendering {
         documentApplicationEnvironment.canvasPreviewRenderer
-    }
-
-    var layerTransformProcessor: any LayerTransformProcessing {
-        documentApplicationEnvironment.layerTransformProcessor
     }
 
     var canvasEyedropperSampler: any CanvasEyedropperSampling {
@@ -196,20 +178,12 @@ extension DependencyValues {
         documentApplicationEnvironment.contentService
     }
 
-    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
-        documentApplicationEnvironment.canvasEditingWorkflowService
-    }
-
     var selectionWorkflowService: SelectionWorkflowService {
         documentApplicationEnvironment.selectionWorkflowService
     }
 
     var selectionWorkflowEnvironment: SelectionWorkflowEnvironment {
         documentApplicationEnvironment.selectionWorkflowEnvironment
-    }
-
-    var transformWorkflowEnvironment: TransformWorkflowEnvironment {
-        documentApplicationEnvironment.transformWorkflowEnvironment
     }
 
     var workspaceApplicationWorkflowService: WorkspaceApplicationWorkflowService {

@@ -57,30 +57,6 @@ private extension CanvasFeature.Action {
             self = .autoSelectionRequested(sample)
         case let .textPlacementRequested(point):
             self = .textPlacementRequested(point)
-        case .transformGestureBegan:
-            self = .transformGestureBegan
-        case let .transformPreviewChanged(offset):
-            self = .transformPreviewChanged(offset)
-        case let .transformEnded(offset):
-            self = .transformEnded(offset)
-        case .transformScaleGestureBegan:
-            self = .transformScaleGestureBegan
-        case let .transformScaleChanged(scale):
-            self = .transformScaleChanged(scale)
-        case let .transformScaleEnded(scale):
-            self = .transformScaleEnded(scale)
-        case let .transformScaleSet(x, y):
-            self = .transformScaleSet(x: x, y: y)
-        case .transformRotationGestureBegan:
-            self = .transformRotationGestureBegan
-        case let .transformRotationChanged(rotation):
-            self = .transformRotationChanged(rotation)
-        case let .transformRotationEnded(rotation):
-            self = .transformRotationEnded(rotation)
-        case let .transformPivotSet(point):
-            self = .transformPivotSet(point)
-        case let .transformQuadOffsetsSet(offsets):
-            self = .transformQuadOffsetsSet(offsets)
         case let .viewportOffsetChanged(offset):
             self = .viewportOffsetChanged(offset)
         case let .zoomScaleChanged(scale):
@@ -114,14 +90,6 @@ private extension CanvasPresentationState {
             eyedropperSamplingSource: store.eyedropperSamplingSource,
             selection: store.selection,
             selectionPreviewPoints: store.selectionPreviewPoints,
-            transformPreviewOffset: store.transformPreviewOffset,
-            transformPreviewScaleX: store.transformPreviewScaleX,
-            transformPreviewScaleY: store.transformPreviewScaleY,
-            transformPreviewRotationDegrees: store.transformPreviewRotationDegrees,
-            transformPivot: store.transformPivot,
-            transformMode: store.transformMode,
-            transformLocksAspectRatio: store.transformLocksAspectRatio,
-            transformQuadOffsets: store.transformQuadOffsets,
             activeTextLayer: store.activeTextLayer,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,

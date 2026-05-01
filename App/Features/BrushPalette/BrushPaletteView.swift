@@ -9,12 +9,6 @@ struct BrushPaletteView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     let currentTool: StudioToolKind
     let hasSelection: Bool
-    let transformPreviewOffset: CGSize
-    var transformPreviewScaleX: CGFloat = 1.0
-    var transformPreviewScaleY: CGFloat = 1.0
-    var transformPreviewRotationDegrees: Double = 0
-    var transformMode: CanvasTransformMode = .standard
-    var transformLocksAspectRatio = true
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
@@ -29,9 +23,6 @@ struct BrushPaletteView: View {
     var onSelectTool: (StudioToolKind) -> Void = { _ in }
     var onRequestExpandSelection: () -> Void = {}
     var onRequestContractSelection: () -> Void = {}
-    var onRequestTransformNumericInput: () -> Void = {}
-    var onSetTransformMode: (CanvasTransformMode) -> Void = { _ in }
-    var onSetTransformAspectRatioLock: (Bool) -> Void = { _ in }
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {

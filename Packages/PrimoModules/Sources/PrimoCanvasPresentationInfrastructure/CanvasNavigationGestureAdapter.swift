@@ -63,7 +63,7 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
 
     func handlePanTouchesIfNeeded(_ touches: Set<UITouch>, with event: UIEvent?, phase: PanPhase) -> Bool {
         guard let context, let hostView else { return false }
-        guard context.currentTool == .move, let touch = touches.first, touch.type != .pencil else {
+        guard let touch = touches.first, touch.type != .pencil else {
             if phase == .ended || phase == .cancelled {
                 cancelPan()
             }
@@ -131,32 +131,6 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
     private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
         guard let context, context.geometry.documentSize.width > 0, context.geometry.documentSize.height > 0 else { return }
 
-        if context.currentTool == .move {
-            switch recognizer.state {
-            case .began:
-                guard context.transformMode == .standard else {
-                    isPinchGestureActive = false
-                    return
-                }
-                isPinchGestureActive = true
-                actionSink?.send(.transformScaleGestureBegan)
-
-            case .changed:
-                actionSink?.send(.transformScaleChanged(recognizer.scale))
-
-            case .ended, .cancelled, .failed:
-                actionSink?.send(.transformScaleEnded(recognizer.scale))
-                if isPinchGestureActive {
-                    lastNavigationGestureEndedAt = CACurrentMediaTime()
-                }
-                isPinchGestureActive = false
-
-            default:
-                break
-            }
-            return
-        }
-
         let location = recognizer.location(in: hostView)
         switch recognizer.state {
         case .began:
@@ -189,17 +163,7 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
 
     @objc
     private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
-        guard let context, context.currentTool == .move, context.transformMode == .standard else { return }
-        switch recognizer.state {
-        case .began:
-            actionSink?.send(.transformRotationGestureBegan)
-        case .changed:
-            actionSink?.send(.transformRotationChanged(recognizer.rotation))
-        case .ended, .cancelled, .failed:
-            actionSink?.send(.transformRotationEnded(recognizer.rotation))
-        default:
-            break
-        }
+        return
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -221,7 +185,6 @@ extension CanvasNavigationGestureAdapter {
 
     struct Context {
         let currentTool: StudioToolKind
-        let transformMode: CanvasTransformMode
         let geometry: CanvasViewportGeometry
     }
 }

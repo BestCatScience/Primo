@@ -126,79 +126,6 @@ extension BrushPaletteView {
                             metricRow(language.localized("動作"), value: language.localized("ドラッグで連続取得"))
                         }
                     }
-                } else if currentTool == .select {
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        StudioTheme.Palette.accent.opacity(0.95),
-                                        StudioTheme.Palette.coolGlow.opacity(0.42)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 72, height: 72)
-                            .overlay(
-                                Image(systemName: store.selection.toolMode == .lasso ? "lasso" : "wand.and.stars")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
-                            )
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("モード"), value: store.selection.toolMode.localizedTitle(language))
-                            metricRow(language.localized("合成"), value: store.selection.combineMode.localizedTitle(language))
-                            if store.selection.toolMode == .auto {
-                                metricRow(language.localized("しきい値"), value: store.selection.thresholdMode.localizedTitle(language))
-                                metricRow(
-                                    language.localized("一致"),
-                                    value: "\(Int((store.selection.thresholdMode == .opacity ? store.selection.opacityTolerance : store.selection.colorTolerance) * 100))%"
-                                )
-                                metricRow(language.localized("拡張"), value: "\(Int(store.selection.expansion)) px")
-                            } else {
-                                metricRow(language.localized("入力"), value: language.localized("フリーハンド"))
-                                metricRow(language.localized("動作"), value: language.localized("パスを閉じる"))
-                                metricRow(language.localized("対象"), value: language.localized("アクティブレイヤー"))
-                            }
-                        }
-                    }
-                } else if currentTool == .move {
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        StudioTheme.Palette.coolGlow.opacity(0.9),
-                                        StudioTheme.Palette.accent.opacity(0.45)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 72, height: 72)
-                            .overlay(
-                                Image(systemName: hasSelection ? "selection.pin.in.out" : "square.stack.3d.up")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
-                            )
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("対象"), value: hasSelection ? language.localized("選択設定") : language.localized("レイヤー"))
-                            metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
-                            metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
-                            metricRow(language.localized("拡大 X"), value: "\(Int((transformPreviewScaleX * 100).rounded()))%")
-                            metricRow(language.localized("拡大 Y"), value: "\(Int((transformPreviewScaleY * 100).rounded()))%")
-                            metricRow(language.localized("回転"), value: "\(Int(transformPreviewRotationDegrees.rounded()))°")
-                            metricRow(language.localized("モード"), value: transformMode.title(language))
-                            metricRow(
-                                language.localized("状態"),
-                                value: transformPreviewOffset == .zero && abs(transformPreviewScaleX - 1.0) <= 0.001 && abs(transformPreviewScaleY - 1.0) <= 0.001 && abs(transformPreviewRotationDegrees) <= 0.001
-                                    ? language.localized("待機")
-                                    : language.localized("未確定")
-                            )
-                        }
-                    }
                 } else if currentTool == .blur {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -394,7 +321,7 @@ extension BrushPaletteView {
                         )
                 }
             }
-        } else if currentTool != .select && currentTool != .move {
+        } else {
             cardContainer(showsChrome: showsChrome) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center, spacing: 10) {
@@ -438,50 +365,14 @@ extension BrushPaletteView {
                     brushColorPalettePanel
                 }
             }
-        } else {
-            cardContainer(showsChrome: showsChrome) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .center, spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            StudioTheme.Palette.accent,
-                                            StudioTheme.Palette.coolGlow
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-
-                            Image(systemName: "selection.pin.in.out")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.92))
-                        }
-                        .frame(width: 38, height: 38)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(language.localized("選択設定"))
-                                .font(StudioTheme.Typography.title(14))
-                                .foregroundStyle(panelStrongTextStyle)
-                            Text(store.selection.toolMode == .lasso ? language.localized("\(inputPointerDescription)で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
-                                .font(StudioTheme.Typography.body(11))
-                                .foregroundStyle(panelSecondaryTextStyle)
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-                }
-            }
         }
     }
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .select, .move, .blur, .shape, .text, .erase:
+        case .fill, .eyedropper, .blur, .shape, .text, .erase:
             return currentTool.localizedTitle(language)
-        case .brush:
+        case .brush, .select:
             return StudioToolKind.brush.localizedTitle(language)
         }
     }
@@ -555,17 +446,13 @@ extension BrushPaletteView {
             return language.localized("塗りつぶし設定")
         case .eyedropper:
             return language.localized("スポイト設定")
-        case .select:
-            return language.localized("選択設定")
-        case .move:
-            return language.localized("変形")
         case .blur:
             return language.localized("ぼかし設定")
         case .shape:
             return language.localized("形状設定")
         case .erase:
             return language.localized("消しゴム設定")
-        case .brush:
+        case .brush, .select:
             return language.localized("ブラシ設定")
         }
     }

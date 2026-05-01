@@ -50,18 +50,6 @@ struct CanvasFeature {
         var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
         var selection: CanvasSelection?
         var selectionPreviewPoints: [CGPoint] = []
-        var transformPreviewOffset: CGSize = .zero
-        var transformGestureBaseOffset: CGSize = .zero
-        var transformPreviewScaleX: CGFloat = 1.0
-        var transformPreviewScaleY: CGFloat = 1.0
-        var transformGestureBaseScaleX: CGFloat = 1.0
-        var transformGestureBaseScaleY: CGFloat = 1.0
-        var transformPreviewRotationDegrees: Double = 0
-        var transformGestureBaseRotationDegrees: Double = 0
-        var transformPivot: CGPoint?
-        var transformMode: CanvasTransformMode = .standard
-        var transformLocksAspectRatio = true
-        var transformQuadOffsets = TransformQuadOffsets.zero
         var activeTextLayer: TextLayerData?
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
@@ -82,36 +70,6 @@ struct CanvasFeature {
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var previewResetNonce: Int = 0
-
-        var transformPreviewScale: CGFloat {
-            get { transformPreviewScaleX }
-            set {
-                transformPreviewScaleX = newValue
-                transformPreviewScaleY = newValue
-            }
-        }
-
-        var transformHasPreview: Bool {
-            transformPreviewOffset != .zero ||
-            abs(transformPreviewScaleX - 1.0) > 0.001 ||
-            abs(transformPreviewScaleY - 1.0) > 0.001 ||
-            abs(transformPreviewRotationDegrees) > 0.001 ||
-            !transformQuadOffsets.isZero
-        }
-
-        mutating func resetTransformPreview() {
-            transformPreviewOffset = .zero
-            transformGestureBaseOffset = .zero
-            transformPreviewScaleX = 1.0
-            transformPreviewScaleY = 1.0
-            transformGestureBaseScaleX = 1.0
-            transformGestureBaseScaleY = 1.0
-            transformPreviewRotationDegrees = 0
-            transformGestureBaseRotationDegrees = 0
-            transformPivot = nil
-            transformMode = .standard
-            transformQuadOffsets = .zero
-        }
 
         mutating func setCanvasSize(_ size: CGSize) {
             canvasSize = size
@@ -152,8 +110,7 @@ struct CanvasFeature {
                 eyedropperSamplingSource: eyedropperSamplingSource
             )
             clearSelectionPreview()
-            resetTransformPreview()
-            if tool != .select && tool != .move {
+            if tool != .select {
                 clearSelection()
             }
         }
@@ -169,7 +126,6 @@ struct CanvasFeature {
         mutating func replaceSelection(_ selection: CanvasSelection?) {
             self.selection = selection
             clearSelectionPreview()
-            resetTransformPreview()
         }
 
         mutating func clearSelectionPreview() {
@@ -179,7 +135,6 @@ struct CanvasFeature {
         mutating func clearSelectionState() {
             selection = nil
             selectionPreviewPoints = []
-            resetTransformPreview()
         }
 
         mutating func clearAdjustmentPreview() {
@@ -472,15 +427,6 @@ struct CanvasFeature {
             }
         }
 
-        mutating func completeTransformMutation(
-            at layerIndex: Int,
-            selection: CanvasSelection?
-        ) {
-            discardBufferedStrokes(for: layerIndex, incrementsRevision: true)
-            setSelection(selection)
-            resetTransformPreview()
-        }
-
         private static func replacingCompositeRegion(
             in compositePixelData: Data,
             canvasWidth: Int,
@@ -643,23 +589,6 @@ struct CanvasFeature {
         case autoSelectionRequested(StylusSample)
         case textPlacementRequested(CGPoint)
         case selectionUpdated(CanvasSelection?)
-        case transformGestureBegan
-        case transformPreviewChanged(CGSize)
-        case transformEnded(CGSize)
-        case transformScaleGestureBegan
-        case transformScaleChanged(CGFloat)
-        case transformScaleEnded(CGFloat)
-        case transformScaleSet(x: CGFloat, y: CGFloat)
-        case transformRotationGestureBegan
-        case transformRotationChanged(CGFloat)
-        case transformRotationEnded(CGFloat)
-        case transformRotationSet(Double)
-        case transformOffsetSet(CGSize)
-        case transformPivotSet(CGPoint?)
-        case transformModeChanged(CanvasTransformMode)
-        case transformAspectRatioLockChanged(Bool)
-        case transformQuadOffsetsSet(TransformQuadOffsets)
-        case transformPreviewCleared
         case requestLocalUndo
         case requestLocalRedo
         case viewportOffsetChanged(CGSize)
@@ -681,7 +610,6 @@ struct CanvasFeature {
         case lassoSelect([CGPoint])
         case autoSelect(StylusSample)
         case placeText(CGPoint)
-        case applyTransform(CGSize)
         case toggleBrushAndEraser
         case requestUndo
         case requestRedo
@@ -716,97 +644,6 @@ struct CanvasFeature {
 
             case let .selectionUpdated(selection):
                 state.replaceSelection(selection)
-                return .none
-
-            case .transformGestureBegan:
-                state.transformGestureBaseOffset = state.transformPreviewOffset
-                return .none
-
-            case let .transformPreviewChanged(offset):
-                state.transformPreviewOffset = CGSize(
-                    width: state.transformGestureBaseOffset.width + offset.width,
-                    height: state.transformGestureBaseOffset.height + offset.height
-                )
-                return .none
-
-            case let .transformEnded(offset):
-                state.transformPreviewOffset = CGSize(
-                    width: state.transformGestureBaseOffset.width + offset.width,
-                    height: state.transformGestureBaseOffset.height + offset.height
-                )
-                state.transformGestureBaseOffset = state.transformPreviewOffset
-                return .none
-
-            case .transformScaleGestureBegan:
-                state.transformGestureBaseScaleX = state.transformPreviewScaleX
-                state.transformGestureBaseScaleY = state.transformPreviewScaleY
-                return .none
-
-            case let .transformScaleChanged(scale):
-                let nextScale = min(max(scale, 0.2), 6.0)
-                state.transformPreviewScaleX = min(max(state.transformGestureBaseScaleX * nextScale, 0.2), 6.0)
-                state.transformPreviewScaleY = min(max(state.transformGestureBaseScaleY * nextScale, 0.2), 6.0)
-                return .none
-
-            case let .transformScaleEnded(scale):
-                let nextScale = min(max(scale, 0.2), 6.0)
-                state.transformPreviewScaleX = min(max(state.transformGestureBaseScaleX * nextScale, 0.2), 6.0)
-                state.transformPreviewScaleY = min(max(state.transformGestureBaseScaleY * nextScale, 0.2), 6.0)
-                state.transformGestureBaseScaleX = state.transformPreviewScaleX
-                state.transformGestureBaseScaleY = state.transformPreviewScaleY
-                return .none
-
-            case let .transformScaleSet(x, y):
-                state.transformPreviewScaleX = min(max(x, 0.2), 6.0)
-                state.transformPreviewScaleY = min(max(y, 0.2), 6.0)
-                state.transformGestureBaseScaleX = state.transformPreviewScaleX
-                state.transformGestureBaseScaleY = state.transformPreviewScaleY
-                return .none
-
-            case .transformRotationGestureBegan:
-                state.transformGestureBaseRotationDegrees = state.transformPreviewRotationDegrees
-                return .none
-
-            case let .transformRotationChanged(rotation):
-                state.transformPreviewRotationDegrees = state.transformGestureBaseRotationDegrees + (Double(rotation) * 180.0 / .pi)
-                return .none
-
-            case let .transformRotationEnded(rotation):
-                state.transformPreviewRotationDegrees = state.transformGestureBaseRotationDegrees + (Double(rotation) * 180.0 / .pi)
-                state.transformGestureBaseRotationDegrees = state.transformPreviewRotationDegrees
-                return .none
-
-            case let .transformRotationSet(rotationDegrees):
-                state.transformPreviewRotationDegrees = rotationDegrees
-                state.transformGestureBaseRotationDegrees = rotationDegrees
-                return .none
-
-            case let .transformOffsetSet(offset):
-                state.transformPreviewOffset = offset
-                state.transformGestureBaseOffset = offset
-                return .none
-
-            case let .transformPivotSet(point):
-                state.transformPivot = point
-                return .none
-
-            case let .transformModeChanged(mode):
-                state.transformMode = mode
-                if mode == .standard {
-                    state.transformQuadOffsets = .zero
-                }
-                return .none
-
-            case let .transformAspectRatioLockChanged(isLocked):
-                state.transformLocksAspectRatio = isLocked
-                return .none
-
-            case let .transformQuadOffsetsSet(offsets):
-                state.transformQuadOffsets = offsets
-                return .none
-
-            case .transformPreviewCleared:
-                state.resetTransformPreview()
                 return .none
 
             case .requestLocalUndo:

@@ -19,9 +19,6 @@ public protocol CanvasInputHandlingDelegate: AnyObject {
     func didEndSelectionPath(_ points: [CGPoint])
     func didRequestAutoSelection(at sample: StylusSample)
     func didRequestTextPlacement(at point: CGPoint)
-    func didBeginTransform()
-    func didUpdateTransform(translation: CGSize)
-    func didEndTransform(translation: CGSize)
 }
 
 @MainActor
@@ -148,12 +145,6 @@ public final class CanvasInputHandler {
                 delegate?.didRequestAutoSelection(at: sample)
             case let .requestTextPlacement(point):
                 delegate?.didRequestTextPlacement(at: point)
-            case .beginTransform:
-                delegate?.didBeginTransform()
-            case let .updateTransform(translation):
-                delegate?.didUpdateTransform(translation: translation)
-            case let .endTransform(translation):
-                delegate?.didEndTransform(translation: translation)
             }
         }
     }
@@ -212,8 +203,6 @@ private extension CanvasInputToolKind {
             self = .eyedropper
         case .select:
             self = .select
-        case .move:
-            self = .move
         case .shape:
             self = .shape
         case .text:

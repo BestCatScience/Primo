@@ -1556,7 +1556,6 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 private struct DerivedGpuDependencyProbe {
     @Dependency(\.canvasPreviewRenderer) var previewRenderer
     @Dependency(\.selectionMaskProcessor) var selectionMaskProcessor
-    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
     @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
 
     func outputs() -> [Data?] {
@@ -1566,12 +1565,6 @@ private struct DerivedGpuDependencyProbe {
             revision: 0,
             compositePixelData: Data(count: 4),
             layers: []
-        )
-        let selection = CanvasSelection.unsafeUnchecked(bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-            maskWidth: 1,
-            maskHeight: 1,
-            maskData: Data([255]),
-            mode: .lasso
         )
 
         return [
@@ -1585,19 +1578,6 @@ private struct DerivedGpuDependencyProbe {
                 width: 1,
                 height: 1
             )?.pixelData,
-            layerTransformProcessor.transformedLayerPixels(
-                source: Data(repeating: 255, count: 4),
-                canvasWidth: 1,
-                canvasHeight: 1,
-                selection: selection,
-                translation: CGSize(width: 1, height: 0),
-                scaleX: 1,
-                scaleY: 1,
-                rotationDegrees: 0,
-                pivot: nil,
-                mode: .standard,
-                quadOffsets: .zero
-            ),
             canvasPresentationEnvironment.previewRenderer.compositePreviewImageData(
                 snapshot: snapshot,
                 activeLayerIndex: 0,
@@ -1608,19 +1588,6 @@ private struct DerivedGpuDependencyProbe {
                 width: 1,
                 height: 1
             )?.pixelData,
-            canvasPresentationEnvironment.layerTransformProcessor.transformedLayerPixels(
-                source: Data(repeating: 255, count: 4),
-                canvasWidth: 1,
-                canvasHeight: 1,
-                selection: selection,
-                translation: CGSize(width: 1, height: 0),
-                scaleX: 1,
-                scaleY: 1,
-                rotationDegrees: 0,
-                pivot: nil,
-                mode: .standard,
-                quadOffsets: .zero
-            ),
         ]
     }
 }

@@ -22,7 +22,6 @@
 		6F602A2861F142CEBB3FE6EA /* DocumentFeature+ImageAdjustmentOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE6 /* DocumentFeature+ImageAdjustmentOps.swift */; };
 		6F602A2861F142CEBB3FE6EB /* AdjustmentWorkflowReducer+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE7 /* AdjustmentWorkflowReducer+Workflow.swift */; };
 		6F602A2861F142CEBB3FE6EC /* LayerWorkflowReducer+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE8 /* LayerWorkflowReducer+Workflow.swift */; };
-		6F602A2861F142CEBB3FE6ED /* CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE9 /* CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift */; };
 		6F602A2861F142CEBB3FE6EE /* DocumentLifecycleReducer+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEA /* DocumentLifecycleReducer+Workflow.swift */; };
 		6F602A2861F142CEBB3FE6EF /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEB /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift */; };
 		6F602A2861F142CEBB3FE6F0 /* AIImageWorkflowReducer+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEC /* AIImageWorkflowReducer+Workflow.swift */; };
@@ -208,7 +207,6 @@
 		1686F75A86724FBA8A0DAAE6 /* DocumentFeature+ImageAdjustmentOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+ImageAdjustmentOps.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAE7 /* AdjustmentWorkflowReducer+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AdjustmentWorkflowReducer+Workflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAE8 /* LayerWorkflowReducer+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerWorkflowReducer+Workflow.swift"; sourceTree = "<group>"; };
-		1686F75A86724FBA8A0DAAE9 /* CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAEA /* DocumentLifecycleReducer+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentLifecycleReducer+Workflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAEB /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasEditingWorkflowReducer+StrokeWorkflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAEC /* AIImageWorkflowReducer+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIImageWorkflowReducer+Workflow.swift"; sourceTree = "<group>"; };
@@ -557,7 +555,6 @@
 				A00000000000000000000019 /* BrushPaletteFeature.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				4D1000000000000000000009 /* CanvasEditingWorkflowReducer.swift */,
-				1686F75A86724FBA8A0DAAE9 /* CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift */,
 				A000000000000000000000E5 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift */,
 				1686F75A86724FBA8A0DAAEB /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift */,
 				A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */,
@@ -826,7 +823,6 @@
 				6F602A2861F142CEBB3FE6EA /* DocumentFeature+ImageAdjustmentOps.swift in Sources */,
 				6F602A2861F142CEBB3FE6EB /* AdjustmentWorkflowReducer+Workflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6EC /* LayerWorkflowReducer+Workflow.swift in Sources */,
-				6F602A2861F142CEBB3FE6ED /* CanvasEditingWorkflowReducer+SelectionTransformWorkflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6EE /* DocumentLifecycleReducer+Workflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6EF /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6F0 /* AIImageWorkflowReducer+Workflow.swift in Sources */,

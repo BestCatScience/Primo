@@ -89,15 +89,8 @@ struct DocumentMutationWorkflowSupport<Action> {
                 incrementsRevision: finalization.incrementsRevision,
                 clearsSelection: finalization.clearsSelection
             )
-        case let .completeTransform(layerIndex, selection):
-            state.canvas.completeTransformMutation(
-                at: layerIndex,
-                selection: selection
-            )
         case .resetTransientEditingState:
             state.canvas.resetTransientEditingState()
-        case .resetTransformPreview:
-            state.canvas.resetTransformPreview()
         }
     }
 }

@@ -188,11 +188,6 @@ struct CrossFeatureIntegrationReducer: Reducer {
         case let .document(.delegate(.paperStyleSyncRequested(paperStyle))):
             return .send(.document(.presentation(.paperStyleSyncRequested(paperStyle))))
 
-        case .document(.brushPalette(.delegate(.cancelTransform))),
-             .document(.brushPalette(.delegate(.applyTransform))),
-             .document(.canvas(.delegate(.applyTransform))):
-            return .none
-
         case .document(.layerWorkflow(.editing(.activeLayerVisibilityToggled))),
              .document(.layerWorkflow(.editing(.selectPreviousLayer))),
              .document(.layerWorkflow(.editing(.selectNextLayer))),

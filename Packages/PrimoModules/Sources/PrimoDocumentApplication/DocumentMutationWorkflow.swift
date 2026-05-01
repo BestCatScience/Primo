@@ -7,9 +7,7 @@ public enum DocumentCanvasMutationIntent<Selection: Equatable & Sendable>: Equat
     case none
     case clearSelection
     case finalizeLayer(DocumentLayerMutationFinalization)
-    case completeTransform(layerIndex: Int, selection: Selection?)
     case resetTransientEditingState
-    case resetTransformPreview
 }
 
 public enum DocumentPresentationRefreshIntent: Equatable, Sendable {

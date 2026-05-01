@@ -403,8 +403,6 @@ struct BrushPaletteFeature {
         case applyTextButtonTapped
         case clearActiveLayerButtonTapped
         case clearSelectionButtonTapped
-        case applyTransformButtonTapped
-        case cancelTransformButtonTapped
         case delegate(Delegate)
     }
 
@@ -414,8 +412,6 @@ struct BrushPaletteFeature {
         case invertSelection
         case expandSelection(Int)
         case contractSelection(Int)
-        case applyTransform
-        case cancelTransform
         case applyText(TextLayerDraft)
     }
 
@@ -869,12 +865,6 @@ struct BrushPaletteFeature {
 
             case .clearSelectionButtonTapped:
                 return .send(.delegate(.clearSelection))
-
-            case .applyTransformButtonTapped:
-                return .send(.delegate(.applyTransform))
-
-            case .cancelTransformButtonTapped:
-                return .send(.delegate(.cancelTransform))
 
             case .delegate:
                 return .none
