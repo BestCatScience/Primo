@@ -392,16 +392,28 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
     private func applyPendingSnapshotIfNeeded(device: MTLDevice) {
         guard showsPaper else { return }
         guard let snapshot = pendingSnapshot, snapshot.revision != appliedRevision else { return }
+        guard let geometry = PixelGeometry(width: snapshot.width, height: snapshot.height) else {
+            Self.logger.error("Invalid composite snapshot geometry for revision \(snapshot.revision, privacy: .public)")
+            pendingSnapshot = nil
+            return
+        }
 
         let clock = ContinuousClock()
         let start = clock.now
 
         let texture = ensureCompositeTexture(device: device)
+        var didApplySnapshot = false
         if let handle = snapshot.compositeBufferHandle,
            let texture,
            resourceStore.populateTexture(texture, from: handle) {
             // GPU-backed snapshot upload completed directly from cached buffer.
+            didApplySnapshot = true
         } else {
+            guard Self.canUseCPUFallback(for: snapshot, geometry: geometry) else {
+                Self.logger.error("Missing CPU fallback for GPU-backed snapshot revision \(snapshot.revision, privacy: .public)")
+                pendingSnapshot = nil
+                return
+            }
             snapshot.compositePixelData.withUnsafeBytes { bytes in
                 guard let baseAddress = bytes.baseAddress else { return }
                 texture?.replace(
@@ -411,14 +423,23 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
                     bytesPerRow: snapshot.width * 4
                 )
             }
+            didApplySnapshot = true
         }
 
+        guard didApplySnapshot else { return }
         appliedRevision = snapshot.revision
         lastAppliedIncrementalUpdateID = nil
         pendingSnapshot = nil
         let duration = start.duration(to: clock.now)
         let megabytes = snapshot.compositePixelData.count / 1_048_576
         Self.logger.debug("Applied composite snapshot revision \(snapshot.revision, privacy: .public) with \(megabytes, privacy: .public) MB in \(String(describing: duration), privacy: .public)")
+    }
+
+    nonisolated package static func canUseCPUFallback(
+        for snapshot: MetalDocumentSnapshot,
+        geometry: PixelGeometry
+    ) -> Bool {
+        snapshot.compositePixelData.count == geometry.rgbaByteCount
     }
 
     private func applyPendingSurfaceIfNeeded(device: MTLDevice) {

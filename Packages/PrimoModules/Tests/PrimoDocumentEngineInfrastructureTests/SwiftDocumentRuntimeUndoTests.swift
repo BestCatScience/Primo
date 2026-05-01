@@ -282,6 +282,28 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func cancelBlurStrokeRestoresBaselineWithoutUndoOrTimelapse() throws {
+        let blurredPixels = Data(repeating: 0x77, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [], blurOutputs: [blurredPixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+        let baselinePixels = Data(count: 16)
+
+        _ = try runtime.blur(samples: [sample()], brush: brush(), layerIndex: 0, captureTimelapse: false).get()
+        #expect(runtime.pixelDataForLayer(index: 0) == blurredPixels)
+
+        runtime.cancelBlurStroke()
+
+        #expect(runtime.pixelDataForLayer(index: 0) == baselinePixels)
+        #expect(!runtime.canUndo())
+        if case let .operations(operations) = runtime.timelapseCapture()?.source {
+            #expect(!operations.contains { operation in
+                if case .blurStroke = operation { return true }
+                return false
+            })
+        }
+    }
+
+    @Test
     func gpuBackedStrokeFillAndBlurPlansPassRetainedSourceHandles() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x55, count: 16)])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
@@ -783,6 +805,7 @@ private final class AsyncMutationResult: @unchecked Sendable {
 private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private let lock = NSLock()
     private var strokeOutputs: [Data]
+    private var blurOutputs: [Data]
     private var pixelDataByHandle: [MetalBufferHandle: Data] = [:]
     private var referenceCountByHandle: [MetalBufferHandle: Int] = [:]
     private var retainedHandles: [MetalBufferHandle] = []
@@ -792,8 +815,9 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private var materializedHandles: [MetalBufferHandle] = []
     private var retainSucceeds = true
 
-    init(strokeOutputs: [Data]) {
+    init(strokeOutputs: [Data], blurOutputs: [Data] = []) {
         self.strokeOutputs = strokeOutputs
+        self.blurOutputs = blurOutputs
     }
 
     func makeHandle(width: Int, height: Int, pixelData: Data) -> MetalBufferHandle {
@@ -909,13 +933,14 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 self.lock.withLock {
                     self.blurSourceBufferHandles.append(sourceBufferHandle)
                 }
+                let output = self.nextBlurPixelData() ?? pixelData
                 return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
                     dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
                     gpuBufferHandle: nil,
-                    rectPixelData: pixelData,
-                    fullPixelData: pixelData
+                    rectPixelData: output,
+                    fullPixelData: output
                 )
             },
             _fillPixels: { pixelData, sourceBufferHandle, width, height, _, _ in
@@ -972,6 +997,13 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 gpuBufferHandle: handle,
                 rectPixelData: nil
             )
+        }
+    }
+
+    private func nextBlurPixelData() -> Data? {
+        lock.withLock {
+            guard !blurOutputs.isEmpty else { return nil }
+            return blurOutputs.removeFirst()
         }
     }
 }

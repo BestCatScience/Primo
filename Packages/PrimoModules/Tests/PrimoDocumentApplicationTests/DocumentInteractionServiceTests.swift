@@ -165,7 +165,8 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
 }
 
 private func strokeGateway(
-    endBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) }
+    endBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) },
+    cancelBlurStroke: @escaping @Sendable () -> Void = {}
 ) -> StrokeInputGateway {
     StrokeInputGateway(
         beginStroke: { _, _ in },
@@ -174,6 +175,7 @@ private func strokeGateway(
         cancelStroke: {},
         blurStroke: { _, _, _, _ in .success(()) },
         endBlurStroke: endBlurStroke,
+        cancelBlurStroke: cancelBlurStroke,
         fill: { _, _ in .success(()) },
         applyGpuStrokeSurface: { _, _, _ in .success(()) }
     )

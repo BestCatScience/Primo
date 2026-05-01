@@ -363,6 +363,7 @@ extension DocumentMutationGateway {
 extension StrokeInputGateway {
     static func stub(
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult = { _, _, _, _ in .success(()) },
+        cancelBlurStroke: @escaping @Sendable () -> Void = {},
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult = { _, _ in .success(()) },
         applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult = { _, _, _ in .success(()) }
     ) -> Self {
@@ -373,6 +374,7 @@ extension StrokeInputGateway {
             cancelStroke: {},
             blurStroke: blurStroke,
             endBlurStroke: { .success(()) },
+            cancelBlurStroke: cancelBlurStroke,
             fill: fill,
             applyGpuStrokeSurface: applyGpuStrokeSurface
         )

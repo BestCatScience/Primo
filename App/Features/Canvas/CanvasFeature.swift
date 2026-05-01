@@ -675,6 +675,7 @@ struct CanvasFeature {
         case commitStroke([StylusSample])
         case blurSamples([StylusSample])
         case endBlurStroke
+        case cancelBlurStroke
         case fill(StylusSample)
         case lassoSelect([CGPoint])
         case autoSelect(StylusSample)
@@ -864,14 +865,15 @@ struct CanvasFeature {
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = true
                 if state.currentTool == .shape {
-                    let hadLivePreview = state.shapePreviewIsLive
+                    let samples = stroke.points.map(\.stylusSample)
                     state.activeStroke = nil
                     state.strokeSession.committedPointCount = 0
                     state.shapePreviewIsLive = false
-                    if hadLivePreview {
-                        return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
+                    guard samples.count >= 2 else {
+                        state.isAwaitingCommittedRender = false
+                        return .none
                     }
-                    return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
+                    return .send(.delegate(.commitStroke(samples)))
                 }
                 if state.currentTool == .blur {
                     state.activeStroke = nil
@@ -914,7 +916,7 @@ struct CanvasFeature {
                 state.strokeSession.committedPointCount = 0
                 state.shapePreviewIsLive = false
                 if state.currentTool == .blur {
-                    return .send(.delegate(.endBlurStroke))
+                    return .send(.delegate(.cancelBlurStroke))
                 }
                 if state.currentTool == .brush || state.currentTool == .erase,
                    didCommitStroke,

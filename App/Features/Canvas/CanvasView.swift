@@ -11,16 +11,29 @@ struct CanvasView: UIViewRepresentable {
     let store: StoreOf<CanvasFeature>
     var allowsFingerTouchInput = false
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(store: store)
+    }
+
     func makeUIView(context: Context) -> CanvasPresentationContainerView {
         let view = CanvasPresentationContainerView(environment: canvasPresentationEnvironment)
         view.actionSink = CanvasPresentationActionSink { action in
-            store.send(CanvasFeature.Action(action))
+            context.coordinator.store.send(CanvasFeature.Action(action))
         }
         return view
     }
 
     func updateUIView(_ uiView: CanvasPresentationContainerView, context: Context) {
+        context.coordinator.store = store
         uiView.update(CanvasPresentationState(canvas: store, allowsFingerTouchInput: allowsFingerTouchInput))
+    }
+
+    final class Coordinator {
+        var store: StoreOf<CanvasFeature>
+
+        init(store: StoreOf<CanvasFeature>) {
+            self.store = store
+        }
     }
 }
 

@@ -84,6 +84,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
              .canvas(.delegate(.commitStroke)),
              .canvas(.delegate(.blurSamples)),
              .canvas(.delegate(.endBlurStroke)),
+             .canvas(.delegate(.cancelBlurStroke)),
              .canvas(.delegate(.fill)):
             return routeDocumentEditorEditingAction(state: &state, action: action) ?? .none
 

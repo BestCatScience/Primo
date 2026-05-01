@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 
@@ -55,9 +56,12 @@ public struct MetalSurfaceResourceGateway: Sendable {
         guard region.originX >= 0, region.originY >= 0 else { return nil }
         guard region.originX + region.width <= surfaceWidth else { return nil }
         guard region.originY + region.height <= surfaceHeight else { return nil }
-        guard pixelData.count == surfaceWidth * surfaceHeight * 4 else { return nil }
+        guard let surfaceGeometry = PixelGeometry(width: surfaceWidth, height: surfaceHeight),
+              let regionGeometry = PixelGeometry(width: region.width, height: region.height),
+              pixelData.count == surfaceGeometry.rgbaByteCount
+        else { return nil }
 
-        var regionData = Data(count: region.width * region.height * 4)
+        var regionData = Data(count: regionGeometry.rgbaByteCount)
         regionData.withUnsafeMutableBytes { destinationBytes in
             pixelData.withUnsafeBytes { sourceBytes in
                 guard

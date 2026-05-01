@@ -55,6 +55,9 @@ extension CanvasEditingWorkflowReducer {
         case .canvas(.delegate(.endBlurStroke)):
             return handleEndBlurStroke(state: &state)
 
+        case .canvas(.delegate(.cancelBlurStroke)):
+            return handleCancelBlurStroke(state: &state)
+
         case let .canvas(.delegate(.fill(sample))):
             return handleFill(state: &state, sample: sample)
 
@@ -647,6 +650,11 @@ extension CanvasEditingWorkflowReducer {
             contract: .currentPresentation,
             mutation: documentStrokeCommandService.endBlurStroke
         )
+    }
+
+    func handleCancelBlurStroke(state: inout DocumentEditingState) -> Effect<Action> {
+        documentStrokeCommandService.cancelBlurStroke()
+        return .none
     }
 
     func handleFill(

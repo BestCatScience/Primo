@@ -134,6 +134,7 @@ public enum DocumentEngineFactory {
                 performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeBox: runtimeBox)
             },
             endBlurStroke: { runtimeBox.withRuntime { $0.endBlurStroke() } },
+            cancelBlurStroke: { runtimeBox.withRuntime { $0.cancelBlurStroke() } },
             fill: { sample, brush in
                 performFill(sample: sample, brush: brush, runtimeBox: runtimeBox)
             },

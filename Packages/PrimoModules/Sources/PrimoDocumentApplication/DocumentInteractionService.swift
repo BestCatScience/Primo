@@ -118,6 +118,7 @@ public struct DocumentStrokeCommandService: Sendable {
     public let applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
     public let blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
     public let endBlurStroke: @Sendable () -> DocumentMutationResult
+    public let cancelBlurStroke: @Sendable () -> Void
     public let fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
 
     public init(
@@ -128,6 +129,7 @@ public struct DocumentStrokeCommandService: Sendable {
         applyGpuStrokeSurface: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
         blurStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
+        cancelBlurStroke: @escaping @Sendable () -> Void,
         fill: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
     ) {
         self.beginStroke = beginStroke
@@ -137,6 +139,7 @@ public struct DocumentStrokeCommandService: Sendable {
         self.applyGpuStrokeSurface = applyGpuStrokeSurface
         self.blurStroke = blurStroke
         self.endBlurStroke = endBlurStroke
+        self.cancelBlurStroke = cancelBlurStroke
         self.fill = fill
     }
 
@@ -149,6 +152,7 @@ public struct DocumentStrokeCommandService: Sendable {
             applyGpuStrokeSurface: strokeGateway.applyGpuStrokeSurface,
             blurStroke: strokeGateway.blurStroke,
             endBlurStroke: strokeGateway.endBlurStroke,
+            cancelBlurStroke: strokeGateway.cancelBlurStroke,
             fill: strokeGateway.fill
         )
     }

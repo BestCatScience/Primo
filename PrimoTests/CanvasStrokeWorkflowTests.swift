@@ -462,6 +462,85 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         await store.receive(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
     }
 
+    func testShapeStrokeEndWithSinglePointDoesNotCommit() async {
+        let point = StrokePoint(
+            position: SIMD2<Float>(1, 1),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 0,
+            isPredicted: false
+        )
+        let stroke = Stroke(points: [point])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .shape
+            state.activeStroke = stroke
+            state.shapePreviewIsLive = true
+            state.isStrokeActive = true
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeEnded(stroke)) {
+            $0.isStrokeActive = false
+            $0.activeStroke = nil
+            $0.strokeSession.committedPointCount = 0
+            $0.shapePreviewIsLive = false
+        }
+    }
+
+    func testShapeStrokeEndWithNoPointsDoesNotCommit() async {
+        let stroke = Stroke(points: [])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .shape
+            state.shapePreviewIsLive = true
+            state.isStrokeActive = true
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeEnded(stroke)) {
+            $0.isStrokeActive = false
+            $0.strokeSession.committedPointCount = 0
+            $0.shapePreviewIsLive = false
+        }
+    }
+
+    func testBlurStrokeCancelDiscardsInsteadOfFinalizing() async {
+        let stroke = Stroke(points: [
+            StrokePoint(
+                position: SIMD2<Float>(1, 1),
+                pressure: 1,
+                altitude: 0,
+                azimuth: 0,
+                timestamp: 0,
+                isPredicted: false
+            )
+        ])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .blur
+            state.activeStroke = stroke
+            state.isStrokeActive = true
+            state.isAwaitingCommittedRender = true
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeCancelled) {
+            $0.isStrokeActive = false
+            $0.isAwaitingCommittedRender = false
+            $0.activeStroke = nil
+            $0.strokeSession.committedPointCount = 0
+        }
+        await store.receive(.delegate(.cancelBlurStroke))
+    }
+
     func testBrushStrokeEndKeepsFullStrokeAvailableForFinalAppendPreview() async {
         let first = StrokePoint(
             position: SIMD2<Float>(1, 1),

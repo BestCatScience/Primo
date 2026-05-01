@@ -3,6 +3,7 @@ import PrimoCanvasPresentationInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
+import PrimoDocumentMetalRuntimeInfrastructure
 import Testing
 
 @Suite
@@ -101,6 +102,35 @@ struct CanvasRenderSessionTests {
 
         #expect(source.contains("sharedMetalResourceLifetime"))
         #expect(source.contains("resourceStore.release(handle.buffer)"))
+    }
+
+    @Test
+    func gpuBackedSnapshotWithEmptyPixelsCannotUseCPUFallback() throws {
+        let geometry = try #require(PixelGeometry(width: 4, height: 4))
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 1,
+            compositeBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
+            compositePixelData: Data(),
+            layers: []
+        )
+
+        #expect(!PrimoMetalCanvasView.canUseCPUFallback(for: snapshot, geometry: geometry))
+    }
+
+    @Test
+    func cpuBackedSnapshotWithFullPixelsCanUseCPUFallback() throws {
+        let geometry = try #require(PixelGeometry(width: 4, height: 4))
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 1,
+            compositePixelData: Data(count: geometry.rgbaByteCount),
+            layers: []
+        )
+
+        #expect(PrimoMetalCanvasView.canUseCPUFallback(for: snapshot, geometry: geometry))
     }
 
     @Test

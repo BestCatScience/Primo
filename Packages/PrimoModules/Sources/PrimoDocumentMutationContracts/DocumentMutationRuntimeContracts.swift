@@ -251,6 +251,7 @@ public struct StrokeInputGateway: Sendable {
     public let cancelStroke: @Sendable () -> Void
     public let blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
     public let endBlurStroke: @Sendable () -> DocumentMutationResult
+    public let cancelBlurStroke: @Sendable () -> Void
     public let fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
     public let applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
@@ -261,6 +262,7 @@ public struct StrokeInputGateway: Sendable {
         cancelStroke: @escaping @Sendable () -> Void,
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
+        cancelBlurStroke: @escaping @Sendable () -> Void,
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult,
         applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     ) {
@@ -270,6 +272,7 @@ public struct StrokeInputGateway: Sendable {
         self.cancelStroke = cancelStroke
         self.blurStroke = blurStroke
         self.endBlurStroke = endBlurStroke
+        self.cancelBlurStroke = cancelBlurStroke
         self.fill = fill
         self.applyGpuStrokeSurface = applyGpuStrokeSurface
     }

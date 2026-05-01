@@ -48,9 +48,10 @@ enum MetalDocumentGpuOperationBackendFactory {
             },
             shapePreviewSurface: { samples, brush, canvasWidth, canvasHeight in
                 guard !samples.isEmpty,
+                      let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
                       let pixelData = backend.executeStroke(
                         PrimoMetalStrokeExecutionRequest(
-                            basePixelData: Data(count: canvasWidth * canvasHeight * 4),
+                            basePixelData: Data(count: geometry.rgbaByteCount),
                             canvasWidth: canvasWidth,
                             canvasHeight: canvasHeight,
                             samples: samples,

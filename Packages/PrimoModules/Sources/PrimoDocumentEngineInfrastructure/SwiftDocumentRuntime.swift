@@ -1885,6 +1885,20 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         currentStroke = nil
     }
 
+    func cancelBlurStroke() {
+        guard let baseline = currentBlurStroke?.baseline else {
+            currentBlurStroke = nil
+            return
+        }
+        let currentRevision = store.snapshot.revision
+        releaseLayerBufferHandles()
+        store.restore(baseline)
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
+        captureDirtyUpdate()
+        currentBlurStroke = nil
+    }
+
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
         switch makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse) {
         case let .failure(failure):
