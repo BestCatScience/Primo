@@ -4,6 +4,7 @@ import PrimoCanvasPresentationDomain
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication

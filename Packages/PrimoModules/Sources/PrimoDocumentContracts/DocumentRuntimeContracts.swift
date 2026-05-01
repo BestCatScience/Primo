@@ -1,5 +1,1 @@
-@_exported import PrimoBrushRuntimeContracts
-@_exported import PrimoDocumentMutationContracts
-@_exported import PrimoDocumentPersistenceContracts
-@_exported import PrimoDocumentPresentationContracts
-@_exported import PrimoDocumentRenderingContracts
+// Compatibility target only. Do not re-export narrow contract modules from here.

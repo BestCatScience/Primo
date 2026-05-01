@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 
 extension PresentationRefreshReducer {
     func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {

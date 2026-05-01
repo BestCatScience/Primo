@@ -2,6 +2,7 @@ import Foundation
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
 
 extension AdjustmentWorkflowReducer {

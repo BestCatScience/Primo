@@ -3,6 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 
 extension CanvasEditingWorkflowReducer {
     func handleInvertSelection(state: inout State) {

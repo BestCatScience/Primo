@@ -1,6 +1,8 @@
 import CoreGraphics
 import Foundation
+import PrimoAIImageDomain
 import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import SwiftUI
 
 extension DocumentFeature {

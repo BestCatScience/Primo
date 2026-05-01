@@ -3,6 +3,8 @@ import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import UIKit
 
 extension DocumentMutationWorkflowOutcome where Selection == CanvasSelection, Feedback == ApplicationFeature.Feedback {

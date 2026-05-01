@@ -1,6 +1,8 @@
 import CoreGraphics
 import Foundation
+import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 
 extension DocumentFeature {

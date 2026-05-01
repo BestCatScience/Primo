@@ -2,6 +2,13 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import Testing
 
 struct DocumentRasterImageServiceTests {

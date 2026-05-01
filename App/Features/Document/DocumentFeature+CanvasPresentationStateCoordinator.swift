@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 import SwiftUI
 
 extension DocumentFeature {

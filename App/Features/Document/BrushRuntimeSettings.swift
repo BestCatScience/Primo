@@ -1,5 +1,6 @@
 import Foundation
 import PrimoCoreTypes
+import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
 
 extension BrushRuntimeSettings {

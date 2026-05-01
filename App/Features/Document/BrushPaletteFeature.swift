@@ -5,6 +5,7 @@ import PrimoBrushFileFormats
 import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 import SwiftUI
 import UIKit
 

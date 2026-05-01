@@ -1,3 +1,1 @@
-@_exported import PrimoAIImageDomain
-@_exported import PrimoAIImageApplication
-@_exported import PrimoAIImageRuntime
+// App files import AI image modules explicitly.

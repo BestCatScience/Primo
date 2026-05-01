@@ -4,6 +4,11 @@ import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
 import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentGPUContracts
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication

@@ -622,8 +622,30 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
 
         #expect(lineCount < 100, "DocumentRuntimeContracts.swift should stay a thin compatibility umbrella")
+        #expect(
+            !body.contains("@_exported import"),
+            "DocumentRuntimeContracts.swift should not hide dependency boundaries through re-exported imports"
+        )
         for token in banned {
             #expect(!body.contains(token), "Runtime contract type \(token) should live in a narrow contract target")
+        }
+    }
+
+    @Test
+    func appContractImportsStayExplicit() throws {
+        let repoRoot = try Self.repoRoot()
+        let appExportFiles = [
+            "App/Support/PrimoModuleExports.swift",
+            "App/Support/PrimoAIImageModules.swift"
+        ]
+        for file in appExportFiles {
+            let url = repoRoot.appendingPathComponent(file, isDirectory: false)
+            let body = try String(contentsOf: url, encoding: .utf8)
+
+            #expect(
+                !body.contains("@_exported import"),
+                "App files should import narrow Primo modules explicitly instead of relying on App-wide re-exports"
+            )
         }
     }
 

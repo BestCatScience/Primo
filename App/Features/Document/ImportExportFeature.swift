@@ -5,6 +5,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
 

@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 import PrimoLocalization
 
 enum WorkspaceLayoutMode: Equatable, Sendable {

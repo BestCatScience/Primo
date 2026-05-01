@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
 
 extension CanvasEditingWorkflowReducer {
     func handleApplyTransform(state: inout State) -> Effect<Action> {

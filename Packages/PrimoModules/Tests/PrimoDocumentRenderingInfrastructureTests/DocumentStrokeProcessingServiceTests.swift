@@ -1,5 +1,12 @@
 import Foundation
 import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentMetalStrokeInfrastructure
 import Testing
 

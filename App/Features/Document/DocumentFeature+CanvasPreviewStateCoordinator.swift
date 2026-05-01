@@ -1,5 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 
 extension DocumentFeature {

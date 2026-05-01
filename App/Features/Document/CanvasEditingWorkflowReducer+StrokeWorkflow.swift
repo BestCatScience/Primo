@@ -1,9 +1,12 @@
 import ComposableArchitecture
 import Foundation
+import PrimoBrushRuntimeContracts
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentStrokeApplication
 
 extension CanvasEditingWorkflowReducer {

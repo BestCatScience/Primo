@@ -4,6 +4,7 @@ import PhotosUI
 import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit

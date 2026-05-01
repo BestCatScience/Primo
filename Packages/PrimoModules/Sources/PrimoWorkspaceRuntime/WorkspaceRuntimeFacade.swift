@@ -2,6 +2,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure

@@ -1,5 +1,7 @@
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
+import PrimoAIImageDomain
 import SwiftUI
 import UIKit
 

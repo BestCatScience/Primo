@@ -1,6 +1,13 @@
 import PrimoBrushDomain
 import PrimoBrushInfrastructure
+import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import Testing
 
 struct BrushRuntimeSettingsAssemblyServiceTests {

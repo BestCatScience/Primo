@@ -2,6 +2,9 @@ import CoreGraphics
 import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
+import PrimoDocumentGPUContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentMutationContracts

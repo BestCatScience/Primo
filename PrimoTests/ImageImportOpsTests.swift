@@ -1,6 +1,13 @@
 import CoreGraphics
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 import XCTest
 @testable import Primo

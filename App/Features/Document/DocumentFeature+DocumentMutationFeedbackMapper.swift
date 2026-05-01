@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
 
 extension DocumentFeature {
     static func documentMutationFailureMessage(

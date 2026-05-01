@@ -2,6 +2,12 @@ import CoreGraphics
 import Foundation
 import XCTest
 @testable import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 @testable import PrimoDocumentDomain
 @testable import PrimoWorkspaceDomain
 

@@ -3,6 +3,8 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
 import PrimoAIImageApplication
 import PrimoAIImageDomain

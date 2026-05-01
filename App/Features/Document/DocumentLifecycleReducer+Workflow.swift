@@ -3,6 +3,8 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 
 extension DocumentLifecycleReducer {
     func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {

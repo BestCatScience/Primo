@@ -2,6 +2,13 @@ import CoreGraphics
 import CoreVideo
 import Foundation
 import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
