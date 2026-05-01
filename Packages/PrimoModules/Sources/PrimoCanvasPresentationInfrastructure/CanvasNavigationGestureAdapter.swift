@@ -63,6 +63,7 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
 
     func handlePanTouchesIfNeeded(_ touches: Set<UITouch>, with event: UIEvent?, phase: PanPhase) -> Bool {
         guard let context, let hostView else { return false }
+        guard context.currentTool != .select else { return false }
         guard let touch = touches.first, touch.type != .pencil else {
             if phase == .ended || phase == .cancelled {
                 cancelPan()

@@ -108,7 +108,15 @@ extension ContentView {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .overlay(alignment: .bottom) {
+            if store.document.editing.canvas.selection?.isEmpty == false {
+                selectionActionBar
+                    .padding(.bottom, aiImageState.workspaceBottomPanelCollapsed ? 18 : 128)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .animation(studioPanelAnimation, value: aiImageState.workspaceBottomPanelCollapsed)
+        .animation(studioPanelAnimation, value: store.document.editing.canvas.selection?.isEmpty == false)
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
@@ -1086,6 +1094,14 @@ extension ContentView {
                 .allowsHitTesting(false)
         )
         .shadow(color: .black.opacity(0.16), radius: 10, y: 6)
+        .overlay(alignment: .topLeading) {
+            if showsSelectionSubtoolPalette {
+                selectionSubtoolPalette
+                    .offset(x: 54, y: selectionSubtoolPaletteYOffset)
+                    .transition(.scale(scale: 0.96, anchor: .leading).combined(with: .opacity))
+                    .zIndex(100)
+            }
+        }
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
@@ -1094,8 +1110,7 @@ extension ContentView {
     }
 
     func toolDockItem(tool: StudioToolKind, isActive: Bool) -> some View {
-        Image(systemName: tool.systemImage)
-            .font(.system(size: 15, weight: .semibold))
+        toolDockIcon(tool: tool)
             .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.iconInactive)
             .frame(width: 36, height: 36)
             .background(
@@ -1106,15 +1121,199 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(isActive ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.hairline, lineWidth: 1)
             )
+            .overlay(alignment: .bottomTrailing) {
+                if tool == .select {
+                    Triangle()
+                        .fill(selectionSubtoolAccentColor)
+                        .frame(width: 7, height: 7)
+                        .padding(3)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
+                if tool == .select, isActive {
+                    withAnimation(studioPanelAnimation) {
+                        showsSelectionSubtoolPalette.toggle()
+                    }
+                    return
+                }
+                if tool != .select {
+                    withAnimation(studioPanelAnimation) {
+                        showsSelectionSubtoolPalette = false
+                    }
+                }
                 store.send(.document(.canvasEditing(.editing(.toolSelected(tool)))))
             }
             .onLongPressGesture(minimumDuration: 0.45) {
-                if tool == .brush || tool == .erase {
+                if tool == .select {
+                    store.send(.document(.canvasEditing(.editing(.toolSelected(.select)))))
+                    withAnimation(studioPanelAnimation) {
+                        showsSelectionSubtoolPalette = true
+                    }
+                } else if tool == .brush || tool == .erase {
                     store.send(.document(.canvasEditing(.editing(.toolLongPressed(tool)))))
                 }
             }
+    }
+
+    @ViewBuilder
+    func toolDockIcon(tool: StudioToolKind) -> some View {
+        if tool == .select {
+            SelectionToolDockIcon()
+                .frame(width: 19, height: 19)
+        } else {
+            Image(systemName: tool.systemImage)
+                .font(.system(size: 15, weight: .semibold))
+        }
+    }
+
+    private var selectionSubtoolPaletteYOffset: CGFloat {
+        guard let index = studioTools.firstIndex(of: .select) else { return 6 }
+        return CGFloat(index) * 42 + 6
+    }
+
+    private var selectionSubtoolAccentColor: Color {
+        switch store.document.editing.brushPalette.selection.toolMode {
+        case .lasso:
+            return StudioTheme.Palette.accentBright
+        case .rectangle:
+            return Color(red: 0.58, green: 0.78, blue: 1.0)
+        case .auto:
+            return Color(red: 1.0, green: 0.82, blue: 0.35)
+        }
+    }
+
+    var selectionSubtoolPalette: some View {
+        VStack(spacing: 7) {
+            selectionSubtoolButton(mode: .lasso, title: language.localized("投げ縄"))
+            selectionSubtoolButton(mode: .rectangle, title: language.localized("矩形選択"))
+            selectionSubtoolButton(mode: .auto, title: language.localized("自動選択"))
+        }
+        .padding(7)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(red: 0.19, green: 0.19, blue: 0.20).opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 12, y: 8)
+    }
+
+    func selectionSubtoolButton(mode: SelectionToolMode, title: String) -> some View {
+        let isSelected = store.document.editing.brushPalette.selection.toolMode == mode
+        return Button {
+            store.send(.document(.brushPalette(.selectionToolModeSelected(mode))))
+            store.send(.document(.canvasEditing(.editing(.toolSelected(.select)))))
+            withAnimation(studioPanelAnimation) {
+                showsSelectionSubtoolPalette = false
+            }
+        } label: {
+            selectionSubtoolIcon(mode: mode)
+                .foregroundStyle(isSelected ? StudioTheme.Palette.accentBright : Color.white.opacity(0.68))
+                .frame(width: 26, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(isSelected ? StudioTheme.Palette.accentBright.opacity(0.18) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    @ViewBuilder
+    func selectionSubtoolIcon(mode: SelectionToolMode) -> some View {
+        switch mode {
+        case .lasso:
+            SelectionToolDockIcon()
+                .frame(width: 17, height: 17)
+        case .rectangle:
+            Image(systemName: "rectangle.dashed")
+                .font(.system(size: 16, weight: .semibold))
+        case .auto:
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 15, weight: .semibold))
+        }
+    }
+
+    var selectionActionBar: some View {
+        HStack(spacing: 8) {
+            selectionActionButton(title: language.localized("選択解除"), systemImage: "xmark.square") {
+                store.send(.document(.brushPalette(.delegate(.clearSelection))))
+            }
+            selectionActionButton(title: language.localized("マスク"), systemImage: "circle.dashed") {
+                store.send(.document(.layerWorkflow(.editing(.createLayerMaskFromSelectionRequested))))
+            }
+            selectionActionButton(title: language.localized("消去"), systemImage: "eraser", isEnabled: false) {}
+            selectionActionButton(title: language.localized("反転"), systemImage: "arrow.left.arrow.right") {
+                store.send(.document(.brushPalette(.delegate(.invertSelection))))
+            }
+            Menu {
+                Button(language.localized("拡張")) {
+                    selectionExpansionText = "4"
+                    showsExpandSelectionSheet = true
+                }
+                Button(language.localized("縮小")) {
+                    selectionContractionText = "4"
+                    showsContractSelectionSheet = true
+                }
+                Button(language.localized("ぼかし")) {
+                    selectionFeatherRadiusText = "8"
+                    showsFeatherSelectionSheet = true
+                }
+            } label: {
+                selectionActionLabel(title: language.localized("境界線を調整"), systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.plain)
+            Menu {
+                Text(language.localized("その他の選択操作は今後追加予定です"))
+            } label: {
+                selectionActionLabel(title: language.localized("その他"), systemImage: "ellipsis")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(red: 0.18, green: 0.18, blue: 0.19).opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.30), radius: 14, y: 8)
+    }
+
+    func selectionActionButton(
+        title: String,
+        systemImage: String,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            selectionActionLabel(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.36)
+    }
+
+    func selectionActionLabel(title: String, systemImage: String) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 22, height: 18)
+            Text(title)
+                .font(StudioTheme.Typography.label(10))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 58, height: 26)
+        }
+        .foregroundStyle(Color.white.opacity(0.82))
+        .frame(width: 64, height: 48)
+        .contentShape(Rectangle())
     }
 
     var toolDockMetrics: some View {

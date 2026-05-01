@@ -50,6 +50,9 @@ struct CanvasFeature {
         var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
         var selection: CanvasSelection?
         var selectionPreviewPoints: [CGPoint] = []
+        var selectionMoveStartPoint: CGPoint?
+        var selectionMoveOffset: CGSize = .zero
+        var selectionMoveSourceSelection: CanvasSelection?
         var activeTextLayer: TextLayerData?
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
@@ -121,11 +124,13 @@ struct CanvasFeature {
 
         mutating func clearSelection() {
             selection = nil
+            cancelSelectionMove()
         }
 
         mutating func replaceSelection(_ selection: CanvasSelection?) {
             self.selection = selection
             clearSelectionPreview()
+            cancelSelectionMove()
         }
 
         mutating func clearSelectionPreview() {
@@ -135,6 +140,26 @@ struct CanvasFeature {
         mutating func clearSelectionState() {
             selection = nil
             selectionPreviewPoints = []
+            cancelSelectionMove()
+        }
+
+        mutating func beginSelectionMove(at point: CGPoint) {
+            guard let selection else { return }
+            selectionMoveStartPoint = point
+            selectionMoveOffset = .zero
+            selectionMoveSourceSelection = selection
+            clearSelectionPreview()
+        }
+
+        mutating func updateSelectionMove(offset: CGSize) {
+            guard selectionMoveStartPoint != nil else { return }
+            selectionMoveOffset = offset
+        }
+
+        mutating func cancelSelectionMove() {
+            selectionMoveStartPoint = nil
+            selectionMoveOffset = .zero
+            selectionMoveSourceSelection = nil
         }
 
         mutating func clearAdjustmentPreview() {
@@ -586,6 +611,10 @@ struct CanvasFeature {
         case colorSampled(SampledColor)
         case selectionPreviewUpdated([CGPoint])
         case selectionPathEnded([CGPoint])
+        case selectionMoveBegan(CGPoint)
+        case selectionMoveUpdated(CGSize)
+        case selectionMoveEnded(CGSize)
+        case selectionMoveCancelled
         case autoSelectionRequested(StylusSample)
         case textPlacementRequested(CGPoint)
         case selectionUpdated(CanvasSelection?)
@@ -608,6 +637,9 @@ struct CanvasFeature {
         case cancelBlurStroke
         case fill(StylusSample)
         case lassoSelect([CGPoint])
+        case previewSelectionMove(CGSize)
+        case applySelectionMove(CGSize)
+        case cancelSelectionMove
         case autoSelect(StylusSample)
         case placeText(CGPoint)
         case toggleBrushAndEraser
@@ -635,6 +667,22 @@ struct CanvasFeature {
                 state.clearSelectionPreview()
                 return .send(.delegate(.lassoSelect(points)))
 
+            case let .selectionMoveBegan(point):
+                state.beginSelectionMove(at: point)
+                return .none
+
+            case let .selectionMoveUpdated(offset):
+                state.updateSelectionMove(offset: offset)
+                return .send(.delegate(.previewSelectionMove(offset)))
+
+            case let .selectionMoveEnded(offset):
+                state.updateSelectionMove(offset: offset)
+                return .send(.delegate(.applySelectionMove(offset)))
+
+            case .selectionMoveCancelled:
+                state.cancelSelectionMove()
+                return .send(.delegate(.cancelSelectionMove))
+
             case let .autoSelectionRequested(sample):
                 state.clearSelectionPreview()
                 return .send(.delegate(.autoSelect(sample)))
@@ -647,9 +695,11 @@ struct CanvasFeature {
                 return .none
 
             case .requestLocalUndo:
+                state.cancelSelectionMove()
                 return .send(.delegate(.requestUndo))
 
             case .requestLocalRedo:
+                state.cancelSelectionMove()
                 return .send(.delegate(.requestRedo))
 
             case let .viewportOffsetChanged(offset):

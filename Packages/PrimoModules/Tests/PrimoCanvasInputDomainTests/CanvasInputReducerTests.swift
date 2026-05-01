@@ -296,6 +296,168 @@ struct CanvasInputReducerTests {
         #expect(selectionCommands == [CanvasInputCommand.updateSelectionPath([CGPoint(x: 3, y: 4)])])
     }
 
+    @Test
+    func rectangleSelectionEmitsStartCurrentPoints() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(tool: .select, selectionMode: .rectangle)
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 3, y: 4, pressure: 1, time: 0),
+            coalescedSamples: [sample(x: 3, y: 4, pressure: 1, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+        let update = reducer.reduce(
+            phase: .moved,
+            sample: sample(x: 9, y: 11, pressure: 1, time: 0.1),
+            coalescedSamples: [sample(x: 9, y: 11, pressure: 1, time: 0.1)],
+            state: &state,
+            configuration: configuration
+        )
+        let ended = reducer.reduce(
+            phase: .ended,
+            sample: sample(x: 12, y: 14, pressure: 1, time: 0.2),
+            coalescedSamples: [sample(x: 12, y: 14, pressure: 1, time: 0.2)],
+            state: &state,
+            configuration: configuration
+        )
+
+        #expect(update == [.updateSelectionPath([CGPoint(x: 3, y: 4), CGPoint(x: 9, y: 11)])])
+        #expect(ended == [.endSelectionPath([CGPoint(x: 3, y: 4), CGPoint(x: 12, y: 14)])])
+    }
+
+    @Test
+    func selectionInsideExistingMaskBeginsMoveInsteadOfLasso() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            tool: .select,
+            selectionContext: CanvasInputSelectionContext(
+                bounds: CGRect(x: 2, y: 2, width: 4, height: 4),
+                maskWidth: 4,
+                maskHeight: 4,
+                maskData: Data(repeating: 255, count: 16)
+            )
+        )
+
+        let commands = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 3, y: 4, pressure: 1, time: 0),
+            coalescedSamples: [sample(x: 3, y: 4, pressure: 1, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        #expect(commands == [.beginSelectionMove(CGPoint(x: 3, y: 4))])
+    }
+
+    @Test
+    func selectionMoveUpdatesAndEndsWithOffset() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            tool: .select,
+            selectionContext: CanvasInputSelectionContext(
+                bounds: CGRect(x: 0, y: 0, width: 10, height: 10),
+                maskWidth: 10,
+                maskHeight: 10,
+                maskData: Data(repeating: 255, count: 100)
+            )
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 2, y: 3, pressure: 1, time: 0),
+            coalescedSamples: [sample(x: 2, y: 3, pressure: 1, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+        let update = reducer.reduce(
+            phase: .moved,
+            sample: sample(x: 7, y: 1, pressure: 1, time: 0.1),
+            coalescedSamples: [sample(x: 7, y: 1, pressure: 1, time: 0.1)],
+            state: &state,
+            configuration: configuration
+        )
+        let ended = reducer.reduce(
+            phase: .ended,
+            sample: sample(x: 8, y: 2, pressure: 1, time: 0.2),
+            coalescedSamples: [sample(x: 8, y: 2, pressure: 1, time: 0.2)],
+            state: &state,
+            configuration: configuration
+        )
+
+        #expect(update == [.updateSelectionMove(CGSize(width: 5, height: -2))])
+        #expect(ended == [.endSelectionMove(CGSize(width: 6, height: -1))])
+    }
+
+    @Test
+    func selectionOutsideExistingMaskStartsNewLasso() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            tool: .select,
+            selectionContext: CanvasInputSelectionContext(
+                bounds: CGRect(x: 2, y: 2, width: 4, height: 4),
+                maskWidth: 4,
+                maskHeight: 4,
+                maskData: Data(repeating: 255, count: 16)
+            )
+        )
+
+        let commands = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 8, y: 8, pressure: 1, time: 0),
+            coalescedSamples: [sample(x: 8, y: 8, pressure: 1, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        #expect(commands == [.updateSelectionPath([CGPoint(x: 8, y: 8)])])
+    }
+
+    @Test
+    func selectionMoveCancelClearsMoveState() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            tool: .select,
+            selectionContext: CanvasInputSelectionContext(
+                bounds: CGRect(x: 0, y: 0, width: 10, height: 10),
+                maskWidth: 10,
+                maskHeight: 10,
+                maskData: Data(repeating: 255, count: 100)
+            )
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 2, y: 2, pressure: 1, time: 0),
+            coalescedSamples: [sample(x: 2, y: 2, pressure: 1, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+        let cancelled = reducer.reduce(
+            phase: .cancelled,
+            sample: sample(x: 4, y: 4, pressure: 1, time: 0.1),
+            coalescedSamples: [sample(x: 4, y: 4, pressure: 1, time: 0.1)],
+            state: &state,
+            configuration: configuration
+        )
+        let restarted = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 14, y: 14, pressure: 1, time: 0.2),
+            coalescedSamples: [sample(x: 14, y: 14, pressure: 1, time: 0.2)],
+            state: &state,
+            configuration: configuration
+        )
+
+        #expect(cancelled == [.cancelSelectionMove])
+        #expect(restarted == [.updateSelectionPath([CGPoint(x: 14, y: 14)])])
+    }
+
     private func sample(x: CGFloat, y: CGFloat, pressure: Float, time: TimeInterval) -> CanvasInputSample {
         CanvasInputSample(
             point: CGPoint(x: x, y: y),

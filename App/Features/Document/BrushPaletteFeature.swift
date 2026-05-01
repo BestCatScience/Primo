@@ -403,6 +403,7 @@ struct BrushPaletteFeature {
         case applyTextButtonTapped
         case clearActiveLayerButtonTapped
         case clearSelectionButtonTapped
+        case selectionToolModeSelected(SelectionToolMode)
         case delegate(Delegate)
     }
 
@@ -865,6 +866,11 @@ struct BrushPaletteFeature {
 
             case .clearSelectionButtonTapped:
                 return .send(.delegate(.clearSelection))
+
+            case let .selectionToolModeSelected(mode):
+                state.selection.toolMode = mode
+                state.library.selectedBrush = nil
+                return .none
 
             case .delegate:
                 return .none

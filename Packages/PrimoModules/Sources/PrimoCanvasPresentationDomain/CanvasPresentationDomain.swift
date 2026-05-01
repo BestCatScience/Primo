@@ -15,6 +15,10 @@ public enum CanvasPresentationAction: Sendable {
     case colorSampled(SampledColor)
     case selectionPreviewUpdated([CGPoint])
     case selectionPathEnded([CGPoint])
+    case selectionMoveBegan(CGPoint)
+    case selectionMoveUpdated(CGSize)
+    case selectionMoveEnded(CGSize)
+    case selectionMoveCancelled
     case autoSelectionRequested(StylusSample)
     case textPlacementRequested(CGPoint)
     case viewportOffsetChanged(CGSize)
@@ -53,6 +57,7 @@ public struct CanvasPresentationState: Sendable {
     public var eyedropperSamplingSource: EyedropperSamplingSource
     public var selection: CanvasSelection?
     public var selectionPreviewPoints: [CGPoint]
+    public var selectionMoveOffset: CGSize
     public var activeTextLayer: TextLayerData?
     public var viewportOffset: CGSize
     public var zoomScale: CGFloat
@@ -74,6 +79,7 @@ public struct CanvasPresentationState: Sendable {
         eyedropperSamplingSource: EyedropperSamplingSource,
         selection: CanvasSelection?,
         selectionPreviewPoints: [CGPoint],
+        selectionMoveOffset: CGSize = .zero,
         activeTextLayer: TextLayerData?,
         viewportOffset: CGSize,
         zoomScale: CGFloat,
@@ -94,6 +100,7 @@ public struct CanvasPresentationState: Sendable {
         self.eyedropperSamplingSource = eyedropperSamplingSource
         self.selection = selection
         self.selectionPreviewPoints = selectionPreviewPoints
+        self.selectionMoveOffset = selectionMoveOffset
         self.activeTextLayer = activeTextLayer
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale

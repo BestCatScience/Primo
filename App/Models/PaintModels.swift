@@ -29,7 +29,7 @@ extension StudioToolKind {
         case .eyedropper:
             return language.localized("スポイト設定")
         case .select:
-            return language.localized("ブラシ")
+            return language.localized("選択")
         case .shape:
             return language.localized("形状")
         case .text:
@@ -50,7 +50,7 @@ extension StudioToolKind {
         case .eyedropper:
             return "eyedropper"
         case .select:
-            return "cursorarrow"
+            return "lasso"
         case .shape:
             return "square.on.circle"
         case .text:

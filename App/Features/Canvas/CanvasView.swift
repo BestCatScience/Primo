@@ -53,6 +53,14 @@ private extension CanvasFeature.Action {
             self = .selectionPreviewUpdated(points)
         case let .selectionPathEnded(points):
             self = .selectionPathEnded(points)
+        case let .selectionMoveBegan(point):
+            self = .selectionMoveBegan(point)
+        case let .selectionMoveUpdated(offset):
+            self = .selectionMoveUpdated(offset)
+        case let .selectionMoveEnded(offset):
+            self = .selectionMoveEnded(offset)
+        case .selectionMoveCancelled:
+            self = .selectionMoveCancelled
         case let .autoSelectionRequested(sample):
             self = .autoSelectionRequested(sample)
         case let .textPlacementRequested(point):
@@ -90,6 +98,7 @@ private extension CanvasPresentationState {
             eyedropperSamplingSource: store.eyedropperSamplingSource,
             selection: store.selection,
             selectionPreviewPoints: store.selectionPreviewPoints,
+            selectionMoveOffset: store.selectionMoveOffset,
             activeTextLayer: store.activeTextLayer,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,

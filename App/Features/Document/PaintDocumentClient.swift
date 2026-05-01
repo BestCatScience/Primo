@@ -49,6 +49,8 @@ struct DocumentApplicationEnvironment: Sendable {
     let historyCommandService: DocumentHistoryCommandService
     let mutationWorkflowService: DocumentMutationWorkflowService
     let contentService: DocumentContentService
+    let canvasEditingWorkflowService: CanvasEditingWorkflowService
+    let layerTransformProcessor: any LayerTransformProcessing
     let selectionWorkflowService: SelectionWorkflowService
     let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
 
@@ -68,6 +70,8 @@ struct DocumentApplicationEnvironment: Sendable {
         self.historyCommandService = runtime.historyCommands
         self.mutationWorkflowService = runtime.mutationWorkflow
         self.contentService = runtime.contentService
+        self.canvasEditingWorkflowService = runtime.canvasEditingWorkflow
+        self.layerTransformProcessor = runtime.layerTransformProcessor
         self.selectionWorkflowService = runtime.selectionWorkflow
         self.selectionWorkflowEnvironment = SelectionWorkflowEnvironment(workflow: runtime.selectionWorkflow)
 
@@ -176,6 +180,14 @@ extension DependencyValues {
 
     var documentContentService: DocumentContentService {
         documentApplicationEnvironment.contentService
+    }
+
+    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
+        documentApplicationEnvironment.canvasEditingWorkflowService
+    }
+
+    var layerTransformProcessor: any LayerTransformProcessing {
+        documentApplicationEnvironment.layerTransformProcessor
     }
 
     var selectionWorkflowService: SelectionWorkflowService {

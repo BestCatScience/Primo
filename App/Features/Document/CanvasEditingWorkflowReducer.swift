@@ -18,6 +18,8 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
     @Dependency(\.documentPresentationReader) var documentPresentationReader
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
+    @Dependency(\.canvasEditingWorkflowService) var canvasEditingWorkflowService
+    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
     @Dependency(\.selectionWorkflowEnvironment) var selectionWorkflowEnvironment
 
     enum EditingAction: Equatable {
@@ -73,7 +75,10 @@ struct CanvasEditingWorkflowReducer: Reducer {
              .canvas(.delegate(.blurSamples)),
              .canvas(.delegate(.endBlurStroke)),
              .canvas(.delegate(.cancelBlurStroke)),
-             .canvas(.delegate(.fill)):
+             .canvas(.delegate(.fill)),
+             .canvas(.delegate(.previewSelectionMove)),
+             .canvas(.delegate(.applySelectionMove)),
+             .canvas(.delegate(.cancelSelectionMove)):
             return routeDocumentEditorEditingAction(state: &state, action: action) ?? .none
 
         case .canvas(.delegate(.toggleBrushAndEraser)):

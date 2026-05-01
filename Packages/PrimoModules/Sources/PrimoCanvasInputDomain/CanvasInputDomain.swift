@@ -127,13 +127,55 @@ public enum CanvasInputCommand: Equatable, Sendable {
     case requestColorSample(StylusSample)
     case updateSelectionPath([CGPoint])
     case endSelectionPath([CGPoint])
+    case beginSelectionMove(CGPoint)
+    case updateSelectionMove(CGSize)
+    case endSelectionMove(CGSize)
+    case cancelSelectionMove
     case requestAutoSelection(StylusSample)
     case requestTextPlacement(CGPoint)
+}
+
+public struct CanvasInputSelectionContext: Equatable, Sendable {
+    public var bounds: CGRect
+    public var maskWidth: Int
+    public var maskHeight: Int
+    public var maskData: Data
+
+    public init(bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data) {
+        self.bounds = bounds
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+        self.maskData = maskData
+    }
+
+    public init?(_ selection: CanvasSelection?) {
+        guard let selection, !selection.isEmpty else { return nil }
+        self.init(
+            bounds: selection.bounds,
+            maskWidth: selection.maskWidth,
+            maskHeight: selection.maskHeight,
+            maskData: selection.maskData
+        )
+    }
+
+    public func contains(_ point: CGPoint) -> Bool {
+        guard !bounds.isNull, !bounds.isEmpty, bounds.contains(point) else { return false }
+        guard maskWidth > 0, maskHeight > 0, maskData.count == maskWidth * maskHeight else {
+            return true
+        }
+        let maskX = Int((point.x - bounds.minX).rounded(.down))
+        let maskY = Int((point.y - bounds.minY).rounded(.down))
+        guard (0..<maskWidth).contains(maskX), (0..<maskHeight).contains(maskY) else {
+            return false
+        }
+        return maskData[(maskY * maskWidth) + maskX] > 0
+    }
 }
 
 public struct CanvasInputConfiguration: Equatable, Sendable {
     public var tool: CanvasInputToolKind
     public var selectionMode: SelectionToolMode
+    public var selectionContext: CanvasInputSelectionContext?
     public var shapeMode: ShapeToolMode
     public var brushTipKind: BrushTipKind
     public var brushColor: SIMD4<Float>
@@ -143,6 +185,7 @@ public struct CanvasInputConfiguration: Equatable, Sendable {
     public init(
         tool: CanvasInputToolKind = .brush,
         selectionMode: SelectionToolMode = .lasso,
+        selectionContext: CanvasInputSelectionContext? = nil,
         shapeMode: ShapeToolMode = .line,
         brushTipKind: BrushTipKind = .pencil,
         brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1),
@@ -151,6 +194,7 @@ public struct CanvasInputConfiguration: Equatable, Sendable {
     ) {
         self.tool = tool
         self.selectionMode = selectionMode
+        self.selectionContext = selectionContext
         self.shapeMode = shapeMode
         self.brushTipKind = brushTipKind
         self.brushColor = brushColor
@@ -166,6 +210,7 @@ public struct CanvasInputReducer: Sendable {
         public var stabilizerAnchor: CanvasStrokePoint?
         public var rawStrokePoints: [CanvasStrokePoint] = []
         public var currentSelectionPoints: [CGPoint] = []
+        public var selectionMoveStartPoint: CGPoint?
 
         public init() {}
     }
@@ -301,22 +346,66 @@ public struct CanvasInputReducer: Sendable {
         if configuration.selectionMode == .auto {
             guard phase == .began else { return [] }
             state.currentSelectionPoints.removeAll()
+            state.selectionMoveStartPoint = nil
             return [.requestAutoSelection(sample.stylusSample)]
         }
 
         switch phase {
         case .began:
+            if configuration.selectionContext?.contains(sample.point) == true {
+                state.currentSelectionPoints.removeAll()
+                state.selectionMoveStartPoint = sample.point
+                return [.beginSelectionMove(sample.point)]
+            }
             state.currentSelectionPoints = [sample.point]
+            state.selectionMoveStartPoint = nil
             return [.updateSelectionPath(state.currentSelectionPoints)]
         case .moved, .stationary:
+            if let startPoint = state.selectionMoveStartPoint {
+                return [.updateSelectionMove(selectionMoveOffset(from: startPoint, to: sample.point))]
+            }
+            if configuration.selectionMode == .rectangle {
+                updateSelectionRectangle(to: sample.point, state: &state)
+                return [.updateSelectionPath(state.currentSelectionPoints)]
+            }
             appendSelectionPoints(coalescedSamples.map(\.point), to: &state.currentSelectionPoints)
             return [.updateSelectionPath(state.currentSelectionPoints)]
-        case .ended, .cancelled:
+        case .ended:
+            if let startPoint = state.selectionMoveStartPoint {
+                state.selectionMoveStartPoint = nil
+                return [.endSelectionMove(selectionMoveOffset(from: startPoint, to: sample.point))]
+            }
+            if configuration.selectionMode == .rectangle {
+                updateSelectionRectangle(to: sample.point, state: &state)
+            } else {
+                appendSelectionPoints(coalescedSamples.map(\.point), to: &state.currentSelectionPoints)
+            }
+            let points = state.currentSelectionPoints
+            state.currentSelectionPoints.removeAll()
+            return [.endSelectionPath(points)]
+        case .cancelled:
+            if state.selectionMoveStartPoint != nil {
+                state.selectionMoveStartPoint = nil
+                state.currentSelectionPoints.removeAll()
+                return [.cancelSelectionMove]
+            }
             appendSelectionPoints(coalescedSamples.map(\.point), to: &state.currentSelectionPoints)
             let points = state.currentSelectionPoints
             state.currentSelectionPoints.removeAll()
             return [.endSelectionPath(points)]
         }
+    }
+
+    private func selectionMoveOffset(from startPoint: CGPoint, to point: CGPoint) -> CGSize {
+        CGSize(width: point.x - startPoint.x, height: point.y - startPoint.y)
+    }
+
+    private func updateSelectionRectangle(to point: CGPoint, state: inout State) {
+        guard let startPoint = state.currentSelectionPoints.first else {
+            state.currentSelectionPoints = [point]
+            return
+        }
+        state.currentSelectionPoints = [startPoint, point]
     }
 
     private func appendSelectionPoints(_ points: [CGPoint], to currentSelectionPoints: inout [CGPoint]) {

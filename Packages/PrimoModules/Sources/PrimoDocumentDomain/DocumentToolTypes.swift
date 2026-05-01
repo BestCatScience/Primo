@@ -2,6 +2,7 @@ import Foundation
 
 public enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case lasso
+    case rectangle
     case auto
 
     public var id: String { rawValue }

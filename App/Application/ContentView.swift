@@ -45,6 +45,7 @@ struct ContentView: View {
     @State var showsContractSelectionSheet = false
     @State var showsFeatherSelectionSheet = false
     @State var showsColorRangeSelectionSheet = false
+    @State var showsSelectionSubtoolPalette = false
     @State var showsLicensesSheet = false
     @State var showsAIImageSettingsSheet = false
     @State var newCanvasWidthText = ""

@@ -1140,7 +1140,63 @@ extension ContentView {
     }
 }
 
-let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .shape, .text]
+let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .shape, .text]
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+struct SelectionToolDockIcon: View {
+    var body: some View {
+        Canvas { context, size in
+            let stroke = StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
+            let scaleX = size.width / 19
+            let scaleY = size.height / 19
+
+            var loop = Path()
+            loop.move(to: CGPoint(x: 8.9 * scaleX, y: 3.2 * scaleY))
+            loop.addCurve(
+                to: CGPoint(x: 3.2 * scaleX, y: 9.1 * scaleY),
+                control1: CGPoint(x: 5.4 * scaleX, y: 2.8 * scaleY),
+                control2: CGPoint(x: 2.9 * scaleX, y: 5.3 * scaleY)
+            )
+            loop.addCurve(
+                to: CGPoint(x: 9.5 * scaleX, y: 14.1 * scaleY),
+                control1: CGPoint(x: 3.4 * scaleX, y: 12.7 * scaleY),
+                control2: CGPoint(x: 6.2 * scaleX, y: 14.6 * scaleY)
+            )
+            loop.addCurve(
+                to: CGPoint(x: 15.6 * scaleX, y: 8.2 * scaleY),
+                control1: CGPoint(x: 13.3 * scaleX, y: 13.6 * scaleY),
+                control2: CGPoint(x: 16.1 * scaleX, y: 11.2 * scaleY)
+            )
+            loop.addCurve(
+                to: CGPoint(x: 8.9 * scaleX, y: 3.2 * scaleY),
+                control1: CGPoint(x: 15.2 * scaleX, y: 5.4 * scaleY),
+                control2: CGPoint(x: 12.5 * scaleX, y: 3.6 * scaleY)
+            )
+
+            var tail = Path()
+            tail.move(to: CGPoint(x: 11.5 * scaleX, y: 13.1 * scaleY))
+            tail.addCurve(
+                to: CGPoint(x: 16.5 * scaleX, y: 16.2 * scaleY),
+                control1: CGPoint(x: 13.0 * scaleX, y: 14.6 * scaleY),
+                control2: CGPoint(x: 14.8 * scaleX, y: 15.7 * scaleY)
+            )
+
+            context.stroke(loop, with: .foreground, style: stroke)
+            context.stroke(tail, with: .foreground, style: stroke)
+        }
+        .accessibilityHidden(true)
+    }
+}
 
 struct StudioPanelShell<Content: View>: View {
     let title: String

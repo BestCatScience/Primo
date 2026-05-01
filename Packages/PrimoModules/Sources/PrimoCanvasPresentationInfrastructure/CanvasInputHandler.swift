@@ -17,6 +17,10 @@ public protocol CanvasInputHandlingDelegate: AnyObject {
     func didRequestColorSample(at sample: StylusSample)
     func didUpdateSelectionPath(_ points: [CGPoint])
     func didEndSelectionPath(_ points: [CGPoint])
+    func didBeginSelectionMove(at point: CGPoint)
+    func didUpdateSelectionMove(offset: CGSize)
+    func didEndSelectionMove(offset: CGSize)
+    func didCancelSelectionMove()
     func didRequestAutoSelection(at sample: StylusSample)
     func didRequestTextPlacement(at point: CGPoint)
 }
@@ -27,6 +31,7 @@ public final class CanvasInputHandler {
 
     public var tool: StudioToolKind = .brush
     public var selectionMode: SelectionToolMode = .lasso
+    public var selectionContext: CanvasInputSelectionContext?
     public var shapeMode: ShapeToolMode = .line
     public var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
     public var brushTipKind: BrushTipKind = .pencil
@@ -71,6 +76,7 @@ public final class CanvasInputHandler {
             configuration: CanvasInputConfiguration(
                 tool: CanvasInputToolKind(tool),
                 selectionMode: selectionMode,
+                selectionContext: selectionContext,
                 shapeMode: shapeMode,
                 brushTipKind: brushTipKind,
                 brushColor: brushColor,
@@ -94,7 +100,10 @@ public final class CanvasInputHandler {
     }
 
     private func isAllowedInputTouch(_ touch: UITouch) -> Bool {
-        allowsFingerTouchInput || touch.type != .direct
+        if tool == .select {
+            return true
+        }
+        return allowsFingerTouchInput || touch.type != .direct
     }
 
     private func shouldDeferToNavigationGesture(for touch: UITouch, touches: Set<UITouch>, event: UIEvent?) -> Bool {
@@ -113,6 +122,7 @@ public final class CanvasInputHandler {
             configuration: CanvasInputConfiguration(
                 tool: CanvasInputToolKind(tool),
                 selectionMode: selectionMode,
+                selectionContext: selectionContext,
                 shapeMode: shapeMode,
                 brushTipKind: brushTipKind,
                 brushColor: brushColor,
@@ -141,6 +151,14 @@ public final class CanvasInputHandler {
                 delegate?.didUpdateSelectionPath(points)
             case let .endSelectionPath(points):
                 delegate?.didEndSelectionPath(points)
+            case let .beginSelectionMove(point):
+                delegate?.didBeginSelectionMove(at: point)
+            case let .updateSelectionMove(offset):
+                delegate?.didUpdateSelectionMove(offset: offset)
+            case let .endSelectionMove(offset):
+                delegate?.didEndSelectionMove(offset: offset)
+            case .cancelSelectionMove:
+                delegate?.didCancelSelectionMove()
             case let .requestAutoSelection(sample):
                 delegate?.didRequestAutoSelection(at: sample)
             case let .requestTextPlacement(point):

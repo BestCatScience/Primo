@@ -42,6 +42,38 @@ struct SelectionWorkflowServiceTests {
     }
 
     @Test
+    func rectangleSelectionBuildsClampedMask() throws {
+        let service = SelectionWorkflowService(operations: .selectionStub())
+
+        let selection = try #require(
+            service.makeRectangleSelection(
+                from: CGPoint(x: -2, y: 1),
+                to: CGPoint(x: 3, y: 4),
+                canvasSize: CGSize(width: 5, height: 5)
+            )
+        )
+
+        #expect(selection.bounds == CGRect(x: 0, y: 1, width: 3, height: 3))
+        #expect(selection.maskWidth == 3)
+        #expect(selection.maskHeight == 3)
+        #expect(selection.maskData == Data(repeating: 255, count: 9))
+        #expect(selection.mode == .rectangle)
+    }
+
+    @Test
+    func zeroSizedRectangleSelectionReturnsNil() {
+        let service = SelectionWorkflowService(operations: .selectionStub())
+
+        let selection = service.makeRectangleSelection(
+            from: CGPoint(x: 2, y: 2),
+            to: CGPoint(x: 2, y: 5),
+            canvasSize: CGSize(width: 6, height: 6)
+        )
+
+        #expect(selection == nil)
+    }
+
+    @Test
     func invertWithoutSelectionBuildsFullCanvasSelection() throws {
         let service = SelectionWorkflowService(operations: .selectionStub())
 
@@ -105,11 +137,32 @@ private extension DocumentSelectionMaskOperations {
             alphaMask: { _, _, _ in selectionFailure() },
             croppedSelectionMask: { mask, width, height in
                 guard mask.contains(where: { $0 > 0 }) else { return nil }
+                var minX = width
+                var minY = height
+                var maxX = -1
+                var maxY = -1
+                for y in 0..<height {
+                    for x in 0..<width where mask[(y * width) + x] > 0 {
+                        minX = min(minX, x)
+                        minY = min(minY, y)
+                        maxX = max(maxX, x)
+                        maxY = max(maxY, y)
+                    }
+                }
+                guard maxX >= minX, maxY >= minY else { return nil }
+                let croppedWidth = maxX - minX + 1
+                let croppedHeight = maxY - minY + 1
+                var cropped = [UInt8](repeating: 0, count: croppedWidth * croppedHeight)
+                for y in 0..<croppedHeight {
+                    for x in 0..<croppedWidth {
+                        cropped[(y * croppedWidth) + x] = mask[((minY + y) * width) + minX + x]
+                    }
+                }
                 return DocumentCroppedSelectionMask(
-                    bounds: CGRect(x: 0, y: 0, width: width, height: height),
-                    maskData: Data(mask),
-                    maskWidth: width,
-                    maskHeight: height
+                    bounds: CGRect(x: minX, y: minY, width: croppedWidth, height: croppedHeight),
+                    maskData: Data(cropped),
+                    maskWidth: croppedWidth,
+                    maskHeight: croppedHeight
                 )
             },
             combinedSelectionMask: { base, incoming, mode, _, _ in

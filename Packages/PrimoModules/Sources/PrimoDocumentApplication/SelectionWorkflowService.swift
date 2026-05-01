@@ -92,6 +92,34 @@ public struct SelectionWorkflowService: Sendable {
         }
     }
 
+    public func makeRectangleSelection(
+        from startPoint: CGPoint,
+        to endPoint: CGPoint,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
+        let minX = min(startPoint.x, endPoint.x)
+        let maxX = max(startPoint.x, endPoint.x)
+        let minY = min(startPoint.y, endPoint.y)
+        let maxY = max(startPoint.y, endPoint.y)
+        let left = max(Int(floor(minX)), 0)
+        let top = max(Int(floor(minY)), 0)
+        let right = min(Int(ceil(maxX)), canvasWidth)
+        let bottom = min(Int(ceil(maxY)), canvasHeight)
+        guard right > left, bottom > top else { return nil }
+
+        var mask = [UInt8](repeating: 0, count: canvasGeometry.maskByteCount)
+        for y in top..<bottom {
+            let rowStart = y * canvasWidth
+            for x in left..<right {
+                mask[rowStart + x] = 255
+            }
+        }
+        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .rectangle)
+    }
+
     public func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
         guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
         guard let selectionGeometry = PixelGeometry(width: selection.maskWidth, height: selection.maskHeight) else { return nil }

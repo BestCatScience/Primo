@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import PrimoCanvasInputDomain
 import PrimoCanvasPresentationDomain
 import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
@@ -119,6 +120,7 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         inputHandler.tool = state.currentTool
         inputHandler.allowsFingerTouchInput = state.allowsFingerTouchInput
         inputHandler.selectionMode = state.selectionMode
+        inputHandler.selectionContext = CanvasInputSelectionContext(state.selection)
         inputHandler.shapeMode = state.shapeMode
         inputHandler.eyedropperSamplingSource = state.eyedropperSamplingSource
         inputHandler.brushTipKind = state.previewStyle.tipKind
@@ -129,7 +131,9 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         selectionOverlayView.update(
             selection: state.selection,
             previewPoints: state.selectionPreviewPoints,
+            moveOffset: state.selectionMoveOffset,
             currentTool: state.currentTool,
+            selectionMode: state.selectionMode,
             geometry: geometry
         )
 
@@ -218,6 +222,22 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
 
     public func didEndSelectionPath(_ points: [CGPoint]) {
         actionSink?.send(.selectionPathEnded(points))
+    }
+
+    public func didBeginSelectionMove(at point: CGPoint) {
+        actionSink?.send(.selectionMoveBegan(point))
+    }
+
+    public func didUpdateSelectionMove(offset: CGSize) {
+        actionSink?.send(.selectionMoveUpdated(offset))
+    }
+
+    public func didEndSelectionMove(offset: CGSize) {
+        actionSink?.send(.selectionMoveEnded(offset))
+    }
+
+    public func didCancelSelectionMove() {
+        actionSink?.send(.selectionMoveCancelled)
     }
 
     public func didRequestAutoSelection(at sample: StylusSample) {

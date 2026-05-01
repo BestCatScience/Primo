@@ -64,6 +64,15 @@ extension CanvasEditingWorkflowReducer {
         case let .canvas(.delegate(.fill(sample))):
             return handleFill(state: &state, sample: sample)
 
+        case let .canvas(.delegate(.previewSelectionMove(offset))):
+            return handlePreviewSelectionMove(state: &state, offset: offset)
+
+        case let .canvas(.delegate(.applySelectionMove(offset))):
+            return handleApplySelectionMove(state: &state, offset: offset)
+
+        case .canvas(.delegate(.cancelSelectionMove)):
+            return handleCancelSelectionMove(state: &state)
+
         case .canvas:
             return .none
 
