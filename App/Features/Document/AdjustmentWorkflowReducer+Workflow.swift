@@ -1,21 +1,22 @@
 import Foundation
 import ComposableArchitecture
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 
 extension AdjustmentWorkflowReducer {
     struct AdjustmentWorkflowService {
-        let documentMutationGateway: DocumentMutationGateway
+        let documentMutationWorkflowService: DocumentMutationWorkflowService
 
         func applyLayerProcessing(
             _ layerIndex: Int,
             request: LayerProcessingRequest
         ) -> DocumentMutationResult {
-            documentMutationGateway.applyLayerProcessing(layerIndex, request)
+            documentMutationWorkflowService.applyLayerProcessing(layerIndex, request: request)
         }
     }
 
     var adjustmentWorkflowService: AdjustmentWorkflowService {
-        AdjustmentWorkflowService(documentMutationGateway: documentMutationGateway)
+        AdjustmentWorkflowService(documentMutationWorkflowService: documentMutationWorkflowService)
     }
 
     struct ActiveLayerPixelContext {

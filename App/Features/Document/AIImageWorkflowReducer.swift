@@ -19,8 +19,8 @@ struct AIImageWorkflowReducer: Reducer {
     @Dependency(\.aiImageEditUseCase) var aiImageEditUseCase
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.dateClient) var dateClient
+    @Dependency(\.documentContentService) var documentContentService
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
     @Dependency(\.textLayerGateway) var textLayerGateway
     @Dependency(\.uuidClient) var uuidClient

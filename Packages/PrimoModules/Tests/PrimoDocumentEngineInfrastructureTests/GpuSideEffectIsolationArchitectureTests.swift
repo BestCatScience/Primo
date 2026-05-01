@@ -444,6 +444,39 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentMutationGatewayDoesNotExposePublicRawMutationClosuresToApp() throws {
+        let repoRoot = try Self.repoRoot()
+        let contract = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let gatewayBody = try #require(Self.typeBody(named: "DocumentMutationGateway", in: contract))
+        for rawClosure in [
+            "public let deleteLayer",
+            "public let setActiveLayer",
+            "public let replaceLayerPixels",
+            "public let replaceLayerPixelsInRect",
+            "public let applyLayerProcessing",
+            "public let clearLayer",
+            "public let replaceLayerMask"
+        ] {
+            #expect(!gatewayBody.contains(rawClosure), "DocumentMutationGateway should keep raw mutation closures package-scoped")
+        }
+
+        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
+        for source in try Self.swiftSources(under: appRoot) {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            #expect(
+                !body.contains("@Dependency(\\.documentMutationGateway)"),
+                "\(source.path) should use validated command/workflow services instead of raw DocumentMutationGateway"
+            )
+        }
+    }
+
+    @Test
     func documentRuntimeFacadeDoesNotReexportConcreteInfrastructureModules() throws {
         let repoRoot = try Self.repoRoot()
         let facade = repoRoot.appendingPathComponent(
@@ -847,6 +880,30 @@ struct GpuSideEffectIsolationArchitectureTests {
             guard parts.count > 1 else { return nil }
             return String(parts[1])
         }
+    }
+
+    private static func typeBody(named typeName: String, in source: String) -> String? {
+        guard let declaration = source.range(of: "struct \(typeName)") ?? source.range(of: "enum \(typeName)") else {
+            return nil
+        }
+        guard let openingBrace = source[declaration.lowerBound...].firstIndex(of: "{") else {
+            return nil
+        }
+        var depth = 0
+        var index = openingBrace
+        while index < source.endIndex {
+            let character = source[index]
+            if character == "{" {
+                depth += 1
+            } else if character == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return String(source[openingBrace...index])
+                }
+            }
+            index = source.index(after: index)
+        }
+        return nil
     }
 
     private static func packageTargetGraph() throws -> [String: Set<String>] {

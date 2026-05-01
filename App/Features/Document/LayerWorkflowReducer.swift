@@ -14,8 +14,8 @@ struct LayerWorkflowReducer: Reducer {
     typealias LayerWorkflowService = DocumentFeature.LayerWorkflowService
 
     @Dependency(\.appLanguageClient) var appLanguageClient
+    @Dependency(\.documentContentService) var documentContentService
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
     @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
     @Dependency(\.documentQueryGateway) var documentQueryGateway
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase

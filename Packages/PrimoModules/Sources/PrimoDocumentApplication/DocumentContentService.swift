@@ -30,9 +30,9 @@ public struct SelectionTransformCommit: Equatable, Sendable {
 }
 
 public struct DocumentContentService: Sendable {
-    public let documentQueryGateway: DocumentQueryGateway
-    public let documentMutationGateway: DocumentMutationGateway
-    public let textLayerGateway: TextLayerGateway
+    package let documentQueryGateway: DocumentQueryGateway
+    package let documentMutationGateway: DocumentMutationGateway
+    package let textLayerGateway: TextLayerGateway
 
     public init(
         documentQueryGateway: DocumentQueryGateway,
@@ -48,7 +48,12 @@ public struct DocumentContentService: Sendable {
         _ layerIndex: Int,
         _ textLayer: TextLayerData
     ) -> DocumentMutationResult {
-        textLayerGateway.setTextLayer(layerIndex, textLayer)
+        switch existingLayerIndex(layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(index):
+            return textLayerGateway.setTextLayer(index.rawValue, textLayer)
+        }
     }
 
     public func pixelDataForLayer(_ layerIndex: Int) -> Data {
@@ -59,7 +64,12 @@ public struct DocumentContentService: Sendable {
         _ layerIndex: Int,
         _ pixelData: Data
     ) -> DocumentMutationResult {
-        documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
+        switch existingLayerIndex(layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(index):
+            return documentMutationGateway.replaceLayerPixels(index.rawValue, pixelData)
+        }
     }
 
     public func applyPixels(
@@ -127,7 +137,12 @@ public struct DocumentContentService: Sendable {
         let originalActiveLayerIndex = documentQueryGateway.lightweightPresentation().activeLayerIndex
         switch target {
         case let .existingLayer(index):
-            return .success((index, false, originalActiveLayerIndex))
+            switch existingLayerIndex(index) {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(index):
+                return .success((index.rawValue, false, originalActiveLayerIndex))
+            }
         case let .newLayer(name):
             switch documentMutationGateway.addLayer(name) {
             case let .success(index):
@@ -163,5 +178,29 @@ public struct DocumentContentService: Sendable {
             return failure
         }
         return rollbackFailure
+    }
+
+    private func existingLayerIndex(_ rawValue: Int) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
+        let context = layerMutationContext()
+        guard let index = context.existingLayerIndex(rawValue) else {
+            return .failure(.invalidLayerIndex(rawValue))
+        }
+        return .success(index)
+    }
+
+    private func layerMutationContext() -> DocumentLayerMutationContext {
+        let presentation = documentQueryGateway.lightweightPresentation()
+        return DocumentLayerMutationContext(
+            layerCount: presentation.layerRows.count,
+            folderIDs: Set(
+                presentation.layerSidebarRows.compactMap { row in
+                    guard case let .folder(folder) = row else { return nil }
+                    return folder.id
+                }
+            ),
+            isLayerLocked: { index in
+                presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
+            }
+        )
     }
 }

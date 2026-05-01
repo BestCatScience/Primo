@@ -145,11 +145,7 @@ extension AIImageWorkflowReducer {
     }
 
     private var aiImageLayerContentService: DocumentContentService {
-        DocumentContentService(
-            documentQueryGateway: documentQueryGateway,
-            documentMutationGateway: documentMutationGateway,
-            textLayerGateway: textLayerGateway
-        )
+        documentContentService
     }
 
     private var aiImageDocumentService: AIImageDocumentService {

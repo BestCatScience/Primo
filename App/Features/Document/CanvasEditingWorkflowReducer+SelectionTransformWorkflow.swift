@@ -75,11 +75,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     var selectionTransformService: SelectionTransformService {
-        SelectionTransformService(
-            documentQueryGateway: documentQueryGateway,
-            documentMutationGateway: documentMutationGateway,
-            textLayerGateway: textLayerGateway
-        )
+        documentContentService
     }
 
     func handleApplyTransform(state: inout State) -> Effect<Action> {

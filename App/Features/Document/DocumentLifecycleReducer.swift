@@ -13,7 +13,6 @@ struct DocumentLifecycleReducer: Reducer {
     @Dependency(\.documentExportGateway) var documentExportGateway
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
 
     enum Action: Equatable {

@@ -184,24 +184,24 @@ public enum LayerProcessingRequest: Equatable, Sendable {
 }
 
 public struct DocumentMutationGateway: Sendable {
-    public let resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
-    public let resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
-    public let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
-    public let deleteLayer: @Sendable (Int) -> DocumentMutationResult
-    public let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
-    public let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
-    public let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
-    public let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
-    public let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
-    public let applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
-    public let applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
-    public let applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
-    public let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
-    public let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
-    public let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
-    public let clearLayer: @Sendable (Int) -> DocumentMutationResult
-    public let applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
+    package let resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
+    package let resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
+    package let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
+    package let deleteLayer: @Sendable (Int) -> DocumentMutationResult
+    package let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
+    package let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
+    package let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+    package let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    package let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
+    package let applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
+    package let applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
+    package let applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
+    package let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
+    package let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
+    package let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
+    package let clearLayer: @Sendable (Int) -> DocumentMutationResult
+    package let applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
 
     public init(
         resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,

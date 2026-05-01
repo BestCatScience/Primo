@@ -73,6 +73,17 @@ private enum DocumentMutationWorkflowServiceKey: DependencyKey {
     }
 }
 
+private enum DocumentContentServiceKey: DependencyKey {
+    static var liveValue: DocumentContentService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return DocumentContentService(
+            documentQueryGateway: composition.queryGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+    }
+}
+
 private enum SelectionWorkflowServiceKey: DependencyKey {
     static var liveValue: SelectionWorkflowService {
         @Dependency(\.documentRuntimeComposition) var composition
@@ -171,6 +182,11 @@ private extension DependencyValues {
         self[DocumentMutationWorkflowServiceKey.self] = DocumentMutationWorkflowService(
             documentEditingGateway: composition.editingGateway,
             documentLayerEffectsGateway: composition.layerEffectsGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        self[DocumentContentServiceKey.self] = DocumentContentService(
+            documentQueryGateway: composition.queryGateway,
             documentMutationGateway: composition.mutationGateway,
             textLayerGateway: composition.textLayerGateway
         )
@@ -325,6 +341,11 @@ extension DependencyValues {
     var documentMutationWorkflowService: DocumentMutationWorkflowService {
         get { self[DocumentMutationWorkflowServiceKey.self] }
         set { self[DocumentMutationWorkflowServiceKey.self] = newValue }
+    }
+
+    var documentContentService: DocumentContentService {
+        get { self[DocumentContentServiceKey.self] }
+        set { self[DocumentContentServiceKey.self] = newValue }
     }
 
     var selectionWorkflowService: SelectionWorkflowService {

@@ -7,7 +7,7 @@ struct AdjustmentWorkflowReducer: Reducer {
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
+    @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
     @Dependency(\.documentQueryGateway) var documentQueryGateway
 
     enum EditingAction: Equatable {

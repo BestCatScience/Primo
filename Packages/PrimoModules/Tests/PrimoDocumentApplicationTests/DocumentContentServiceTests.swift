@@ -7,6 +7,44 @@ import Testing
 
 struct DocumentContentServiceTests {
     @Test
+    func applyPixelsRejectsInvalidExistingLayerBeforeMutationGateway() {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentMutationGateway: mutationGateway(recorder: recorder),
+            textLayerGateway: textLayerGateway()
+        )
+
+        let result = service.applyPixels(
+            Data(repeating: 0xff, count: 16),
+            to: .existingLayer(index: 4)
+        )
+
+        #expect(result == .failure(.invalidLayerIndex(4)))
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func directPixelReplacementRejectsInvalidLayerBeforeMutationGateway() {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentMutationGateway: mutationGateway(recorder: recorder),
+            textLayerGateway: textLayerGateway()
+        )
+
+        let result = service.replaceLayerPixels(2, Data(repeating: 0xff, count: 16))
+
+        switch result {
+        case let .failure(failure):
+            #expect(failure == .invalidLayerIndex(2))
+        case .success:
+            Issue.record("Expected invalid layer index failure")
+        }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
     func applyPixelsRollsBackCreatedLayerAfterFailure() {
         let recorder = CallRecorder()
         let service = DocumentContentService(
@@ -136,10 +174,14 @@ private final class CallRecorder: @unchecked Sendable {
 }
 
 private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
+    queryGateway(activeLayerIndex: activeLayerIndex, layerCount: 0)
+}
+
+private func queryGateway(activeLayerIndex: Int, layerCount: Int) -> DocumentQueryGateway {
     let presentation = PaintDocumentPresentation(
         canvasSize: CGSize(width: 64, height: 64),
         activeLayerIndex: activeLayerIndex,
-        layerRows: [],
+        layerRows: (0..<layerCount).map(layerRow),
         layerSidebarRows: [],
         renderSnapshot: nil
     )
@@ -150,6 +192,58 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
         compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
         pixelDataForLayer: { _ in Data() },
         consumeDirtyUpdate: { nil }
+    )
+}
+
+private func layerRow(index: Int) -> LayerRowModel {
+    LayerRowModel(
+        index: index,
+        name: "Layer \(index)",
+        visible: true,
+        opacity: 1,
+        isLocked: false,
+        isAlphaLocked: false,
+        isClipped: false,
+        blendMode: .normal,
+        folderID: nil,
+        hasMask: false,
+        isTextLayer: false,
+        textLayer: nil
+    )
+}
+
+private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway {
+    DocumentMutationGateway(
+        resizeCanvas: { _, _ in .success(()) },
+        resizeCanvasExtent: { _, _ in .success(()) },
+        addLayer: { _ in
+            recorder.record("addLayer")
+            return .success(1)
+        },
+        deleteLayer: { _ in
+            recorder.record("deleteLayer")
+            return .success(())
+        },
+        setActiveLayer: { _ in
+            recorder.record("setActiveLayer")
+            return .success(())
+        },
+        setLayerName: { _, _ in .success(()) },
+        setLayerVisibility: { _, _ in .success(()) },
+        revealLayerForEditing: { _ in .success(()) },
+        replaceLayerPixels: { _, _ in
+            recorder.record("replaceLayerPixels")
+            return .success(())
+        },
+        replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+        applyLayerSurfaceMutation: { _, _ in .success(()) },
+        applyLayerMutation: { _, _ in .success(()) },
+        applyTextLayerMutation: { _, _, _ in .success(()) },
+        replaceLayerMask: { _, _ in .success(()) },
+        clearLayerMask: { _ in .success(()) },
+        applyLayerMask: { _ in .success(()) },
+        clearLayer: { _ in .success(()) },
+        applyLayerProcessing: { _, _ in .success(()) }
     )
 }
 

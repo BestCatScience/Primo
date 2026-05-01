@@ -15,7 +15,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     @Dependency(\.documentLayerCommandService) var documentLayerCommandService
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
+    @Dependency(\.documentContentService) var documentContentService
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService

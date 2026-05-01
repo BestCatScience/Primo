@@ -61,7 +61,7 @@ public struct DocumentMutationWorkflowOutcome<Selection: Equatable & Sendable, F
 public struct DocumentMutationWorkflowService: Sendable {
     public let documentEditingGateway: DocumentEditingGateway
     public let documentLayerEffectsGateway: DocumentLayerEffectsGateway
-    public let documentMutationGateway: DocumentMutationGateway
+    package let documentMutationGateway: DocumentMutationGateway
     public let textLayerGateway: TextLayerGateway
 
     public init(
@@ -154,6 +154,10 @@ public struct DocumentMutationWorkflowService: Sendable {
 
     public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
         documentMutationGateway.replaceLayerPixels(index, pixelData)
+    }
+
+    public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
+        documentMutationGateway.applyLayerProcessing(index, request)
     }
 
     public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult {

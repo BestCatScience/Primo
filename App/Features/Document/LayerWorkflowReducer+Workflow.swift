@@ -27,11 +27,7 @@ extension LayerWorkflowReducer {
     }
 
     var layerContentWorkflowService: LayerContentWorkflowService {
-        LayerContentWorkflowService(
-            documentQueryGateway: documentQueryGateway,
-            documentMutationGateway: documentMutationGateway,
-            textLayerGateway: textLayerGateway
-        )
+        documentContentService
     }
 
     func handleActiveLayerVisibilityToggle(state: inout State) -> Effect<Action> {
