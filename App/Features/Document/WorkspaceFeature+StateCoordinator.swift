@@ -101,6 +101,19 @@ extension WorkspaceFeature.State {
         openTabs.filter { tabIDs.contains($0.id) && $0.isDirty }
     }
 
+    func duplicateTitle(for title: String) -> String {
+        let suffix = title.localizedStandardContains("コピー") ? "コピー" : "Copy"
+        let baseTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : title
+        var candidate = "\(baseTitle) \(suffix)"
+        var index = 2
+        let existingTitles = Set(openTabs.map(\.title))
+        while existingTitles.contains(candidate) {
+            candidate = "\(baseTitle) \(suffix) \(index)"
+            index += 1
+        }
+        return candidate
+    }
+
     mutating func appendTab(_ tab: OpenDocumentTab) {
         openTabs.append(tab)
     }
@@ -199,11 +212,15 @@ extension WorkspaceFeature.State {
         if activeTabID == movingID {
             focusedWorkspacePane = pane
         }
-        workspaceLayout = hasTabs(in: .secondary) ? .split : .single
+        if !hasTabs(in: .secondary) {
+            workspaceLayout = .single
+        } else if workspaceLayout == .single {
+            workspaceLayout = .splitRight
+        }
     }
 
     mutating func beginSplitLayout() {
-        workspaceLayout = .split
+        workspaceLayout = .splitRight
     }
 
     mutating func focus(on pane: WorkspacePane) {

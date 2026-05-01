@@ -7,9 +7,39 @@ extension BrushPaletteView {
     func floatingBrushSettingsPanel(proxy: GeometryProxy) -> some View {
         if currentTool == .brush || currentTool == .erase {
             compactBrushToolPanel(proxy: proxy)
+                .simultaneousGesture(floatingPanelCloseGesture(edge: .bottom))
         } else {
             legacyFloatingBrushSettingsPanel(proxy: proxy)
+                .simultaneousGesture(floatingPanelCloseGesture(edge: .leading))
         }
+    }
+
+    private enum FloatingPanelCloseEdge {
+        case leading
+        case bottom
+    }
+
+    private func floatingPanelCloseGesture(edge: FloatingPanelCloseEdge) -> some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onEnded { value in
+                let shouldClose: Bool
+                switch edge {
+                case .leading:
+                    let horizontalTravel = min(value.translation.width, value.predictedEndTranslation.width)
+                    shouldClose = abs(horizontalTravel) > abs(value.translation.height) * 1.25
+                        && horizontalTravel < -28
+                case .bottom:
+                    let verticalTravel = max(value.translation.height, value.predictedEndTranslation.height)
+                    shouldClose = abs(verticalTravel) > abs(value.translation.width) * 1.25
+                        && verticalTravel > 24
+                }
+
+                if shouldClose {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+                        store.ui.showsBrushSettingsPopover = false
+                    }
+                }
+            }
     }
 
     private func legacyFloatingBrushSettingsPanel(proxy: GeometryProxy) -> some View {
@@ -37,6 +67,7 @@ extension BrushPaletteView {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
+        .studioWindowGlow(cornerRadius: 16, intensity: 0.52)
         .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
     }
 
@@ -50,20 +81,6 @@ extension BrushPaletteView {
 
     var floatingPanelHeader: some View {
         HStack(spacing: 12) {
-            Button {
-                store.ui.showsBrushSettingsPopover = false
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(StudioTheme.Palette.textSecondary)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        Circle()
-                            .fill(StudioTheme.Palette.cardFillStrong)
-                    )
-            }
-            .buttonStyle(.plain)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.library.selectedBrush?.name ?? currentTool.localizedTitle(language))
                     .font(StudioTheme.Typography.title(16))
@@ -103,21 +120,12 @@ extension BrushPaletteView {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
+        .studioWindowGlow(cornerRadius: 16, intensity: 0.52)
         .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
     }
 
     var compactBrushToolHeader: some View {
         HStack(spacing: 8) {
-            Button {
-                store.ui.showsBrushSettingsPopover = false
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(StudioTheme.Palette.textSecondary)
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(.plain)
-
             Text(language.localized("ツール"))
                 .font(StudioTheme.Typography.title(18))
                 .foregroundStyle(StudioTheme.Palette.textPrimary)

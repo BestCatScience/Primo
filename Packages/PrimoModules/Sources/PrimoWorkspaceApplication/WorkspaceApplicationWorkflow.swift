@@ -168,7 +168,10 @@ public struct WorkspaceApplicationWorkflowService: Sendable {
         for result: WorkspacePersistenceResult
     ) -> WorkspacePersistenceApplicationOutcome {
         switch result {
-        case .dirtyPresentationPersisted, .documentReplacementPrepared, .newTabBackingStoreReserved:
+        case .dirtyPresentationPersisted,
+             .activeCanvasDuplicated,
+             .documentReplacementPrepared,
+             .newTabBackingStoreReserved:
             return .none
         case let .activeDocumentSaved(saved):
             switch saved.purpose {

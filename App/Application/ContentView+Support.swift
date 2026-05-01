@@ -175,6 +175,26 @@ extension View {
     func minimumHitTarget(_ minSize: CGFloat = 44) -> some View {
         modifier(MinimumHitTargetModifier(minSize: minSize))
     }
+
+    func studioWindowGlow(cornerRadius: CGFloat, intensity: Double = 1) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            StudioTheme.Palette.accentBright.opacity(0.72 * intensity),
+                            Color.white.opacity(0.20 * intensity),
+                            StudioTheme.Palette.accentBright.opacity(0.38 * intensity)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
+                .shadow(color: StudioTheme.Palette.accentBright.opacity(0.34 * intensity), radius: 9, x: 0, y: 0)
+                .allowsHitTesting(false)
+        }
+    }
 }
 
 struct ShareSheet: UIViewControllerRepresentable {
@@ -514,7 +534,7 @@ extension ContentView {
 
     var workspaceTabBar: some View {
         Group {
-            if workspaceState.workspaceLayout == .split {
+            if workspaceState.workspaceLayout != .single {
                 HStack(spacing: 0) {
                     workspaceTabStrip(for: .primary)
                     Rectangle()
@@ -526,6 +546,7 @@ extension ContentView {
                 workspaceTabStrip(for: .primary)
             }
         }
+        .frame(height: 48)
         .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -546,6 +567,7 @@ extension ContentView {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
+                .animation(.spring(response: 0.28, dampingFraction: 0.88), value: tabs.map(\.id))
             }
             .dropDestination(for: String.self) { items, _ in
                 guard
@@ -557,14 +579,14 @@ extension ContentView {
                 store.send(.workspace(.tabDropped(moving: movingID, toPane: pane, before: nil)))
                 return true
             }
+            .frame(height: 48)
 
             HStack(spacing: 6) {
                 if pane == .primary {
-                    if workspaceState.workspaceLayout == .single, workspaceState.activeTabID != nil {
-                        workspaceTabChromeButton(symbol: "square.split.2x1") {
-                            store.send(.workspace(.splitActiveTabIntoSecondaryPane))
-                        }
-                    } else if workspaceState.workspaceLayout == .split {
+                    if workspaceState.activeTabID != nil {
+                        workspaceTabAddMenu()
+                    }
+                    if workspaceState.workspaceLayout != .single {
                         workspaceTabChromeButton(symbol: "sidebar.leading") {
                             store.send(.workspace(.mergeWorkspacePanes))
                         }
@@ -572,8 +594,10 @@ extension ContentView {
                 }
             }
             .padding(.trailing, 10)
+            .frame(height: 48)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 48)
     }
 
     func workspaceTabItem(_ tab: OpenDocumentTab, in pane: WorkspacePane) -> some View {
@@ -593,6 +617,7 @@ extension ContentView {
                 .font(StudioTheme.Typography.label(10))
                 .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
                 .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 store.send(.workspace(.tabCloseRequested(tab.id)))
@@ -610,7 +635,7 @@ extension ContentView {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(minWidth: 144, alignment: .leading)
+        .frame(width: 144, height: 32, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(isActive ? StudioTheme.Palette.selectedFill : (isSelected ? Color.white.opacity(0.08) : StudioTheme.Palette.toolbarFill))
@@ -649,6 +674,103 @@ extension ContentView {
             store.send(.workspace(.tabDropped(moving: movingID, toPane: pane, before: tab.id)))
             return true
         }
+    }
+
+    func workspaceTabAddMenu() -> some View {
+        Button {
+            showsWorkspaceTabAddMenu = true
+        } label: {
+            workspaceTabAddMenuLabel
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showsWorkspaceTabAddMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            workspaceTabAddPopover
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    var workspaceTabAddPopover: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            workspaceTabAddPopoverButton(
+                title: language.localized("タブ"),
+                systemImage: "tag",
+                destination: .currentPane
+            )
+            workspaceTabAddPopoverButton(
+                title: language.localized("右側にキャンバスを複製"),
+                systemImage: "square.split.2x1",
+                destination: .rightPane
+            )
+            workspaceTabAddPopoverButton(
+                title: language.localized("下側にキャンバスを複製"),
+                systemImage: "square.split.1x2",
+                destination: .belowPane
+            )
+        }
+        .padding(8)
+        .frame(width: 260, alignment: .leading)
+        .background(StudioTheme.Gradients.chrome)
+    }
+
+    func workspaceTabAddPopoverButton(
+        title: String,
+        systemImage: String,
+        destination: WorkspaceFeature.WorkspaceCanvasDuplicateDestination
+    ) -> some View {
+        Button {
+            showsWorkspaceTabAddMenu = false
+            store.send(.workspace(.duplicateActiveCanvasRequested(destination)))
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 20)
+                Text(title)
+                    .font(StudioTheme.Typography.label(12))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(StudioTheme.Palette.textPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
+    }
+
+    var workspaceTabAddMenuLabel: some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: "tag")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 19, height: 19)
+
+            Image(systemName: "plus")
+                .font(.system(size: 7, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 11, height: 11)
+                .background(
+                    Circle()
+                        .fill(StudioTheme.Palette.accentBright)
+                )
+                .offset(x: 5, y: -5)
+        }
+        .foregroundStyle(StudioTheme.Palette.accentBright)
+        .frame(width: 30, height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(StudioTheme.Palette.accentBright.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(StudioTheme.Palette.accentBright.opacity(0.64), lineWidth: 1.4)
+        )
+        .shadow(color: StudioTheme.Palette.accentBright.opacity(0.24), radius: 8, x: 0, y: 0)
+        .contentShape(Rectangle())
     }
 
     func workspaceTabChromeButton(symbol: String, action: @escaping () -> Void) -> some View {
@@ -1024,21 +1146,15 @@ let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, 
 struct StudioPanelShell<Content: View>: View {
     let title: String
     let isCollapsed: Bool
-    let toggleSystemName: String
-    let onToggleCollapse: () -> Void
     let content: Content
 
     init(
         title: String,
         isCollapsed: Bool,
-        toggleSystemName: String,
-        onToggleCollapse: @escaping () -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.isCollapsed = isCollapsed
-        self.toggleSystemName = toggleSystemName
-        self.onToggleCollapse = onToggleCollapse
         self.content = content()
     }
 
@@ -1064,6 +1180,7 @@ struct StudioPanelShell<Content: View>: View {
                 .blur(radius: 0.5)
                 .padding(1)
         }
+        .studioWindowGlow(cornerRadius: 14, intensity: 0.42)
         .shadow(color: Color.black.opacity(0.24), radius: 18, y: 12)
     }
 
@@ -1083,8 +1200,6 @@ struct StudioPanelShell<Content: View>: View {
             }
 
             Spacer(minLength: 6)
-
-            panelButton(systemName: toggleSystemName, isActive: false, action: onToggleCollapse)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -1099,19 +1214,5 @@ struct StudioPanelShell<Content: View>: View {
 
     private var panelBackground: LinearGradient {
         StudioTheme.Gradients.panel
-    }
-
-    private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
-                .frame(width: 24, height: 24)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
-                )
-        }
-        .buttonStyle(.plain)
     }
 }

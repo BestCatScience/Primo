@@ -40,6 +40,7 @@ struct ContentView: View {
     @State var showsThresholdSheet = false
     @State var showsPosterizeSheet = false
     @State var showsGradientMapSheet = false
+    @State var showsWorkspaceTabAddMenu = false
     @State var showsExpandSelectionSheet = false
     @State var showsContractSelectionSheet = false
     @State var showsFeatherSelectionSheet = false
@@ -313,6 +314,8 @@ struct ContentView: View {
                 panelRail(for: .layers)
                     .zIndex(20)
             }
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.document.editing.brushPanel.isCollapsed)
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: store.document.editing.layerPanel.isCollapsed)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(StudioTheme.Gradients.appBackground)
@@ -341,6 +344,22 @@ struct ContentView: View {
                     let panelHeight = min(max(proxy.size.height - 128, 520), 760)
                     let panelX = min(max(proxy.size.width * 0.18, 156), 278)
                     let panelY = min(max(proxy.size.height * 0.08, 72), 92)
+                    let closesDownward = store.document.editing.canvas.currentTool == .brush
+                        || store.document.editing.canvas.currentTool == .erase
+                    let closeGesture = DragGesture(minimumDistance: 2)
+                        .onEnded { value in
+                            let horizontalTravel = min(value.translation.width, value.predictedEndTranslation.width)
+                            let verticalTravel = max(value.translation.height, value.predictedEndTranslation.height)
+                            let isMostlyHorizontal = abs(horizontalTravel) > abs(value.translation.height) * 1.25
+                            let isMostlyVertical = abs(verticalTravel) > abs(value.translation.width) * 1.25
+                            let shouldClose = closesDownward
+                                ? isMostlyVertical && verticalTravel > 24
+                                : isMostlyHorizontal && horizontalTravel < -28
+
+                            if shouldClose {
+                                dismissBrushSettingsPopover()
+                            }
+                        }
 
                     ZStack(alignment: .topLeading) {
                         Rectangle()
@@ -389,10 +408,15 @@ struct ContentView: View {
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
                         .offset(x: panelX, y: panelY)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .simultaneousGesture(closeGesture)
+                        .transition(.move(edge: closesDownward ? .bottom : .leading).combined(with: .opacity))
                     }
                 }
                 .zIndex(500)
+                .animation(
+                    .spring(response: 0.28, dampingFraction: 0.88),
+                    value: store.document.editing.brushPalette.ui.showsBrushSettingsPopover
+                )
             }
         }
         .overlay(alignment: .bottom) {

@@ -489,6 +489,38 @@ extension WorkspaceFeature {
         )
     }
 
+    func duplicateActiveCanvasRequest(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot,
+        destination: WorkspaceCanvasDuplicateDestination
+    ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
+        guard let activeTab = applySnapshotToActiveTab(snapshot, state: &state) else {
+            return .failure(WorkspacePersistenceFailure(reason: .activeTabUnavailable))
+        }
+        let pane: WorkspacePane
+        switch destination {
+        case .currentPane:
+            pane = activeTab.pane
+        case .rightPane:
+            pane = .secondary
+            state.workspaceLayout = .splitRight
+        case .belowPane:
+            pane = .secondary
+            state.workspaceLayout = .splitBelow
+        }
+        let title = state.duplicateTitle(for: activeTab.title)
+        return .success(
+            .duplicateActiveCanvas(
+                WorkspaceActiveCanvasDuplicateRequest(
+                    activeTab: activeTab,
+                    title: title,
+                    pane: pane,
+                    paperStyle: snapshot.paperStyle
+                )
+            )
+        )
+    }
+
     func closeTabsPersistenceRequest(
         operation: PendingCloseOperation,
         tabIDs: [OpenDocumentTab.ID],
@@ -771,6 +803,14 @@ extension WorkspaceFeature {
             case let .failure(failure):
                 return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
             }
+
+        case let .duplicateActiveCanvas(destination):
+            switch duplicateActiveCanvasRequest(state: &state, snapshot: snapshot, destination: destination) {
+            case let .success(request):
+                return .send(.persistenceRequested(request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
         }
     }
 
@@ -789,6 +829,14 @@ extension WorkspaceFeature {
             )
         }
         return requestDocumentSnapshot(state: &state, operation: .tabSelection(tabID))
+    }
+
+    func handleDuplicateActiveCanvasRequested(
+        state: inout State,
+        destination: WorkspaceCanvasDuplicateDestination
+    ) -> Effect<Action> {
+        guard state.activeTab != nil else { return .none }
+        return requestDocumentSnapshot(state: &state, operation: .duplicateActiveCanvas(destination))
     }
 
     func handleTabSelectionLoaded(
@@ -1191,6 +1239,25 @@ extension WorkspaceFeature {
                     .send(.delegate(.requestHomeProjectsLoad))
                 )
             }
+        case let .activeCanvasDuplicated(duplicate):
+            let preparedTab = duplicate.preparedTab
+            let tab = OpenDocumentTab(
+                id: preparedTab.id,
+                title: preparedTab.title,
+                backingStoreURL: preparedTab.backingStoreURL,
+                sourceProjectURL: preparedTab.sourceProjectURL,
+                canvasSize: duplicate.canvasSize,
+                isDirty: false,
+                pane: preparedTab.pane,
+                previewSurface: duplicate.previewSurface,
+                previewImageData: duplicate.previewImageData
+            )
+            state.appendTab(tab)
+            if preparedTab.pane == .secondary, state.workspaceLayout == .single {
+                state.workspaceLayout = .splitRight
+            }
+            state.activateTab(preparedTab.id, pane: preparedTab.pane)
+            return .send(.delegate(.workspaceProjectLoadCompleted(nil)))
         case .documentReplacementPrepared:
             return .none
         case let .newTabBackingStoreReserved(preparedTab):

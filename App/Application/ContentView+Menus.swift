@@ -2153,11 +2153,11 @@ extension ContentView {
                 Divider()
 
                 Button(store.document.editing.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
-                    store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.brush)))))
+                    toggleStudioPanel(.brush)
                 }
 
                 Button(store.document.editing.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
-                    store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.layers)))))
+                    toggleStudioPanel(.layers)
                 }
 
                 Divider()
@@ -2189,12 +2189,16 @@ extension ContentView {
     var undoRedoBar: some View {
         HStack(spacing: 8) {
             panelToolbarToggleButton(
-                systemImage: "sidebar.left",
+                systemImage: store.document.editing.brushPanel.isCollapsed
+                    ? "rectangle.leftthird.inset.filled"
+                    : "sidebar.left",
                 accessibilityLabel: store.document.editing.brushPanel.isCollapsed
                     ? StudioStrings.showBrushPanel(language)
-                    : StudioStrings.hideBrushPanel(language)
+                    : StudioStrings.hideBrushPanel(language),
+                isPanelToggle: true,
+                isPanelOpen: !store.document.editing.brushPanel.isCollapsed
             ) {
-                store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.brush)))))
+                toggleStudioPanel(.brush)
             }
 
             Button {
@@ -2286,12 +2290,16 @@ extension ContentView {
             Spacer(minLength: 0)
 
             panelToolbarToggleButton(
-                systemImage: "sidebar.right",
+                systemImage: store.document.editing.layerPanel.isCollapsed
+                    ? "rectangle.rightthird.inset.filled"
+                    : "sidebar.right",
                 accessibilityLabel: store.document.editing.layerPanel.isCollapsed
                     ? StudioStrings.showLayerPanel(language)
-                    : StudioStrings.hideLayerPanel(language)
+                    : StudioStrings.hideLayerPanel(language),
+                isPanelToggle: true,
+                isPanelOpen: !store.document.editing.layerPanel.isCollapsed
             ) {
-                store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.layers)))))
+                toggleStudioPanel(.layers)
             }
         }
         .padding(.horizontal, 12)
@@ -2307,6 +2315,8 @@ extension ContentView {
     func panelToolbarToggleButton(
         systemImage: String,
         accessibilityLabel: String,
+        isPanelToggle: Bool = false,
+        isPanelOpen: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -2315,18 +2325,31 @@ extension ContentView {
                 .frame(width: 18, height: 18)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(StudioTheme.Palette.textPrimary)
+        .foregroundStyle(isPanelToggle ? StudioTheme.Palette.accentBright : StudioTheme.Palette.textPrimary)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .minimumHitTarget(36)
+        .minimumHitTarget(52)
         .background(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(StudioTheme.Palette.toolbarFill)
+                .fill(isPanelToggle ? StudioTheme.Palette.accentBright.opacity(isPanelOpen ? 0.13 : 0.08) : StudioTheme.Palette.toolbarFill)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
+                .stroke(
+                    isPanelToggle
+                        ? StudioTheme.Palette.accentBright.opacity(isPanelOpen ? 0.94 : 0.64)
+                        : StudioTheme.Palette.hairline,
+                    lineWidth: isPanelToggle ? 1.5 : 1
+                )
         }
+        .shadow(
+            color: isPanelToggle ? StudioTheme.Palette.accentBright.opacity(isPanelOpen ? 0.34 : 0.20) : .clear,
+            radius: isPanelToggle ? 8 : 0,
+            x: 0,
+            y: 0
+        )
+        .contentShape(Rectangle())
+        .hoverEffect(.lift)
         .accessibilityLabel(accessibilityLabel)
     }
 

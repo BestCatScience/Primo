@@ -6,7 +6,8 @@ import PrimoLocalization
 
 enum WorkspaceLayoutMode: Equatable, Sendable {
     case single
-    case split
+    case splitRight
+    case splitBelow
 }
 
 extension SaveHistoryTrigger {

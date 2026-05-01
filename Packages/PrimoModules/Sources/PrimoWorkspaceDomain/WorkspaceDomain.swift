@@ -101,6 +101,44 @@ public struct WorkspaceDocumentSaveResult: Equatable, Sendable {
     }
 }
 
+public struct WorkspaceActiveCanvasDuplicateRequest: Equatable, Sendable {
+    public let activeTab: OpenDocumentTab
+    public let title: String
+    public let pane: WorkspacePane
+    public let paperStyle: CanvasPaperStyle
+
+    public init(
+        activeTab: OpenDocumentTab,
+        title: String,
+        pane: WorkspacePane,
+        paperStyle: CanvasPaperStyle
+    ) {
+        self.activeTab = activeTab
+        self.title = title
+        self.pane = pane
+        self.paperStyle = paperStyle
+    }
+}
+
+public struct WorkspaceActiveCanvasDuplicateResult: Equatable, Sendable {
+    public let preparedTab: PreparedWorkspaceTab
+    public let canvasSize: CGSize
+    public let previewSurface: DocumentCompositeSurface?
+    public let previewImageData: Data?
+
+    public init(
+        preparedTab: PreparedWorkspaceTab,
+        canvasSize: CGSize,
+        previewSurface: DocumentCompositeSurface?,
+        previewImageData: Data?
+    ) {
+        self.preparedTab = preparedTab
+        self.canvasSize = canvasSize
+        self.previewSurface = previewSurface
+        self.previewImageData = previewImageData
+    }
+}
+
 public struct WorkspaceDocumentReplacementRequest: Equatable, Sendable {
     public let activeTab: OpenDocumentTab
     public let paperStyle: CanvasPaperStyle
@@ -266,6 +304,7 @@ public struct WorkspaceCatalogFailure: Error, Equatable, Sendable {
 public enum WorkspacePersistenceRequest: Equatable, Sendable {
     case dirtyPresentationRefreshed(WorkspaceDirtyPresentationRequest)
     case saveActiveDocument(WorkspaceDocumentSaveRequest)
+    case duplicateActiveCanvas(WorkspaceActiveCanvasDuplicateRequest)
     case prepareDocumentReplacement(WorkspaceDocumentReplacementRequest)
     case reserveNewTabBackingStore(WorkspaceTabReservationRequest)
     case loadedWorkspaceFollowUp(LoadedWorkspaceFollowUpPersistenceRequest)
@@ -276,6 +315,7 @@ public enum WorkspacePersistenceRequest: Equatable, Sendable {
 public enum WorkspacePersistenceResult: Equatable, Sendable {
     case dirtyPresentationPersisted(OpenDocumentTab.ID)
     case activeDocumentSaved(WorkspaceDocumentSaveResult)
+    case activeCanvasDuplicated(WorkspaceActiveCanvasDuplicateResult)
     case documentReplacementPrepared(OpenDocumentTab.ID)
     case newTabBackingStoreReserved(PreparedWorkspaceTab)
     case loadedWorkspaceFollowUpApplied(LoadedWorkspaceFollowUpPersistenceResult)
@@ -420,6 +460,8 @@ public struct WorkspacePersistenceUseCase: Sendable {
             return persistDirtyPresentation(dirtyPresentation, request: request)
         case let .saveActiveDocument(saveRequest):
             return saveActiveDocument(saveRequest, request: request)
+        case let .duplicateActiveCanvas(duplicateRequest):
+            return duplicateActiveCanvas(duplicateRequest, request: request)
         case let .prepareDocumentReplacement(replacementRequest):
             return prepareDocumentReplacement(replacementRequest, request: request)
         case let .reserveNewTabBackingStore(reservationRequest):
@@ -503,6 +545,48 @@ public struct WorkspacePersistenceUseCase: Sendable {
                         previewImageData: savedTab.previewImageData,
                         canvasSize: savedTab.canvasSize,
                         issues: issues
+                    )
+                )
+            )
+        } catch {
+            return .failure(
+                WorkspacePersistenceFailure(
+                    request: request,
+                    reason: .saveFailed(optionalErrorMessage(error))
+                )
+            )
+        }
+    }
+
+    private func duplicateActiveCanvas(
+        _ requestPayload: WorkspaceActiveCanvasDuplicateRequest,
+        request: WorkspacePersistenceRequest
+    ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+        let tabID = identityGenerator.generateTabID()
+        do {
+            try workspaceBackingStore.saveProject(
+                requestPayload.activeTab.backingStoreURL.fileURL,
+                requestPayload.paperStyle
+            )
+            let backingStoreURL = try workspaceBackingStore.createTabBackingStoreURL(tabID)
+            _ = try workspaceBackingStore.persistProjectSnapshot(
+                requestPayload.activeTab.backingStoreURL,
+                backingStoreURL
+            )
+            let preparedTab = PreparedWorkspaceTab(
+                id: tabID,
+                title: requestPayload.title,
+                backingStoreURL: backingStoreURL,
+                sourceProjectURL: nil,
+                pane: requestPayload.pane
+            )
+            return .success(
+                .activeCanvasDuplicated(
+                    WorkspaceActiveCanvasDuplicateResult(
+                        preparedTab: preparedTab,
+                        canvasSize: requestPayload.activeTab.canvasSize,
+                        previewSurface: requestPayload.activeTab.previewSurface,
+                        previewImageData: requestPayload.activeTab.previewImageData
                     )
                 )
             )

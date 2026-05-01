@@ -313,6 +313,7 @@ struct CrossFeatureIntegrationReducer: Reducer {
              .workspace(.tabDropped),
              .workspace(.splitActiveTabIntoSecondaryPane),
              .workspace(.mergeWorkspacePanes),
+             .workspace(.duplicateActiveCanvasRequested),
              .workspace(.workspacePaneActivated),
              .workspace(.moveSavedProject),
              .workspace(.homeReturnRequested),

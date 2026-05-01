@@ -3,21 +3,15 @@ import PrimoDocumentDomain
 import SwiftUI
 import UIKit
 
-private extension StudioPanelKind {
-    var expandedToggleSystemName: String {
-        switch self {
-        case .brush:
-            return "chevron.left"
-        case .layers:
-            return "chevron.right"
-        }
-    }
-
-}
-
 extension ContentView {
     private var workspaceBottomGestureClearance: CGFloat { 36 }
     private var workspaceAIImagePickerMaximumHeight: CGFloat { 144 }
+    private var studioPanelAnimation: Animation {
+        .spring(response: 0.28, dampingFraction: 0.88)
+    }
+    private var responsiveDragMinimumDistance: CGFloat { 2 }
+    private var responsivePanelCloseThreshold: CGFloat { 28 }
+    private var responsiveBottomPanelCloseThreshold: CGFloat { 24 }
     private var workspaceStageLeadingPadding: CGFloat {
         store.document.editing.brushPanel.isCollapsed ? 6 : 18
     }
@@ -30,7 +24,21 @@ extension ContentView {
 
     func dismissBrushSettingsPopover() {
         if store.document.editing.brushPalette.ui.showsBrushSettingsPopover {
-            store.send(.document(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false)))))
+            _ = withAnimation(studioPanelAnimation) {
+                store.send(.document(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false)))))
+            }
+        }
+    }
+
+    func toggleStudioPanel(_ panel: StudioPanelKind) {
+        _ = withAnimation(studioPanelAnimation) {
+            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
+        }
+    }
+
+    func setWorkspaceBottomPanelCollapsed(_ isCollapsed: Bool) {
+        _ = withAnimation(studioPanelAnimation) {
+            store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(isCollapsed)))
         }
     }
 
@@ -59,31 +67,47 @@ extension ContentView {
                 }
 
             VStack(spacing: 10) {
-                if workspaceState.workspaceLayout == .split {
+                if workspaceState.workspaceLayout == .splitRight {
                     HStack(spacing: 12) {
                         workspacePaneStage(.primary)
                         workspacePaneStage(.secondary)
                     }
                     .padding(workspaceStageHorizontalInsets)
                     .padding(.top, 8)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else if workspaceState.workspaceLayout == .splitBelow {
+                    VStack(spacing: 12) {
+                        workspacePaneStage(.primary)
+                        workspacePaneStage(.secondary)
+                    }
+                    .padding(workspaceStageHorizontalInsets)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
                     workspacePaneStage(.primary)
                         .padding(workspaceStageHorizontalInsets)
                         .padding(.top, 8)
+                        .transition(.opacity)
                 }
 
                 if !aiImageState.workspaceBottomPanelCollapsed {
                     workspaceBottomPanel
                         .padding(workspaceStageHorizontalInsets)
                         .padding(.bottom, workspaceBottomGestureClearance)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: workspaceState.workspaceLayout)
         }
         .overlay(alignment: .bottomTrailing) {
-            bottomWorkspacePanelToggle
-                .padding(.trailing, workspaceStageTrailingPadding + 10)
-                .padding(.bottom, aiImageState.workspaceBottomPanelCollapsed ? 10 : workspaceBottomGestureClearance + 10)
+            if aiImageState.workspaceBottomPanelCollapsed {
+                bottomWorkspacePanelToggle
+                    .padding(.trailing, workspaceStageTrailingPadding + 10)
+                    .padding(.bottom, 10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(studioPanelAnimation, value: aiImageState.workspaceBottomPanelCollapsed)
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
@@ -92,14 +116,43 @@ extension ContentView {
     }
 
     var bottomWorkspacePanelToggle: some View {
-        panelToolbarToggleButton(
-            systemImage: aiImageState.workspaceBottomPanelCollapsed ? "dock.rectangle" : "chevron.down.to.line",
-            accessibilityLabel: aiImageState.workspaceBottomPanelCollapsed
-                ? language.localized("AI Image パネルを表示")
-                : language.localized("AI Image パネルを閉じる")
-        ) {
-            store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(!aiImageState.workspaceBottomPanelCollapsed)))
+        Button {
+            setWorkspaceBottomPanelCollapsed(false)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "tag")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 22, height: 22)
+
+                Image(systemName: "plus")
+                    .font(.system(size: 8, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 12, height: 12)
+                    .background(
+                        Circle()
+                            .fill(StudioTheme.Palette.accentBright)
+                    )
+                    .offset(x: 5, y: -5)
+            }
+            .foregroundStyle(StudioTheme.Palette.accentBright)
+            .frame(width: 30, height: 26)
         }
+        .buttonStyle(WorkspaceFlatButtonStyle())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .minimumHitTarget(52)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(StudioTheme.Palette.accentBright.opacity(0.08))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(StudioTheme.Palette.accentBright.opacity(0.64), lineWidth: 1.5)
+        }
+        .shadow(color: StudioTheme.Palette.accentBright.opacity(0.20), radius: 8, x: 0, y: 0)
+        .contentShape(Rectangle())
+        .hoverEffect(.lift)
+        .accessibilityLabel(language.localized("AI Image パネルを表示"))
     }
 
     @ViewBuilder
@@ -258,24 +311,28 @@ extension ContentView {
     @ViewBuilder
     func panelRail(for panel: StudioPanelKind) -> some View {
         let panelState = panelState(for: panel)
-        let dragThreshold: CGFloat = 80
 
         if panelState.isCollapsed {
             Color.clear
                 .frame(width: 0)
         } else {
-            let panelDragGesture = DragGesture(minimumDistance: 12)
+            let panelDragGesture = DragGesture(minimumDistance: responsiveDragMinimumDistance)
                 .onEnded { value in
                     let translation = value.translation.width
+                    let predictedTranslation = value.predictedEndTranslation.width
+                    let horizontalTravel = max(abs(translation), abs(predictedTranslation))
+                    let isMostlyHorizontal = horizontalTravel > abs(value.translation.height) * 1.25
 
                     switch panel {
                     case .brush:
-                        if translation < dragThreshold * -1 {
-                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
+                        if isMostlyHorizontal,
+                           min(translation, predictedTranslation) < -responsivePanelCloseThreshold {
+                            toggleStudioPanel(panel)
                         }
                     case .layers:
-                        if translation > dragThreshold {
-                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
+                        if isMostlyHorizontal,
+                           max(translation, predictedTranslation) > responsivePanelCloseThreshold {
+                            toggleStudioPanel(panel)
                         }
                     }
                 }
@@ -289,13 +346,8 @@ extension ContentView {
             .padding(.bottom, 8)
             .frame(width: panel == .layers ? 324 : 332)
             .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(alignment: panel == .brush ? .trailing : .leading) {
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .frame(width: 18)
-                    .gesture(panelDragGesture)
-            }
+            .contentShape(Rectangle())
+            .simultaneousGesture(panelDragGesture)
             .simultaneousGesture(
                 TapGesture().onEnded {
                     if panel != .brush {
@@ -303,6 +355,7 @@ extension ContentView {
                     }
                 }
             )
+            .transition(.move(edge: panel == .brush ? .leading : .trailing).combined(with: .opacity))
         }
     }
 
@@ -310,9 +363,7 @@ extension ContentView {
     func studioPanel(for panel: StudioPanelKind) -> some View {
         StudioPanelShell(
             title: panel.title(language),
-            isCollapsed: false,
-            toggleSystemName: panel.expandedToggleSystemName,
-            onToggleCollapse: { store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel))))) }
+            isCollapsed: false
         ) {
             switch panel {
             case .brush:
@@ -367,6 +418,8 @@ extension ContentView {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .animation(studioPanelAnimation, value: store.document.editing.brushPanel.isCollapsed)
+        .animation(studioPanelAnimation, value: store.document.editing.layerPanel.isCollapsed)
     }
 
     func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
@@ -379,18 +432,26 @@ extension ContentView {
     }
 
     var workspaceBottomPanel: some View {
-        VStack(spacing: 0) {
+        let panelDragGesture = DragGesture(minimumDistance: responsiveDragMinimumDistance)
+            .onEnded { value in
+                let verticalTravel = max(value.translation.height, value.predictedEndTranslation.height)
+                let isMostlyVertical = abs(verticalTravel) > abs(value.translation.width) * 1.25
+
+                if isMostlyVertical, verticalTravel > responsiveBottomPanelCloseThreshold {
+                    setWorkspaceBottomPanelCollapsed(true)
+                }
+            }
+
+        return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 workspaceBottomTab(title: "AI IMAGE", section: .aiImage)
                 workspaceBottomTab(title: "HISTORY", section: .history)
                 workspaceBottomTab(title: "OUTPUT", section: .output)
                 Spacer(minLength: 0)
-                workspaceTabChromeButton(symbol: "chevron.down") {
-                    store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(true)))
-                }
+                workspaceBottomPanelCloseButton
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 7)
             .background(Color.white.opacity(0.03))
 
             Group {
@@ -414,6 +475,33 @@ extension ContentView {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
+        .studioWindowGlow(cornerRadius: 16, intensity: 0.58)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .simultaneousGesture(panelDragGesture)
+    }
+
+    var workspaceBottomPanelCloseButton: some View {
+        Button {
+            setWorkspaceBottomPanelCollapsed(true)
+        } label: {
+            Image(systemName: "dock.arrow.down.rectangle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(StudioTheme.Palette.accentBright)
+                .frame(width: 28, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(StudioTheme.Palette.accentBright.opacity(0.10))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(StudioTheme.Palette.accentBright.opacity(0.88), lineWidth: 1.5)
+                }
+        }
+        .buttonStyle(WorkspaceFlatButtonStyle())
+        .minimumHitTarget(52)
+        .contentShape(Rectangle())
+        .hoverEffect(.lift)
+        .accessibilityLabel(language.localized("AI Image パネルを閉じる"))
     }
 
     func workspaceBottomTab(title: String, section: AIImageFeature.WorkspaceBottomPanelSection) -> some View {

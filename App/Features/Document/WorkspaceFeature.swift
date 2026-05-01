@@ -22,6 +22,8 @@ struct WorkspaceFeature {
     typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceApplication.WorkspaceDocumentSavePurpose
     typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceApplication.WorkspaceDocumentSaveRequest
     typealias WorkspaceDocumentSaveResult = PrimoWorkspaceApplication.WorkspaceDocumentSaveResult
+    typealias WorkspaceActiveCanvasDuplicateRequest = PrimoWorkspaceApplication.WorkspaceActiveCanvasDuplicateRequest
+    typealias WorkspaceActiveCanvasDuplicateResult = PrimoWorkspaceApplication.WorkspaceActiveCanvasDuplicateResult
     typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceApplication.WorkspaceDocumentReplacementRequest
     typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceRequest
     typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceResult
@@ -75,6 +77,13 @@ struct WorkspaceFeature {
         case saveHistoryRestore(DocumentProjectPath, openInNewTab: Bool)
         case autosaveRecoveryRestore(AutosaveRecoveryItem)
         case freshDocument(FreshDocumentRequest)
+        case duplicateActiveCanvas(WorkspaceCanvasDuplicateDestination)
+    }
+
+    enum WorkspaceCanvasDuplicateDestination: Equatable, Sendable {
+        case currentPane
+        case rightPane
+        case belowPane
     }
 
     struct FreshDocumentRequest: Equatable, Sendable {
@@ -168,6 +177,7 @@ struct WorkspaceFeature {
         case tabDropped(moving: OpenDocumentTab.ID, toPane: WorkspacePane, before: OpenDocumentTab.ID?)
         case splitActiveTabIntoSecondaryPane
         case mergeWorkspacePanes
+        case duplicateActiveCanvasRequested(WorkspaceCanvasDuplicateDestination)
         case workspacePaneActivated(WorkspacePane)
         case homeProjectSelected(DocumentProjectPath)
         case projectLoadRequested(
@@ -268,6 +278,9 @@ struct WorkspaceFeature {
             case .mergeWorkspacePanes:
                 handleMergeWorkspacePanes(state: &state)
                 return .none
+
+            case let .duplicateActiveCanvasRequested(destination):
+                return handleDuplicateActiveCanvasRequested(state: &state, destination: destination)
 
             case let .workspacePaneActivated(pane):
                 return handleWorkspacePaneActivated(state: &state, pane: pane)
