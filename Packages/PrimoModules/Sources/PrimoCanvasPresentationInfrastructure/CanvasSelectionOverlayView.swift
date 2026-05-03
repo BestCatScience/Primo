@@ -9,6 +9,8 @@ final class CanvasSelectionOverlayView: UIView {
     private let selectionBlackLayer = CAShapeLayer()
     private let previewWhiteLayer = CAShapeLayer()
     private let previewBlackLayer = CAShapeLayer()
+    private let lassoOriginWhiteLayer = CAShapeLayer()
+    private let lassoOriginBlackLayer = CAShapeLayer()
 
     init(selectionProcessor: any SelectionMaskProcessing) {
         _ = selectionProcessor
@@ -21,10 +23,18 @@ final class CanvasSelectionOverlayView: UIView {
         configureAntLayer(previewWhiteLayer, color: .white, lineWidth: 1.8, phase: 0)
         configureAntLayer(previewBlackLayer, color: .black, lineWidth: 1.2, phase: 6)
 
+        lassoOriginWhiteLayer.fillColor = UIColor.white.withAlphaComponent(0.85).cgColor
+        lassoOriginWhiteLayer.strokeColor = UIColor.clear.cgColor
+        lassoOriginBlackLayer.fillColor = UIColor.clear.cgColor
+        lassoOriginBlackLayer.strokeColor = UIColor.black.withAlphaComponent(0.75).cgColor
+        lassoOriginBlackLayer.lineWidth = 1.2
+
         [selectionWhiteLayer, selectionBlackLayer, previewWhiteLayer, previewBlackLayer].forEach {
             layer.addSublayer($0)
             startMarchingAntsAnimation(on: $0)
         }
+        layer.addSublayer(lassoOriginWhiteLayer)
+        layer.addSublayer(lassoOriginBlackLayer)
     }
 
     @available(*, unavailable)
@@ -34,7 +44,8 @@ final class CanvasSelectionOverlayView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        [selectionWhiteLayer, selectionBlackLayer, previewWhiteLayer, previewBlackLayer].forEach {
+        [selectionWhiteLayer, selectionBlackLayer, previewWhiteLayer, previewBlackLayer,
+         lassoOriginWhiteLayer, lassoOriginBlackLayer].forEach {
             $0.frame = bounds
         }
     }
@@ -69,7 +80,7 @@ final class CanvasSelectionOverlayView: UIView {
         geometry viewport: CanvasViewportGeometry
     ) {
         guard
-            currentTool == .select,
+            currentTool.showsSelectionOverlay,
             let selection,
             !selection.isEmpty,
             let path = makeSelectionOutlinePath(selection, moveOffset: moveOffset, geometry: viewport)
@@ -92,6 +103,8 @@ final class CanvasSelectionOverlayView: UIView {
         guard currentTool == .select, points.count >= 2 else {
             previewWhiteLayer.path = nil
             previewBlackLayer.path = nil
+            lassoOriginWhiteLayer.path = nil
+            lassoOriginBlackLayer.path = nil
             return
         }
 
@@ -103,6 +116,8 @@ final class CanvasSelectionOverlayView: UIView {
                 width: abs(last.x - first.x),
                 height: abs(last.y - first.y)
             )))
+            lassoOriginWhiteLayer.path = nil
+            lassoOriginBlackLayer.path = nil
         } else {
             path = UIBezierPath()
             for (index, point) in points.enumerated() {
@@ -112,6 +127,29 @@ final class CanvasSelectionOverlayView: UIView {
                 } else {
                     path.addLine(to: mapped)
                 }
+            }
+            // Closing segment: dashed line from last point back to origin
+            if let first = points.first, let last = points.last {
+                let viewFirst = viewport.viewPoint(fromDocumentPoint: first)
+                let viewLast = viewport.viewPoint(fromDocumentPoint: last)
+                let closing = UIBezierPath()
+                closing.move(to: viewLast)
+                closing.addLine(to: viewFirst)
+                path.append(closing)
+            }
+            // Origin indicator: small circle at the start point
+            if let first = points.first {
+                let viewFirst = viewport.viewPoint(fromDocumentPoint: first)
+                let radius: CGFloat = 5
+                let circleRect = CGRect(
+                    x: viewFirst.x - radius,
+                    y: viewFirst.y - radius,
+                    width: radius * 2,
+                    height: radius * 2
+                )
+                let circlePath = UIBezierPath(ovalIn: circleRect).cgPath
+                lassoOriginWhiteLayer.path = circlePath
+                lassoOriginBlackLayer.path = circlePath
             }
         }
         previewWhiteLayer.path = path.cgPath
@@ -192,6 +230,12 @@ final class CanvasSelectionOverlayView: UIView {
         animation.repeatCount = .infinity
         animation.isRemovedOnCompletion = false
         layer.add(animation, forKey: "marchingAnts")
+    }
+}
+
+private extension StudioToolKind {
+    var showsSelectionOverlay: Bool {
+        self == .select || self == .move
     }
 }
 #endif

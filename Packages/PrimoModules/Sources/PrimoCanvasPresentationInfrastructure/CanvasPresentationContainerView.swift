@@ -121,6 +121,7 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         inputHandler.allowsFingerTouchInput = state.allowsFingerTouchInput
         inputHandler.selectionMode = state.selectionMode
         inputHandler.selectionContext = CanvasInputSelectionContext(state.selection)
+        inputHandler.layerMoveContext = layerMoveContext(for: state)
         inputHandler.shapeMode = state.shapeMode
         inputHandler.eyedropperSamplingSource = state.eyedropperSamplingSource
         inputHandler.brushTipKind = state.previewStyle.tipKind
@@ -269,6 +270,22 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
         let local = convert(location, from: view)
         return viewportGeometry.documentPoint(fromViewPoint: local)
+    }
+
+    private func layerMoveContext(for state: CanvasPresentationState) -> CanvasInputLayerMoveContext? {
+        guard state.selection == nil,
+              let snapshot = state.snapshot,
+              let layer = snapshot.layers.first(where: { $0.index == state.activeLayerIndex }),
+              layer.visible
+        else {
+            return nil
+        }
+        return CanvasInputLayerMoveContext(
+            bounds: CGRect(x: 0, y: 0, width: snapshot.width, height: snapshot.height),
+            width: snapshot.width,
+            height: snapshot.height,
+            pixelData: layer.pixelData
+        )
     }
 
     private func updateShapePreview(

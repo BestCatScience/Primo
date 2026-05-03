@@ -32,6 +32,7 @@ public final class CanvasInputHandler {
     public var tool: StudioToolKind = .brush
     public var selectionMode: SelectionToolMode = .lasso
     public var selectionContext: CanvasInputSelectionContext?
+    public var layerMoveContext: CanvasInputLayerMoveContext?
     public var shapeMode: ShapeToolMode = .line
     public var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
     public var brushTipKind: BrushTipKind = .pencil
@@ -77,6 +78,7 @@ public final class CanvasInputHandler {
                 tool: CanvasInputToolKind(tool),
                 selectionMode: selectionMode,
                 selectionContext: selectionContext,
+                layerMoveContext: layerMoveContext,
                 shapeMode: shapeMode,
                 brushTipKind: brushTipKind,
                 brushColor: brushColor,
@@ -100,7 +102,7 @@ public final class CanvasInputHandler {
     }
 
     private func isAllowedInputTouch(_ touch: UITouch) -> Bool {
-        if tool == .select {
+        if tool == .select || tool == .move {
             return true
         }
         return allowsFingerTouchInput || touch.type != .direct
@@ -123,6 +125,7 @@ public final class CanvasInputHandler {
                 tool: CanvasInputToolKind(tool),
                 selectionMode: selectionMode,
                 selectionContext: selectionContext,
+                layerMoveContext: layerMoveContext,
                 shapeMode: shapeMode,
                 brushTipKind: brushTipKind,
                 brushColor: brushColor,
@@ -219,6 +222,8 @@ private extension CanvasInputToolKind {
             self = .fill
         case .eyedropper:
             self = .eyedropper
+        case .move:
+            self = .move
         case .select:
             self = .select
         case .shape:

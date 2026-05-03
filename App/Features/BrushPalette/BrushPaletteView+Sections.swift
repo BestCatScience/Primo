@@ -370,7 +370,7 @@ extension BrushPaletteView {
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .blur, .shape, .text, .erase:
+        case .fill, .eyedropper, .move, .blur, .shape, .text, .erase:
             return currentTool.localizedTitle(language)
         case .brush, .select:
             return StudioToolKind.brush.localizedTitle(language)
@@ -446,6 +446,8 @@ extension BrushPaletteView {
             return language.localized("塗りつぶし設定")
         case .eyedropper:
             return language.localized("スポイト設定")
+        case .move:
+            return language.localized("移動")
         case .blur:
             return language.localized("ぼかし設定")
         case .shape:

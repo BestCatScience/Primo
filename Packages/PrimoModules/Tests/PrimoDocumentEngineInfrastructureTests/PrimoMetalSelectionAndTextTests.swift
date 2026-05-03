@@ -36,6 +36,72 @@ struct PrimoMetalSelectionAndTextTests {
     }
 
     @Test
+    func lassoSelectionBuildsMaskForBothWindingDirections() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let clockwise = [
+            CGPoint(x: 1, y: 1),
+            CGPoint(x: 6, y: 1),
+            CGPoint(x: 6, y: 6),
+            CGPoint(x: 1, y: 6),
+            CGPoint(x: 1, y: 1),
+        ]
+        let counterClockwise = Array(clockwise.reversed())
+
+        let clockwiseMask = client.lassoSelection(
+            points: clockwise,
+            canvasWidth: 8,
+            canvasHeight: 8
+        )
+        let counterClockwiseMask = client.lassoSelection(
+            points: counterClockwise,
+            canvasWidth: 8,
+            canvasHeight: 8
+        )
+
+        if client.isAvailable {
+            let resolvedClockwise = try #require(clockwiseMask)
+            let resolvedCounterClockwise = try #require(counterClockwiseMask)
+            #expect(resolvedClockwise.contains(where: { $0 != 0 }))
+            #expect(resolvedCounterClockwise.contains(where: { $0 != 0 }))
+            #expect(resolvedClockwise.filter { $0 != 0 }.count == resolvedCounterClockwise.filter { $0 != 0 }.count)
+        } else {
+            #expect(clockwiseMask == nil)
+            #expect(counterClockwiseMask == nil)
+        }
+    }
+
+    @Test
+    func circularLassoBuildsNonEmptyMask() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let polygon = [
+            CGPoint(x: 5, y: 4),
+            CGPoint(x: 10, y: 2),
+            CGPoint(x: 16, y: 4),
+            CGPoint(x: 19, y: 10),
+            CGPoint(x: 17, y: 17),
+            CGPoint(x: 10, y: 20),
+            CGPoint(x: 4, y: 17),
+            CGPoint(x: 2, y: 10),
+            CGPoint(x: 5, y: 4),
+        ]
+
+        let mask = client.lassoSelection(
+            points: polygon,
+            canvasWidth: 24,
+            canvasHeight: 24
+        )
+
+        if client.isAvailable {
+            let resolved = try #require(mask)
+            #expect(polygon.first == polygon.last)
+            #expect(resolved.count == 576)
+            #expect(resolved.contains(where: { $0 != 0 }))
+        } else {
+            #expect(mask == nil)
+        }
+    }
+
+    @Test
     func autoSelectionSelectsContiguousRegion() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let red: [UInt8] = [255, 0, 0, 255]

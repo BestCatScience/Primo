@@ -1,3 +1,4 @@
+import ComposableArchitecture
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoAIImageDomain
@@ -109,11 +110,18 @@ extension ContentView {
             }
         }
         .overlay(alignment: .bottom) {
-            if store.document.editing.canvas.selection?.isEmpty == false {
-                selectionActionBar
-                    .padding(.bottom, aiImageState.workspaceBottomPanelCollapsed ? 18 : 128)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            SelectionActionBarView(
+                store: store,
+                language: language,
+                isVisible: store.document.editing.canvas.selection?.isEmpty == false,
+                bottomPadding: aiImageState.workspaceBottomPanelCollapsed ? 18 : 128,
+                showsExpandSelectionSheet: $showsExpandSelectionSheet,
+                showsContractSelectionSheet: $showsContractSelectionSheet,
+                showsFeatherSelectionSheet: $showsFeatherSelectionSheet,
+                selectionExpansionText: $selectionExpansionText,
+                selectionContractionText: $selectionContractionText,
+                selectionFeatherRadiusText: $selectionFeatherRadiusText
+            )
         }
         .animation(studioPanelAnimation, value: aiImageState.workspaceBottomPanelCollapsed)
         .animation(studioPanelAnimation, value: store.document.editing.canvas.selection?.isEmpty == false)
@@ -424,7 +432,7 @@ extension ContentView {
         }
     }
 
-    var workspaceBottomPanel: some View {
+    var workspaceBottomPanel: AnyView {
         let panelDragGesture = DragGesture(minimumDistance: responsiveDragMinimumDistance)
             .onEnded { value in
                 let verticalTravel = max(value.translation.height, value.predictedEndTranslation.height)
@@ -435,42 +443,44 @@ extension ContentView {
                 }
             }
 
-        return VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                workspaceBottomTab(title: "AI IMAGE", section: .aiImage)
-                workspaceBottomTab(title: "HISTORY", section: .history)
-                workspaceBottomTab(title: "OUTPUT", section: .output)
-                Spacer(minLength: 0)
-                workspaceBottomPanelCloseButton
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color.white.opacity(0.03))
-
-            Group {
-                switch aiImageState.workspaceBottomPanelSection {
-                case .aiImage:
-                    workspaceAIImagePanel
-                case .history:
-                    workspaceHistoryPanel
-                case .output:
-                    workspaceOutputPanel
+        return AnyView(
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    workspaceBottomTab(title: "AI IMAGE", section: .aiImage)
+                    workspaceBottomTab(title: "HISTORY", section: .history)
+                    workspaceBottomTab(title: "OUTPUT", section: .output)
+                    Spacer(minLength: 0)
+                    workspaceBottomPanelCloseButton
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.white.opacity(0.03))
+
+                Group {
+                    switch aiImageState.workspaceBottomPanelSection {
+                    case .aiImage:
+                        workspaceAIImagePanel
+                    case .history:
+                        workspaceHistoryPanel
+                    case .output:
+                        workspaceOutputPanel
+                    }
+                }
+                .padding(12)
             }
-            .padding(12)
-        }
-        .frame(height: 224)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(StudioTheme.Palette.overlayBlack.opacity(0.78))
+            .frame(height: 224)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(StudioTheme.Palette.overlayBlack.opacity(0.78))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+            )
+            .studioWindowGlow(cornerRadius: 16, intensity: 0.58)
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .simultaneousGesture(panelDragGesture)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-        )
-        .studioWindowGlow(cornerRadius: 16, intensity: 0.58)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .simultaneousGesture(panelDragGesture)
     }
 
     var workspaceBottomPanelCloseButton: some View {
@@ -1544,6 +1554,106 @@ extension ContentView {
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
         }
+    }
+}
+
+private struct SelectionActionBarView: View {
+    let store: StoreOf<PrimoRootFeature>
+    let language: AppLanguage
+    let isVisible: Bool
+    let bottomPadding: CGFloat
+    @Binding var showsExpandSelectionSheet: Bool
+    @Binding var showsContractSelectionSheet: Bool
+    @Binding var showsFeatherSelectionSheet: Bool
+    @Binding var selectionExpansionText: String
+    @Binding var selectionContractionText: String
+    @Binding var selectionFeatherRadiusText: String
+
+    var body: some View {
+        if isVisible {
+            bar
+                .padding(.bottom, bottomPadding)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    private var bar: some View {
+        HStack(spacing: 8) {
+            actionButton(title: language.localized("選択解除"), systemImage: "xmark.square") {
+                store.send(.document(.brushPalette(.delegate(.clearSelection))))
+            }
+            actionButton(title: language.localized("マスク"), systemImage: "circle.dashed") {
+                store.send(.document(.layerWorkflow(.editing(.createLayerMaskFromSelectionRequested))))
+            }
+            actionButton(title: language.localized("消去"), systemImage: "eraser", isEnabled: false) {}
+            actionButton(title: language.localized("反転"), systemImage: "arrow.left.arrow.right") {
+                store.send(.document(.brushPalette(.delegate(.invertSelection))))
+            }
+            Menu {
+                Button(language.localized("拡張")) {
+                    selectionExpansionText = "4"
+                    showsExpandSelectionSheet = true
+                }
+                Button(language.localized("縮小")) {
+                    selectionContractionText = "4"
+                    showsContractSelectionSheet = true
+                }
+                Button(language.localized("ぼかし")) {
+                    selectionFeatherRadiusText = "8"
+                    showsFeatherSelectionSheet = true
+                }
+            } label: {
+                actionLabel(title: language.localized("境界線を調整"), systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.plain)
+            Menu {
+                Text(language.localized("その他の選択操作は今後追加予定です"))
+            } label: {
+                actionLabel(title: language.localized("その他"), systemImage: "ellipsis")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(red: 0.18, green: 0.18, blue: 0.19).opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.30), radius: 14, y: 8)
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            actionLabel(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.36)
+    }
+
+    private func actionLabel(title: String, systemImage: String) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 22, height: 18)
+            Text(title)
+                .font(StudioTheme.Typography.label(10))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 58, height: 26)
+        }
+        .foregroundStyle(Color.white.opacity(0.82))
+        .frame(width: 64, height: 48)
+        .contentShape(Rectangle())
     }
 }
 

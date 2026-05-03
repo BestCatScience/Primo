@@ -1140,7 +1140,7 @@ extension ContentView {
     }
 }
 
-let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .shape, .text]
+let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .move, .select, .shape, .text]
 
 struct Triangle: Shape {
     func path(in rect: CGRect) -> Path {

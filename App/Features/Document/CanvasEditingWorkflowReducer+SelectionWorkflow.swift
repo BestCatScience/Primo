@@ -65,7 +65,8 @@ extension CanvasEditingWorkflowReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        state.canvas.replaceSelection(selection)
+        return .none
     }
 
     func handleLassoSelection(
@@ -95,7 +96,8 @@ extension CanvasEditingWorkflowReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        state.canvas.replaceSelection(selection)
+        return .none
     }
 
     func handleAutoSelection(
@@ -117,7 +119,8 @@ extension CanvasEditingWorkflowReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        state.canvas.replaceSelection(selection)
+        return .none
     }
 
     func handlePreviewSelectionMove(
@@ -133,14 +136,15 @@ extension CanvasEditingWorkflowReducer {
             state.canvas.resetStrokePreview()
             return .none
         }
+        let selection = state.canvas.selectionMoveSourceSelection ?? state.canvas.selection
+        let baseSnapshot = state.canvas.selectionMoveBaseSnapshot ?? state.canvas.renderSnapshot
         guard
-            let selection = state.canvas.selectionMoveSourceSelection ?? state.canvas.selection,
-            let snapshot = state.canvas.renderSnapshot,
-            let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+            let baseSnapshot,
+            let layer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
             let transformedPixels = layerTransformProcessor.transformedLayerPixels(
                 source: layer.pixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
+                canvasWidth: baseSnapshot.width,
+                canvasHeight: baseSnapshot.height,
                 selection: selection,
                 translation: offset,
                 scaleX: 1,
@@ -156,7 +160,7 @@ extension CanvasEditingWorkflowReducer {
         }
 
         DocumentFeature.canvasPreviewStateCoordinator.applyLiveStrokePreview(
-            baseSnapshot: snapshot,
+            baseSnapshot: baseSnapshot,
             activeLayerIndex: state.canvas.activeLayerIndex,
             adjustedActiveLayerPixels: transformedPixels,
             gpuOperations: documentRenderingWorkflow,
@@ -181,10 +185,7 @@ extension CanvasEditingWorkflowReducer {
             state.canvas.resetStrokePreview()
             return .none
         }
-        guard let selection = state.canvas.selectionMoveSourceSelection ?? state.canvas.selection else {
-            state.canvas.resetStrokePreview()
-            return .none
-        }
+        let selection = state.canvas.selectionMoveSourceSelection ?? state.canvas.selection
 
         let outcome = canvasEditingWorkflowService.execute(
             .applyTransform,
@@ -239,7 +240,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     private func canMoveActiveSelection(in state: State) -> Bool {
-        guard state.canvas.selection != nil else { return false }
+        guard state.canvas.selection != nil || state.canvas.selectionMoveStartPoint != nil else { return false }
         guard let layer = state.canvas.layerBuffers.first(where: { $0.index == state.canvas.activeLayerIndex }) else {
             return false
         }

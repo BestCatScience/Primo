@@ -53,6 +53,7 @@ struct CanvasFeature {
         var selectionMoveStartPoint: CGPoint?
         var selectionMoveOffset: CGSize = .zero
         var selectionMoveSourceSelection: CanvasSelection?
+        var selectionMoveBaseSnapshot: MetalDocumentSnapshot?
         var activeTextLayer: TextLayerData?
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
@@ -113,7 +114,7 @@ struct CanvasFeature {
                 eyedropperSamplingSource: eyedropperSamplingSource
             )
             clearSelectionPreview()
-            if tool != .select {
+            if tool != .select && tool != .move {
                 clearSelection()
             }
         }
@@ -144,10 +145,10 @@ struct CanvasFeature {
         }
 
         mutating func beginSelectionMove(at point: CGPoint) {
-            guard let selection else { return }
             selectionMoveStartPoint = point
             selectionMoveOffset = .zero
             selectionMoveSourceSelection = selection
+            selectionMoveBaseSnapshot = renderSnapshot
             clearSelectionPreview()
         }
 
@@ -160,6 +161,7 @@ struct CanvasFeature {
             selectionMoveStartPoint = nil
             selectionMoveOffset = .zero
             selectionMoveSourceSelection = nil
+            selectionMoveBaseSnapshot = nil
         }
 
         mutating func clearAdjustmentPreview() {

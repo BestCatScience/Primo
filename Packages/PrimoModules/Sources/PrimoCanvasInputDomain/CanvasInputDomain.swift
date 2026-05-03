@@ -19,6 +19,7 @@ public enum CanvasInputToolKind: Equatable, Sendable {
     case blur
     case fill
     case eyedropper
+    case move
     case select
     case shape
     case text
@@ -172,10 +173,47 @@ public struct CanvasInputSelectionContext: Equatable, Sendable {
     }
 }
 
+public struct CanvasInputLayerMoveContext: Equatable, Sendable {
+    public var bounds: CGRect
+    public var width: Int
+    public var height: Int
+    public var pixelData: Data
+    public var alphaThreshold: UInt8
+
+    public init(
+        bounds: CGRect,
+        width: Int,
+        height: Int,
+        pixelData: Data,
+        alphaThreshold: UInt8 = 0
+    ) {
+        self.bounds = bounds
+        self.width = width
+        self.height = height
+        self.pixelData = pixelData
+        self.alphaThreshold = alphaThreshold
+    }
+
+    public func contains(_ point: CGPoint) -> Bool {
+        guard !bounds.isNull, !bounds.isEmpty, bounds.contains(point) else { return false }
+        guard width > 0, height > 0, pixelData.count == width * height * 4 else {
+            return false
+        }
+        let pixelX = Int((point.x - bounds.minX).rounded(.down))
+        let pixelY = Int((point.y - bounds.minY).rounded(.down))
+        guard (0..<width).contains(pixelX), (0..<height).contains(pixelY) else {
+            return false
+        }
+        let alphaIndex = ((pixelY * width) + pixelX) * 4 + 3
+        return pixelData[alphaIndex] > alphaThreshold
+    }
+}
+
 public struct CanvasInputConfiguration: Equatable, Sendable {
     public var tool: CanvasInputToolKind
     public var selectionMode: SelectionToolMode
     public var selectionContext: CanvasInputSelectionContext?
+    public var layerMoveContext: CanvasInputLayerMoveContext?
     public var shapeMode: ShapeToolMode
     public var brushTipKind: BrushTipKind
     public var brushColor: SIMD4<Float>
@@ -186,6 +224,7 @@ public struct CanvasInputConfiguration: Equatable, Sendable {
         tool: CanvasInputToolKind = .brush,
         selectionMode: SelectionToolMode = .lasso,
         selectionContext: CanvasInputSelectionContext? = nil,
+        layerMoveContext: CanvasInputLayerMoveContext? = nil,
         shapeMode: ShapeToolMode = .line,
         brushTipKind: BrushTipKind = .pencil,
         brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1),
@@ -195,6 +234,7 @@ public struct CanvasInputConfiguration: Equatable, Sendable {
         self.tool = tool
         self.selectionMode = selectionMode
         self.selectionContext = selectionContext
+        self.layerMoveContext = layerMoveContext
         self.shapeMode = shapeMode
         self.brushTipKind = brushTipKind
         self.brushColor = brushColor
@@ -226,6 +266,8 @@ public struct CanvasInputReducer: Sendable {
         configuration: CanvasInputConfiguration
     ) -> [CanvasInputCommand] {
         switch configuration.tool {
+        case .move:
+            return reduceMove(phase: phase, sample: sample, state: &state, configuration: configuration)
         case .select:
             return reduceSelection(phase: phase, sample: sample, coalescedSamples: coalescedSamples, state: &state, configuration: configuration)
         case .text:
@@ -352,7 +394,9 @@ public struct CanvasInputReducer: Sendable {
 
         switch phase {
         case .began:
-            if configuration.selectionContext?.contains(sample.point) == true {
+            if configuration.selectionContext?.contains(sample.point) == true ||
+                configuration.layerMoveContext?.contains(sample.point) == true
+            {
                 state.currentSelectionPoints.removeAll()
                 state.selectionMoveStartPoint = sample.point
                 return [.beginSelectionMove(sample.point)]
@@ -393,6 +437,39 @@ public struct CanvasInputReducer: Sendable {
             let points = state.currentSelectionPoints
             state.currentSelectionPoints.removeAll()
             return [.endSelectionPath(points)]
+        }
+    }
+
+    private func reduceMove(
+        phase: CanvasInputTouchPhase,
+        sample: CanvasInputSample,
+        state: inout State,
+        configuration: CanvasInputConfiguration
+    ) -> [CanvasInputCommand] {
+        switch phase {
+        case .began:
+            guard configuration.selectionContext?.contains(sample.point) == true ||
+                configuration.layerMoveContext?.contains(sample.point) == true
+            else {
+                state.currentSelectionPoints.removeAll()
+                state.selectionMoveStartPoint = nil
+                return []
+            }
+            state.currentSelectionPoints.removeAll()
+            state.selectionMoveStartPoint = sample.point
+            return [.beginSelectionMove(sample.point)]
+        case .moved, .stationary:
+            guard let startPoint = state.selectionMoveStartPoint else { return [] }
+            return [.updateSelectionMove(selectionMoveOffset(from: startPoint, to: sample.point))]
+        case .ended:
+            guard let startPoint = state.selectionMoveStartPoint else { return [] }
+            state.selectionMoveStartPoint = nil
+            return [.endSelectionMove(selectionMoveOffset(from: startPoint, to: sample.point))]
+        case .cancelled:
+            guard state.selectionMoveStartPoint != nil else { return [] }
+            state.selectionMoveStartPoint = nil
+            state.currentSelectionPoints.removeAll()
+            return [.cancelSelectionMove]
         }
     }
 

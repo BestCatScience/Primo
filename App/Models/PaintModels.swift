@@ -28,6 +28,8 @@ extension StudioToolKind {
             return language.localized("塗りつぶし")
         case .eyedropper:
             return language.localized("スポイト設定")
+        case .move:
+            return language.localized("移動")
         case .select:
             return language.localized("選択")
         case .shape:
@@ -49,6 +51,8 @@ extension StudioToolKind {
             return "paintbrush.fill"
         case .eyedropper:
             return "eyedropper"
+        case .move:
+            return "arrow.up.and.down.and.arrow.left.and.right"
         case .select:
             return "lasso"
         case .shape:

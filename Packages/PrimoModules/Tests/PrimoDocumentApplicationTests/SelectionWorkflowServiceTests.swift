@@ -42,6 +42,27 @@ struct SelectionWorkflowServiceTests {
     }
 
     @Test
+    func openLassoPointsBuildSelection() throws {
+        let service = SelectionWorkflowService(operations: .selectionStub())
+
+        let selection = try #require(
+            service.makeLassoSelection(
+                from: [
+                    CGPoint(x: 1, y: 1),
+                    CGPoint(x: 4, y: 1),
+                    CGPoint(x: 4, y: 4),
+                    CGPoint(x: 1, y: 4)
+                ],
+                canvasSize: CGSize(width: 6, height: 6)
+            )
+        )
+
+        #expect(selection.mode == .lasso)
+        #expect(selection.bounds == CGRect(x: 0, y: 0, width: 6, height: 6))
+        #expect(selection.maskData == Data(repeating: 255, count: 36))
+    }
+
+    @Test
     func rectangleSelectionBuildsClampedMask() throws {
         let service = SelectionWorkflowService(operations: .selectionStub())
 

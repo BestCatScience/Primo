@@ -3235,7 +3235,7 @@ kernel void lassoSelectionKernel(
         const float2 a = points[i];
         const float2 b = points[j];
         const bool intersects = ((a.y > samplePoint.y) != (b.y > samplePoint.y)) &&
-            (samplePoint.x < ((b.x - a.x) * (samplePoint.y - a.y) / max(b.y - a.y, 0.00001)) + a.x);
+            (samplePoint.x < ((b.x - a.x) * (samplePoint.y - a.y) / (b.y - a.y)) + a.x);
         if (intersects) {
             inside = !inside;
         }
