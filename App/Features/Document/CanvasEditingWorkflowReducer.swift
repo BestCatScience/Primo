@@ -19,6 +19,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.documentPresentationReader) var documentPresentationReader
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.canvasEditingWorkflowService) var canvasEditingWorkflowService
+    @Dependency(\.documentContentService) var documentContentService
     @Dependency(\.layerTransformProcessor) var layerTransformProcessor
     @Dependency(\.selectionWorkflowEnvironment) var selectionWorkflowEnvironment
 

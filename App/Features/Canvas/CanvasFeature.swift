@@ -54,6 +54,8 @@ struct CanvasFeature {
         var selectionMoveOffset: CGSize = .zero
         var selectionMoveSourceSelection: CanvasSelection?
         var selectionMoveBaseSnapshot: MetalDocumentSnapshot?
+        var selectionMoveSession: CanvasSelectionMoveSession?
+        var retainedSelectionMoveSession: CanvasSelectionMoveSession?
         var activeTextLayer: TextLayerData?
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
@@ -118,18 +120,19 @@ struct CanvasFeature {
                 clearSelection()
             }
         }
-
         mutating func setSelection(_ selection: CanvasSelection?) {
             self.selection = selection
         }
 
         mutating func clearSelection() {
             selection = nil
+            retainedSelectionMoveSession = nil
             cancelSelectionMove()
         }
 
         mutating func replaceSelection(_ selection: CanvasSelection?) {
             self.selection = selection
+            retainedSelectionMoveSession = nil
             clearSelectionPreview()
             cancelSelectionMove()
         }
@@ -141,6 +144,7 @@ struct CanvasFeature {
         mutating func clearSelectionState() {
             selection = nil
             selectionPreviewPoints = []
+            retainedSelectionMoveSession = nil
             cancelSelectionMove()
         }
 
@@ -149,6 +153,7 @@ struct CanvasFeature {
             selectionMoveOffset = .zero
             selectionMoveSourceSelection = selection
             selectionMoveBaseSnapshot = renderSnapshot
+            selectionMoveSession = nil
             clearSelectionPreview()
         }
 
@@ -162,6 +167,7 @@ struct CanvasFeature {
             selectionMoveOffset = .zero
             selectionMoveSourceSelection = nil
             selectionMoveBaseSnapshot = nil
+            selectionMoveSession = nil
         }
 
         mutating func clearAdjustmentPreview() {
@@ -822,4 +828,27 @@ struct CanvasFeature {
         }
     }
 
+}
+
+struct CanvasSelectionMoveSession: Equatable {
+    var layerIndex: Int
+    var canvasWidth: Int
+    var canvasHeight: Int
+    var basePixels: Data
+    var payloadPixels: Data
+    var committedOffset: CGSize
+
+    func committed(by offset: CGSize) -> CanvasSelectionMoveSession {
+        CanvasSelectionMoveSession(
+            layerIndex: layerIndex,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            basePixels: basePixels,
+            payloadPixels: payloadPixels,
+            committedOffset: CGSize(
+                width: committedOffset.width + offset.width,
+                height: committedOffset.height + offset.height
+            )
+        )
+    }
 }
