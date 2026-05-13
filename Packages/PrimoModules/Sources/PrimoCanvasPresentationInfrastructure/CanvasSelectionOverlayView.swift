@@ -18,8 +18,8 @@ final class CanvasSelectionOverlayView: UIView {
         isUserInteractionEnabled = false
         backgroundColor = .clear
 
-        configureAntLayer(selectionWhiteLayer, color: .white, lineWidth: 1.8, phase: 0)
-        configureAntLayer(selectionBlackLayer, color: .black, lineWidth: 1.2, phase: 6)
+        configureSelectionOutlineLayer(selectionWhiteLayer, color: .white, lineWidth: 2.6)
+        configureSelectionOutlineLayer(selectionBlackLayer, color: .black, lineWidth: 1.2)
         configureAntLayer(previewWhiteLayer, color: .white, lineWidth: 1.8, phase: 0)
         configureAntLayer(previewBlackLayer, color: .black, lineWidth: 1.2, phase: 6)
 
@@ -31,7 +31,6 @@ final class CanvasSelectionOverlayView: UIView {
 
         [selectionWhiteLayer, selectionBlackLayer, previewWhiteLayer, previewBlackLayer].forEach {
             layer.addSublayer($0)
-            startMarchingAntsAnimation(on: $0)
         }
         layer.addSublayer(lassoOriginWhiteLayer)
         layer.addSublayer(lassoOriginBlackLayer)
@@ -222,15 +221,16 @@ final class CanvasSelectionOverlayView: UIView {
         layer.lineDashPhase = phase
     }
 
-    private func startMarchingAntsAnimation(on layer: CAShapeLayer) {
-        let animation = CABasicAnimation(keyPath: "lineDashPhase")
-        animation.fromValue = layer.lineDashPhase
-        animation.toValue = layer.lineDashPhase - 12
-        animation.duration = 0.65
-        animation.repeatCount = .infinity
-        animation.isRemovedOnCompletion = false
-        layer.add(animation, forKey: "marchingAnts")
+    private func configureSelectionOutlineLayer(_ layer: CAShapeLayer, color: UIColor, lineWidth: CGFloat) {
+        layer.strokeColor = color.withAlphaComponent(0.98).cgColor
+        layer.fillColor = UIColor.clear.cgColor
+        layer.lineWidth = lineWidth
+        layer.lineCap = .round
+        layer.lineJoin = .round
+        layer.lineDashPattern = nil
+        layer.lineDashPhase = 0
     }
+
 }
 
 private extension StudioToolKind {
