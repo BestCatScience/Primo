@@ -72,10 +72,14 @@ struct ImportExportFeature {
     }
 
     @Dependency(\.dateClient) var dateClient
-    @Dependency(\.documentExportGateway) var documentExportGateway
+    @Dependency(\.documentExportCapability) var documentExportCapability
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.uuidClient) var uuidClient
+
+    var documentExportGateway: DocumentExportGateway {
+        documentExportCapability.exportGateway
+    }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in

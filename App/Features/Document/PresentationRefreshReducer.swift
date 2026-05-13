@@ -1,18 +1,34 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
+import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
 
 struct PresentationRefreshReducer: Reducer {
     typealias State = DocumentEditingState
     typealias WorkspaceDocumentSnapshot = DocumentFeature.WorkspaceDocumentSnapshot
 
-    @Dependency(\.documentExportGateway) var documentExportGateway
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
+    @Dependency(\.documentPresentationCapability) var documentPresentationCapability
     @Dependency(\.processEnvironmentClient) var processEnvironmentClient
+
+    var documentExportGateway: DocumentExportGateway {
+        documentPresentationCapability.exportGateway
+    }
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentPresentationCapability.renderingWorkflow
+    }
+
+    var documentPersistenceGateway: DocumentPersistenceGateway {
+        documentPresentationCapability.persistenceGateway
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentPresentationCapability.presentationReader
+    }
 
     enum Action: Equatable {
         case startupPresentationBootstrapRequested

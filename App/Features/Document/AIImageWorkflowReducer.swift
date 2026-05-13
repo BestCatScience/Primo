@@ -3,6 +3,7 @@ import Foundation
 import PrimoAIImageApplication
 import PrimoAIImageDomain
 import PrimoDocumentApplication
+import PrimoDocumentRuntime
 
 struct AIImageWorkflowReducer: Reducer {
     typealias State = DocumentFeature.State
@@ -19,11 +20,27 @@ struct AIImageWorkflowReducer: Reducer {
     @Dependency(\.aiImageEditUseCase) var aiImageEditUseCase
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.dateClient) var dateClient
-    @Dependency(\.documentContentService) var documentContentService
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
-    @Dependency(\.documentTextLayerService) var documentTextLayerService
-    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
+    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
+
+    var documentContentService: DocumentContentService {
+        documentLayerMutationCapability.contentService
+    }
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentLayerMutationCapability.renderingWorkflow
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentLayerMutationCapability.presentationReader
+    }
+
+    var documentTextLayerService: DocumentTextLayerService {
+        documentLayerMutationCapability.textLayerService
+    }
+
+    var selectionWorkflowService: SelectionWorkflowService {
+        documentLayerMutationCapability.selectionWorkflowService
+    }
     @Dependency(\.uuidClient) var uuidClient
 
     enum Action: Equatable {

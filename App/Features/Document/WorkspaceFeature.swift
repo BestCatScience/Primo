@@ -3,6 +3,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication
 
@@ -55,10 +56,14 @@ struct WorkspaceFeature {
     typealias WorkspaceApplicationServices = PrimoWorkspaceApplication.WorkspaceApplicationServices
 
     @Dependency(\.documentImportClient) var documentImportClient
-    @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
+    @Dependency(\.documentPersistenceCapability) var documentPersistenceCapability
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.workspaceApplicationWorkflowService) var workspaceApplicationWorkflowService
     @Dependency(\.uuidClient) var uuidClient
+
+    var documentPersistenceGateway: DocumentPersistenceGateway {
+        documentPersistenceCapability.persistenceGateway
+    }
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)

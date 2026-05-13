@@ -1,6 +1,12 @@
 import ComposableArchitecture
+import PrimoCanvasPresentationDomain
+import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
+import PrimoDocumentRuntime
+import PrimoDocumentStrokeApplication
 
 struct CanvasEditingWorkflowReducer: Reducer {
     typealias State = DocumentEditingState
@@ -12,16 +18,47 @@ struct CanvasEditingWorkflowReducer: Reducer {
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
     typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
 
-    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentLayerCommandService) var documentLayerCommandService
-    @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
-    @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
-    @Dependency(\.canvasEditingWorkflowService) var canvasEditingWorkflowService
-    @Dependency(\.documentContentService) var documentContentService
-    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
-    @Dependency(\.selectionWorkflowEnvironment) var selectionWorkflowEnvironment
+    @Dependency(\.documentStrokeCapability) var documentStrokeCapability
+
+    var canvasStrokeInteractionService: CanvasStrokeInteractionService {
+        documentStrokeCapability.canvasStrokeInteractionService
+    }
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentStrokeCapability.renderingWorkflow
+    }
+
+    var documentLayerCommandService: DocumentLayerCommandService {
+        documentStrokeCapability.layerCommandService
+    }
+
+    var documentPersistenceGateway: DocumentPersistenceGateway {
+        documentStrokeCapability.persistenceGateway
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentStrokeCapability.presentationReader
+    }
+
+    var documentStrokeCommandService: DocumentStrokeCommandService {
+        documentStrokeCapability.strokeCommandService
+    }
+
+    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
+        documentStrokeCapability.canvasEditingWorkflowService
+    }
+
+    var documentContentService: DocumentContentService {
+        documentStrokeCapability.contentService
+    }
+
+    var layerTransformProcessor: any LayerTransformProcessing {
+        documentStrokeCapability.layerTransformProcessor
+    }
+
+    var selectionWorkflowEnvironment: SelectionWorkflowEnvironment {
+        documentStrokeCapability.selectionWorkflowEnvironment
+    }
 
     enum EditingAction: Equatable {
         case featherSelectionRequested(Int)

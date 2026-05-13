@@ -607,6 +607,51 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentReducersUseRuntimeCapabilitiesInsteadOfRawServices() throws {
+        let repoRoot = try Self.repoRoot()
+        let reducerSources = [
+            "App/Features/Document/WorkspaceFeature.swift",
+            "App/Features/Document/PresentationRefreshReducer.swift",
+            "App/Features/Document/DocumentLifecycleReducer.swift",
+            "App/Features/Document/CanvasEditingWorkflowReducer.swift",
+            "App/Features/Document/LayerWorkflowReducer.swift",
+            "App/Features/Document/AdjustmentWorkflowReducer.swift",
+            "App/Features/Document/AIImageWorkflowReducer.swift",
+            "App/Features/Document/ImportExportFeature.swift"
+        ]
+        let bannedDependencyKeys = [
+            "documentRuntime",
+            "documentPresentationReader",
+            "documentPersistenceGateway",
+            "documentExportGateway",
+            "documentRenderingWorkflow",
+            "documentCanvasCommandService",
+            "documentLayerCommandService",
+            "documentStrokeCommandService",
+            "documentHistoryCommandService",
+            "documentMutationWorkflowService",
+            "documentContentService",
+            "documentTextLayerService",
+            "canvasStrokeInteractionService",
+            "canvasEditingWorkflowService",
+            "layerTransformProcessor",
+            "selectionWorkflowService",
+            "selectionWorkflowEnvironment"
+        ]
+
+        for sourcePath in reducerSources {
+            let source = repoRoot.appendingPathComponent(sourcePath, isDirectory: false)
+            let body = try String(contentsOf: source, encoding: .utf8)
+            for key in bannedDependencyKeys {
+                #expect(
+                    !body.contains("@Dependency(\\.\(key))"),
+                    "\(sourcePath) should depend on document runtime capabilities instead of \\.\(key)"
+                )
+            }
+        }
+    }
+
+    @Test
     func appDoesNotUseRawDocumentGatewayDependencies() throws {
         let repoRoot = try Self.repoRoot()
         let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)

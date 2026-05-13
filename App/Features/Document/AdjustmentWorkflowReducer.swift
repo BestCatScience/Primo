@@ -1,14 +1,26 @@
 import ComposableArchitecture
+import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
+import PrimoDocumentRuntime
 
 struct AdjustmentWorkflowReducer: Reducer {
     typealias State = DocumentEditingState
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
+    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentLayerMutationCapability.renderingWorkflow
+    }
+
+    var documentMutationWorkflowService: DocumentMutationWorkflowService {
+        documentLayerMutationCapability.mutationWorkflowService
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentLayerMutationCapability.presentationReader
+    }
 
     enum EditingAction: Equatable {
         case gradientMapSelected(GradientMapPreset)

@@ -31,8 +31,67 @@ struct SelectionWorkflowEnvironment: Sendable {
     }
 }
 
+struct DocumentPresentationCapability: Sendable {
+    let presentationReader: DocumentPresentationReader
+    let persistenceGateway: DocumentPersistenceGateway
+    let exportGateway: DocumentExportGateway
+    let renderingWorkflow: DocumentRenderingWorkflow
+}
+
+struct DocumentCanvasMutationCapability: Sendable {
+    let canvasCommandService: DocumentCanvasCommandService
+    let historyCommandService: DocumentHistoryCommandService
+    let persistenceGateway: DocumentPersistenceGateway
+    let presentationReader: DocumentPresentationReader
+    let renderingWorkflow: DocumentRenderingWorkflow
+}
+
+struct DocumentLayerMutationCapability: Sendable {
+    let contentService: DocumentContentService
+    let renderingWorkflow: DocumentRenderingWorkflow
+    let mutationWorkflowService: DocumentMutationWorkflowService
+    let presentationReader: DocumentPresentationReader
+    let textLayerService: DocumentTextLayerService
+    let selectionWorkflowService: SelectionWorkflowService
+}
+
+struct DocumentStrokeCapability: Sendable {
+    let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    let renderingWorkflow: DocumentRenderingWorkflow
+    let layerCommandService: DocumentLayerCommandService
+    let strokeCommandService: DocumentStrokeCommandService
+    let persistenceGateway: DocumentPersistenceGateway
+    let presentationReader: DocumentPresentationReader
+    let canvasEditingWorkflowService: CanvasEditingWorkflowService
+    let contentService: DocumentContentService
+    let layerTransformProcessor: any LayerTransformProcessing
+    let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
+}
+
+struct DocumentExportCapability: Sendable {
+    let exportGateway: DocumentExportGateway
+}
+
+struct DocumentPersistenceCapability: Sendable {
+    let persistenceGateway: DocumentPersistenceGateway
+}
+
+struct DocumentPreviewRenderingCapability: Sendable {
+    let canvasPreviewRenderer: any CanvasPreviewRendering
+    let canvasEyedropperSampler: any CanvasEyedropperSampling
+    let selectionMaskProcessor: any SelectionMaskProcessing
+    let canvasPresentationEnvironment: CanvasPresentationEnvironment
+}
+
 struct DocumentApplicationEnvironment: Sendable {
     let runtime: DocumentRuntime
+    let presentationCapability: DocumentPresentationCapability
+    let canvasMutationCapability: DocumentCanvasMutationCapability
+    let layerMutationCapability: DocumentLayerMutationCapability
+    let strokeCapability: DocumentStrokeCapability
+    let exportCapability: DocumentExportCapability
+    let persistenceCapability: DocumentPersistenceCapability
+    let previewRenderingCapability: DocumentPreviewRenderingCapability
     let presentationReader: DocumentPresentationReader
     let persistenceGateway: DocumentPersistenceGateway
     let exportGateway: DocumentExportGateway
@@ -61,7 +120,10 @@ struct DocumentApplicationEnvironment: Sendable {
         self.canvasStrokeInteractionService = runtime.canvasStrokeInteractionService
         self.renderingWorkflow = runtime.renderingWorkflow
         self.canvasPreviewRenderer = runtime.canvasPreviewRenderer
-        self.canvasEyedropperSampler = GpuCanvasEyedropperSampler()
+        let canvasEyedropperSampler = GpuCanvasEyedropperSampler()
+        let selectionWorkflowEnvironment = SelectionWorkflowEnvironment(workflow: runtime.selectionWorkflow)
+
+        self.canvasEyedropperSampler = canvasEyedropperSampler
         self.selectionMaskProcessor = runtime.selectionMaskProcessor
         self.canvasPresentationEnvironment = runtime.canvasPresentationEnvironment
         self.canvasCommandService = runtime.canvasCommands
@@ -73,22 +135,66 @@ struct DocumentApplicationEnvironment: Sendable {
         self.canvasEditingWorkflowService = runtime.canvasEditingWorkflow
         self.layerTransformProcessor = runtime.layerTransformProcessor
         self.selectionWorkflowService = runtime.selectionWorkflow
-        self.selectionWorkflowEnvironment = SelectionWorkflowEnvironment(workflow: runtime.selectionWorkflow)
+        self.selectionWorkflowEnvironment = selectionWorkflowEnvironment
 
         let persistenceClient = runtime.persistenceClient
-        self.persistenceGateway = DocumentPersistenceGateway(
+        let persistenceGateway = DocumentPersistenceGateway(
             saveProject: persistenceClient.saveProject,
             loadProject: persistenceClient.loadProject,
             setPaperStyle: persistenceClient.setPaperStyle,
             newCanvas: persistenceClient.newCanvas,
             prewarmDrawingResources: persistenceClient.prewarmDrawingResources
         )
+        self.persistenceGateway = persistenceGateway
 
         let exportClient = runtime.exportClient
-        self.exportGateway = DocumentExportGateway(
+        let exportGateway = DocumentExportGateway(
             compositeSurface: exportClient.compositeSurface,
             compositePNGData: exportClient.compositePNGData,
             timelapseCapture: exportClient.timelapseCapture
+        )
+        self.exportGateway = exportGateway
+
+        self.presentationCapability = DocumentPresentationCapability(
+            presentationReader: runtime.presentationReader,
+            persistenceGateway: persistenceGateway,
+            exportGateway: exportGateway,
+            renderingWorkflow: runtime.renderingWorkflow
+        )
+        self.canvasMutationCapability = DocumentCanvasMutationCapability(
+            canvasCommandService: runtime.canvasCommands,
+            historyCommandService: runtime.historyCommands,
+            persistenceGateway: persistenceGateway,
+            presentationReader: runtime.presentationReader,
+            renderingWorkflow: runtime.renderingWorkflow
+        )
+        self.layerMutationCapability = DocumentLayerMutationCapability(
+            contentService: runtime.contentService,
+            renderingWorkflow: runtime.renderingWorkflow,
+            mutationWorkflowService: runtime.mutationWorkflow,
+            presentationReader: runtime.presentationReader,
+            textLayerService: runtime.textLayerService,
+            selectionWorkflowService: runtime.selectionWorkflow
+        )
+        self.strokeCapability = DocumentStrokeCapability(
+            canvasStrokeInteractionService: runtime.canvasStrokeInteractionService,
+            renderingWorkflow: runtime.renderingWorkflow,
+            layerCommandService: runtime.layerCommands,
+            strokeCommandService: runtime.strokeCommands,
+            persistenceGateway: persistenceGateway,
+            presentationReader: runtime.presentationReader,
+            canvasEditingWorkflowService: runtime.canvasEditingWorkflow,
+            contentService: runtime.contentService,
+            layerTransformProcessor: runtime.layerTransformProcessor,
+            selectionWorkflowEnvironment: selectionWorkflowEnvironment
+        )
+        self.exportCapability = DocumentExportCapability(exportGateway: exportGateway)
+        self.persistenceCapability = DocumentPersistenceCapability(persistenceGateway: persistenceGateway)
+        self.previewRenderingCapability = DocumentPreviewRenderingCapability(
+            canvasPreviewRenderer: runtime.canvasPreviewRenderer,
+            canvasEyedropperSampler: canvasEyedropperSampler,
+            selectionMaskProcessor: runtime.selectionMaskProcessor,
+            canvasPresentationEnvironment: runtime.canvasPresentationEnvironment
         )
     }
 }
@@ -116,6 +222,34 @@ extension DependencyValues {
             self[DocumentRuntimeKey.self] = newValue
             documentApplicationEnvironment = DocumentApplicationEnvironment(runtime: newValue)
         }
+    }
+
+    var documentPresentationCapability: DocumentPresentationCapability {
+        documentApplicationEnvironment.presentationCapability
+    }
+
+    var documentCanvasMutationCapability: DocumentCanvasMutationCapability {
+        documentApplicationEnvironment.canvasMutationCapability
+    }
+
+    var documentLayerMutationCapability: DocumentLayerMutationCapability {
+        documentApplicationEnvironment.layerMutationCapability
+    }
+
+    var documentStrokeCapability: DocumentStrokeCapability {
+        documentApplicationEnvironment.strokeCapability
+    }
+
+    var documentExportCapability: DocumentExportCapability {
+        documentApplicationEnvironment.exportCapability
+    }
+
+    var documentPersistenceCapability: DocumentPersistenceCapability {
+        documentApplicationEnvironment.persistenceCapability
+    }
+
+    var documentPreviewRenderingCapability: DocumentPreviewRenderingCapability {
+        documentApplicationEnvironment.previewRenderingCapability
     }
 
     var documentPresentationReader: DocumentPresentationReader {

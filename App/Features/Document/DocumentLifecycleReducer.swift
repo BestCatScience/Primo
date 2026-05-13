@@ -1,5 +1,9 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentRenderingContracts
+import PrimoDocumentRuntime
 
 struct DocumentLifecycleReducer: Reducer {
     typealias State = DocumentEditingState
@@ -9,11 +13,28 @@ struct DocumentLifecycleReducer: Reducer {
     typealias DocumentMutationFeedbackMapper = DocumentFeature.DocumentMutationFeedbackMapper
     typealias WorkspaceDocumentSnapshot = DocumentFeature.WorkspaceDocumentSnapshot
 
-    @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
-    @Dependency(\.documentExportGateway) var documentExportGateway
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
+    @Dependency(\.documentCanvasMutationCapability) var documentCanvasMutationCapability
+    @Dependency(\.documentExportCapability) var documentExportCapability
+
+    var documentCanvasCommandService: DocumentCanvasCommandService {
+        documentCanvasMutationCapability.canvasCommandService
+    }
+
+    var documentExportGateway: DocumentExportGateway {
+        documentExportCapability.exportGateway
+    }
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentCanvasMutationCapability.renderingWorkflow
+    }
+
+    var documentHistoryCommandService: DocumentHistoryCommandService {
+        documentCanvasMutationCapability.historyCommandService
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentCanvasMutationCapability.presentationReader
+    }
 
     enum Action: Equatable {
         case freshDocumentMutationRequested(DocumentFeature.FreshDocumentMutationRequest)

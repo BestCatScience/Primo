@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentRuntime
+import PrimoDocumentStrokeApplication
 
 struct LayerWorkflowReducer: Reducer {
     typealias State = DocumentEditingState
@@ -14,13 +16,36 @@ struct LayerWorkflowReducer: Reducer {
     typealias LayerWorkflowService = DocumentFeature.LayerWorkflowService
 
     @Dependency(\.appLanguageClient) var appLanguageClient
-    @Dependency(\.documentContentService) var documentContentService
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
-    @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
-    @Dependency(\.documentPresentationReader) var documentPresentationReader
-    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
-    @Dependency(\.documentTextLayerService) var documentTextLayerService
-    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
+    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
+    @Dependency(\.documentStrokeCapability) var documentStrokeCapability
+
+    var documentContentService: DocumentContentService {
+        documentLayerMutationCapability.contentService
+    }
+
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        documentLayerMutationCapability.renderingWorkflow
+    }
+
+    var documentMutationWorkflowService: DocumentMutationWorkflowService {
+        documentLayerMutationCapability.mutationWorkflowService
+    }
+
+    var documentPresentationReader: DocumentPresentationReader {
+        documentLayerMutationCapability.presentationReader
+    }
+
+    var canvasStrokeInteractionService: CanvasStrokeInteractionService {
+        documentStrokeCapability.canvasStrokeInteractionService
+    }
+
+    var documentTextLayerService: DocumentTextLayerService {
+        documentLayerMutationCapability.textLayerService
+    }
+
+    var selectionWorkflowService: SelectionWorkflowService {
+        documentLayerMutationCapability.selectionWorkflowService
+    }
 
     enum EditingAction: Equatable {
         case clearActiveLayerButtonTapped
