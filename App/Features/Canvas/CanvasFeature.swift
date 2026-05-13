@@ -722,10 +722,10 @@ struct CanvasFeature {
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
                 if state.currentTool == .shape {
-                    state.activeStroke = nil
+                    state.activeStroke = stroke
                     guard stroke.points.count >= 2 else { return .none }
                     state.shapePreviewIsLive = true
-                    return .send(.delegate(.previewShapeStroke(stroke.points.map(\.stylusSample))))
+                    return .none
                 }
 
                 let previousStroke = state.activeStroke

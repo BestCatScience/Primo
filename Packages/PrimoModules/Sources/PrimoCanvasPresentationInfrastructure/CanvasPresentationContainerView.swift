@@ -21,6 +21,7 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
 
     private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
     private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
+    private let shapePreviewLayer = CAShapeLayer()
     private let inputHandler = CanvasInputHandler()
     private let previewRenderer: any CanvasPreviewRendering
     private let eyedropperSampler: any CanvasEyedropperSampling
@@ -58,7 +59,14 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
 
         addSubview(canvasRenderSurfaceView)
         addSubview(shapePreviewSurfaceView)
+        shapePreviewSurfaceView.isHidden = true
+        layer.addSublayer(shapePreviewLayer)
         addSubview(selectionOverlayView)
+        shapePreviewLayer.fillColor = UIColor.clear.cgColor
+        shapePreviewLayer.lineCap = .round
+        shapePreviewLayer.lineJoin = .round
+        shapePreviewLayer.isHidden = true
+        shapePreviewLayer.contentsScale = UIScreen.main.scale
 
         navigationGestureAdapter.actionSink = actionSink
         navigationGestureAdapter.shouldAllowSimultaneousRecognition = { [weak self] gesture, otherGesture in
@@ -94,6 +102,7 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         super.layoutSubviews()
         canvasRenderSurfaceView.frame = bounds
         shapePreviewSurfaceView.frame = bounds
+        shapePreviewLayer.frame = bounds
         selectionOverlayView.frame = bounds
     }
 
@@ -297,20 +306,74 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
     ) {
         guard let stroke, currentTool == .shape, stroke.points.count >= 2 else {
             shapePreviewSurfaceView.update(surface: nil)
+            shapePreviewLayer.path = nil
+            shapePreviewLayer.isHidden = true
             return
         }
-        guard let snapshot,
-              let surface = previewRenderer.shapePreviewSurface(
-                stroke: stroke,
-                style: style,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height
-              ) else {
+        guard snapshot != nil else {
             shapePreviewSurfaceView.update(surface: nil)
+            shapePreviewLayer.path = nil
+            shapePreviewLayer.isHidden = true
             return
         }
-        shapePreviewSurfaceView.update(surface: surface)
-        shapePreviewSurfaceView.frame = viewport.contentRect
+        shapePreviewSurfaceView.update(surface: nil)
+        shapePreviewLayer.path = Self.shapePreviewPath(stroke: stroke, viewport: viewport)
+        shapePreviewLayer.strokeColor = style.color.copy(alpha: Self.shapePreviewAlpha(style: style))
+        shapePreviewLayer.lineWidth = Self.shapePreviewLineWidth(style: style, viewport: viewport)
+        shapePreviewLayer.isHidden = false
+        shapePreviewLayer.setNeedsDisplay()
+    }
+
+    private static func shapePreviewPath(stroke: Stroke, viewport: CanvasViewportGeometry) -> CGPath {
+        let path = CGMutablePath()
+        for (index, point) in stroke.points.enumerated() {
+            let viewPoint = viewport.viewPoint(
+                fromDocumentPoint: CGPoint(
+                    x: CGFloat(point.position.x),
+                    y: CGFloat(point.position.y)
+                )
+            )
+            if index == 0 {
+                path.move(to: viewPoint)
+            } else {
+                path.addLine(to: viewPoint)
+            }
+        }
+        return path
+    }
+
+    private static func shapePreviewLineWidth(
+        style: PreviewStrokeStyle,
+        viewport: CanvasViewportGeometry
+    ) -> CGFloat {
+        guard viewport.documentSize.width > 0 else { return max(1, style.radius * 2.0) }
+        let scale = viewport.contentRect.width / viewport.documentSize.width
+        let textureWidthFactor: CGFloat
+        switch style.tipKind {
+        case .pencil:
+            textureWidthFactor = 0.64
+        case .airbrush:
+            textureWidthFactor = 0.82
+        case .oil, .ink:
+            textureWidthFactor = 1.0
+        }
+        return max(1, style.radius * 2.0 * scale * textureWidthFactor)
+    }
+
+    private static func shapePreviewAlpha(style: PreviewStrokeStyle) -> CGFloat {
+        let baseAlpha = style.color.alpha * style.opacity * style.flow
+        let textureFactor: CGFloat
+        switch style.tipKind {
+        case .pencil:
+            textureFactor = 0.22
+        case .airbrush:
+            textureFactor = 0.28
+        case .oil:
+            textureFactor = 0.56
+        case .ink:
+            textureFactor = 1.0
+        }
+        return max(0.025, min(1.0, baseAlpha * textureFactor))
     }
 }
 

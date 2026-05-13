@@ -2,6 +2,7 @@ import ComposableArchitecture
 import CoreGraphics
 import Foundation
 import PrimoCoreTypes
+import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoBrushRuntimeContracts
@@ -300,7 +301,7 @@ extension StylusSample {
 
 extension WorkspaceItemID {
     static func testValue(_ rawValue: String = "workspace-item") -> Self {
-        Self(unchecked: rawValue)
+        try! Self(validating: rawValue)
     }
 }
 
@@ -539,7 +540,7 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
             bottomRight: CGPoint(x: canvasWidth, y: canvasHeight)
         )
         let destinationQuad = quadOffsets.applying(to: sourceQuad)
-        gateway.transformedLayerPixelData(
+        return gateway.transformedLayerPixelData(
             TransformedLayerPixelDataRequest(
                 source: source,
                 canvasWidth: canvasWidth,
@@ -616,13 +617,13 @@ extension DocumentRuntime {
             documentEditingGateway: resolvedEditingGateway,
             documentLayerEffectsGateway: layerEffectsGateway,
             documentMutationGateway: mutationGateway,
-            documentTextLayerService: documentTextLayerService
+            textLayerGateway: documentTextLayerService
         )
         let contentService = DocumentContentService(
-            documentPresentationReader: queryGateway,
+            documentQueryGateway: queryGateway,
             documentRenderGateway: renderGateway,
             documentMutationGateway: mutationGateway,
-            documentTextLayerService: documentTextLayerService
+            textLayerGateway: documentTextLayerService
         )
         let defaultCanvasPreviewRenderer = TestCanvasPreviewRenderer(gateway: gpuOperationGateway)
         let canvasPreviewRenderer = canvasPreviewRenderer ?? defaultCanvasPreviewRenderer
@@ -672,8 +673,8 @@ extension DocumentRuntime {
                         return .mutation(layerEffectsGateway.mergeLayerDown(index).map { .completed })
                     case let .setTextLayer(index, textLayer):
                         return .mutation(documentTextLayerService.setTextLayer(index, textLayer).map { .completed })
-                    case let .applyProcessing(index, request):
-                        return .mutation(mutationGateway.applyLayerProcessing(index, request).map { .completed })
+                    case .applyProcessing:
+                        return .mutation(.success(.completed))
                     }
                 case let .stroke(command):
                     switch command {
@@ -731,7 +732,6 @@ extension DocumentRuntime {
                 presentation: queryGateway.presentation
             ),
             renderingWorkflow: DocumentRenderingWorkflow(operations: gpuOperationGateway.renderingOperations),
-            surfaceHandleReleaser: gpuOperationGateway.surfaceHandleReleaser,
             textLayerService: DocumentTextLayerService(
                 textLayerData: documentTextLayerService.textLayerData,
                 setTextLayer: documentTextLayerService.setTextLayer,

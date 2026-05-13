@@ -501,6 +501,40 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         }
     }
 
+    func testShapeStrokeUpdateUsesOverlayPreviewInsteadOfGpuMutationPreview() async {
+        let stroke = Stroke(points: [
+            StrokePoint(
+                position: SIMD2<Float>(1, 1),
+                pressure: 1,
+                altitude: 0,
+                azimuth: 0,
+                timestamp: 0,
+                isPredicted: false
+            ),
+            StrokePoint(
+                position: SIMD2<Float>(4, 4),
+                pressure: 1,
+                altitude: 0,
+                azimuth: 0,
+                timestamp: 1,
+                isPredicted: false
+            ),
+        ])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .shape
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeUpdated(stroke)) {
+            $0.isStrokeActive = true
+            $0.activeStroke = stroke
+            $0.shapePreviewIsLive = true
+        }
+    }
+
     func testBlurStrokeCancelDiscardsInsteadOfFinalizing() async {
         let stroke = Stroke(points: [
             StrokePoint(

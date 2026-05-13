@@ -551,6 +551,7 @@ extension CanvasEditingWorkflowReducer {
         case let .failure(failure):
             return applyCanvasStrokeFailure(failure, state: &state)
         }
+        resetStrokePreviewState(state: &state)
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { state in
@@ -575,7 +576,10 @@ extension CanvasEditingWorkflowReducer {
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> Effect<Action> {
-        canvasStrokeInteractionCoordinator.finish(
+        if state.canvas.currentTool == .shape {
+            resetStrokePreviewState(state: &state)
+        }
+        return canvasStrokeInteractionCoordinator.finish(
             state: &state,
             samples: samples,
             keepsSelectionCleared: keepsSelectionCleared,
