@@ -99,17 +99,24 @@ struct GpuSideEffectIsolationArchitectureTests {
     @Test
     func crossFeatureIntegrationReducerOwnsNoDependencies() throws {
         let repoRoot = try Self.repoRoot()
-        let reducerFile = repoRoot.appendingPathComponent(
+        let integrationSources = [
             "App/Features/Document/CrossFeatureIntegrationReducer.swift",
-            isDirectory: false
-        )
-        let body = try String(contentsOf: reducerFile, encoding: .utf8)
+            "App/Features/Document/ApplicationWorkspaceBridge.swift",
+            "App/Features/Document/WorkspaceDocumentBridge.swift",
+            "App/Features/Document/ImportExportWorkspaceBridge.swift",
+            "App/Features/Document/AIImageDocumentBridge.swift",
+            "App/Features/Document/DocumentApplicationFeedbackBridge.swift"
+        ]
         let rootWorkflowReducerName = "RootFeature" + "WorkflowReducer"
-        #expect(!body.contains("@Dependency"), "CrossFeatureIntegrationReducer should be dependency-free")
-        #expect(!body.contains("state."), "CrossFeatureIntegrationReducer should relay feature actions without direct root state access")
-        #expect(!body.contains(rootWorkflowReducerName), "CrossFeatureIntegrationReducer should not delegate to root workflow execution")
-        #expect(!body.contains("func handle"), "CrossFeatureIntegrationReducer should not own workflow handlers")
-        #expect(!body.contains("func route"), "CrossFeatureIntegrationReducer should not own workflow routing helpers")
+        for sourcePath in integrationSources {
+            let source = repoRoot.appendingPathComponent(sourcePath, isDirectory: false)
+            let body = try String(contentsOf: source, encoding: .utf8)
+            #expect(!body.contains("@Dependency"), "\(sourcePath) should be dependency-free")
+            #expect(!body.contains("state."), "\(sourcePath) should relay feature actions without direct root state access")
+            #expect(!body.contains(rootWorkflowReducerName), "\(sourcePath) should not delegate to root workflow execution")
+            #expect(!body.contains("func handle"), "\(sourcePath) should not own workflow handlers")
+            #expect(!body.contains("func route"), "\(sourcePath) should not own workflow routing helpers")
+        }
 
         let rootWorkflowReducer = repoRoot.appendingPathComponent(
             "App/Features/Document/\(rootWorkflowReducerName).swift",
@@ -151,6 +158,7 @@ struct GpuSideEffectIsolationArchitectureTests {
                 return filename == "\(rootWorkflowPrefix)Reducer.swift"
                     || filename.hasPrefix(rootWorkflowPrefix + "+")
                     || filename == "CrossFeatureIntegrationReducer.swift"
+                    || filename.hasSuffix("Bridge.swift")
             }
         let banned = [
             "state.application.beginStartup(",
