@@ -57,9 +57,8 @@ struct WorkspaceFeature {
 
     @Dependency(\.documentImportClient) var documentImportClient
     @Dependency(\.documentPersistenceCapability) var documentPersistenceCapability
-    @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
+    @Dependency(\.workspaceApplicationCapability) var workspaceApplicationCapability
     @Dependency(\.workspaceApplicationWorkflowService) var workspaceApplicationWorkflowService
-    @Dependency(\.uuidClient) var uuidClient
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
         documentPersistenceCapability.persistenceGateway

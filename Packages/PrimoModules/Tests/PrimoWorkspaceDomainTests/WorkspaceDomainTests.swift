@@ -27,6 +27,62 @@ private struct LoadedProject: Equatable, Sendable {
 }
 
 final class WorkspaceDomainTests: XCTestCase {
+    func testRelativeProjectFolderPathValidatesComponents() throws {
+        let root = try XCTUnwrap(RelativeProjectFolderPath(components: []))
+        XCTAssertEqual(root.components, [])
+        XCTAssertEqual(root.rawValue, "")
+
+        let nested = try XCTUnwrap(RelativeProjectFolderPath(components: ["Projects", "Client"]))
+        XCTAssertEqual(nested.components, ["Projects", "Client"])
+        XCTAssertEqual(nested.rawValue, "Projects/Client")
+
+        XCTAssertNil(RelativeProjectFolderPath(components: [""]))
+        XCTAssertNil(RelativeProjectFolderPath(components: ["."]))
+        XCTAssertNil(RelativeProjectFolderPath(components: [".."]))
+        XCTAssertNil(RelativeProjectFolderPath(components: ["a/b"]))
+        XCTAssertNil(RelativeProjectFolderPath(components: ["/abs"]))
+    }
+
+    func testRelativeProjectFolderPathValidatingStringRejectsAbsoluteAndTraversalPaths() throws {
+        let rootFromNil = try RelativeProjectFolderPath(validating: nil)
+        XCTAssertEqual(rootFromNil.components, [])
+
+        let rootFromEmpty = try RelativeProjectFolderPath(validating: "   ")
+        XCTAssertEqual(rootFromEmpty.components, [])
+
+        let nested = try RelativeProjectFolderPath(validating: "Projects/Client")
+        XCTAssertEqual(nested.components, ["Projects", "Client"])
+
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validating: "/Projects"))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validating: "."))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validating: ".."))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validating: "Projects/../Client"))
+    }
+
+    func testRelativeProjectFolderPathCodableUsesComponentValidation() throws {
+        let path = try XCTUnwrap(RelativeProjectFolderPath(components: ["Projects", "Client"]))
+        let data = try JSONEncoder().encode(path)
+        let decoded = try JSONDecoder().decode(RelativeProjectFolderPath.self, from: data)
+        XCTAssertEqual(decoded, path)
+
+        let invalidPayloads = [
+            #"{"components":[""]}"#,
+            #"{"components":["."]}"#,
+            #"{"components":[".."]}"#,
+            #"{"components":["a/b"]}"#,
+            #"{"components":["/abs"]}"#
+        ]
+        for payload in invalidPayloads {
+            XCTAssertThrowsError(
+                try JSONDecoder().decode(
+                    RelativeProjectFolderPath.self,
+                    from: Data(payload.utf8)
+                ),
+                "Payload should fail validation: \(payload)"
+            )
+        }
+    }
+
     func testWorkspaceCatalogMoveFailureRetainsRequestContext() {
         let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/source.atelier"))
         let request = WorkspaceCatalogRequest.moveSavedProject(

@@ -36,7 +36,7 @@ extension ImportExportFeature {
             return .send(.delegate(.exportFailed))
         }
         do {
-            let url = try documentWorkspaceClient.writePNGToTemporaryDirectory(pngData)
+            let url = try workspaceArtifactCapability.writePNGToTemporaryDirectory(pngData)
             state.export.presentShareSheet(makeShareExport(url: url))
         } catch {
             return .send(.delegate(.exportFailed))
@@ -49,14 +49,9 @@ extension ImportExportFeature {
             return .send(.delegate(.timelapseHistoryUnavailable))
         }
         state.export.startTimelapsePreview(from: capture)
-        return .run { [documentWorkspaceClient, fileClient, dateClient] send in
+        return .run { [timelapseExportCapability] send in
             do {
-                let result = try TimelapseExportService.exportVideo(
-                    from: capture,
-                    to: documentWorkspaceClient.timelapseTemporaryDirectory(),
-                    fileClient: fileClient,
-                    dateClient: dateClient
-                ) { progress in
+                let result = try timelapseExportCapability.exportVideo(capture) { progress in
                     Task {
                         await send(.timelapseExportProgressUpdated(progress))
                     }

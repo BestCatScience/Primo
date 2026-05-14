@@ -7,20 +7,12 @@ import PrimoWorkspaceApplication
 import PrimoWorkspaceDomain
 
 extension WorkspaceFeature {
-    var workspaceApplicationServices: WorkspaceApplicationServices {
-        WorkspaceApplicationServices(
-            documentPersistenceGateway: documentPersistenceGateway,
-            documentWorkspaceClient: documentWorkspaceClient,
-            uuidClient: uuidClient
-        )
-    }
-
     var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
-        workspaceApplicationServices.persistenceUseCase
+        workspaceApplicationCapability.persistenceUseCase
     }
 
     var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
-        workspaceApplicationServices.catalogUseCase
+        workspaceApplicationCapability.catalogUseCase
     }
 
     var documentImportGateway: DocumentImportGateway {
@@ -45,9 +37,9 @@ extension WorkspaceFeature {
     }
 
     var workspaceProjectLoadingService: WorkspaceProjectLoadingService {
-        workspaceApplicationServices.projectLoadingService(
-            projectLoader: workspaceProjectLoaderGateway,
-            documentImport: documentImportGateway
+        workspaceApplicationCapability.makeProjectLoadingService(
+            workspaceProjectLoaderGateway,
+            documentImportGateway
         )
     }
 

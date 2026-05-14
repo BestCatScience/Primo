@@ -121,7 +121,7 @@ private struct DocumentWorkspaceStorage: Sendable {
     func moveSavedProject(at url: DocumentProjectPath, toRelativeFolderPath relativeFolderPath: RelativeProjectFolderPath?) throws -> DocumentProjectPath {
         try requireProjectDirectory(at: url.fileURL, label: "saved project")
         let rootDirectory = try appProjectsDirectory()
-        let relativePath = relativeFolderPath ?? RelativeProjectFolderPath(components: [])
+        let relativePath = relativeFolderPath ?? RelativeProjectFolderPath(unchecked: [])
         let destinationDirectory = relativePath.appending(to: rootDirectory)
         try fileClient.createDirectory(destinationDirectory, true)
 

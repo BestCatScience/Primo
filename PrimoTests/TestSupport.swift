@@ -1013,6 +1013,53 @@ extension DocumentWorkspaceClient {
     }
 }
 
+extension WorkspaceApplicationCapability {
+    static func stub(
+        documentPersistenceGateway: DocumentPersistenceGateway = .stub(),
+        documentWorkspaceClient: DocumentWorkspaceClient = .stub(),
+        uuidClient: UUIDClient = UUIDClient(generate: {
+            UUID(uuidString: "00000000-0000-0000-0000-00000000BEEF")!
+        })
+    ) -> Self {
+        WorkspaceApplicationCapability(
+            services: WorkspaceApplicationServices(
+                documentPersistenceGateway: documentPersistenceGateway,
+                documentWorkspaceClient: documentWorkspaceClient,
+                uuidClient: uuidClient
+            )
+        )
+    }
+}
+
+extension WorkspaceArtifactCapability {
+    static func stub(
+        writePNGToTemporaryDirectory: @escaping @Sendable (Data) throws -> URL = { _ in
+            URL(fileURLWithPath: "/tmp/export.png")
+        },
+        timelapseTemporaryDirectory: @escaping @Sendable () -> URL = {
+            URL(fileURLWithPath: "/tmp")
+        }
+    ) -> Self {
+        Self(
+            writePNGToTemporaryDirectory: writePNGToTemporaryDirectory,
+            timelapseTemporaryDirectory: timelapseTemporaryDirectory
+        )
+    }
+}
+
+extension TimelapseExportCapability {
+    static func stub(
+        exportVideo: @escaping @Sendable (
+            TimelapseCapture,
+            @escaping @Sendable (TimelapseExportProgress) -> Void
+        ) throws -> TimelapseExportResult = { _, _ in
+            TimelapseExportResult(url: URL(fileURLWithPath: "/tmp/timelapse.mov"))
+        }
+    ) -> Self {
+        Self(exportVideo: exportVideo)
+    }
+}
+
 extension DocumentImportClient {
     static func stub(
         stageImportedDocument: @escaping @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure> = { request in

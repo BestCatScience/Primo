@@ -71,10 +71,9 @@ struct ImportExportFeature {
         case delegate(Delegate)
     }
 
-    @Dependency(\.dateClient) var dateClient
     @Dependency(\.documentExportCapability) var documentExportCapability
-    @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
-    @Dependency(\.fileClient) var fileClient
+    @Dependency(\.timelapseExportCapability) var timelapseExportCapability
+    @Dependency(\.workspaceArtifactCapability) var workspaceArtifactCapability
     @Dependency(\.uuidClient) var uuidClient
 
     var documentExportGateway: DocumentExportGateway {

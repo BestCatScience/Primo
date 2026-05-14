@@ -705,6 +705,41 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func appReducersDoNotDependOnRawFileOrWorkspaceClients() throws {
+        let repoRoot = try Self.repoRoot()
+        let featureSources = [
+            "App/Features/Document/ApplicationFeature.swift",
+            "App/Features/Document/WorkspaceFeature.swift",
+            "App/Features/Document/DocumentFeature.swift",
+            "App/Features/Document/ImportExportFeature.swift"
+        ]
+
+        for sourcePath in featureSources {
+            let source = repoRoot.appendingPathComponent(sourcePath, isDirectory: false)
+            let body = try String(contentsOf: source, encoding: .utf8)
+            #expect(
+                !body.contains("@Dependency(\\.fileClient)"),
+                "\(sourcePath) should use narrow capabilities instead of raw FileClient"
+            )
+            #expect(
+                !body.contains("@Dependency(\\.documentWorkspaceClient)"),
+                "\(sourcePath) should use narrow workspace capabilities instead of DocumentWorkspaceClient"
+            )
+        }
+
+        let dependencyProvider = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentWorkspaceClient.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        #expect(dependencyProvider.contains("struct WorkspaceApplicationCapability: Sendable"))
+        #expect(dependencyProvider.contains("struct WorkspaceArtifactCapability: Sendable"))
+        #expect(dependencyProvider.contains("struct TimelapseExportCapability: Sendable"))
+    }
+
+    @Test
     func appDoesNotUseRawDocumentGatewayDependencies() throws {
         let repoRoot = try Self.repoRoot()
         let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
@@ -937,6 +972,20 @@ struct GpuSideEffectIsolationArchitectureTests {
             #expect(!body.contains("public init(unchecked"), "\(source.path) should keep unsafe constructors package-scoped")
             #expect(!body.contains("public static func unchecked"), "\(source.path) should keep unsafe factories package-scoped")
         }
+
+        let workspaceDocumentTypes = try String(
+            contentsOf: domainRoot.appendingPathComponent("WorkspaceDocumentTypes.swift"),
+            encoding: .utf8
+        )
+        let relativePath = try #require(Self.typeBody(named: "RelativeProjectFolderPath", in: workspaceDocumentTypes))
+        #expect(
+            relativePath.contains("public init?(components: [String])"),
+            "RelativeProjectFolderPath component construction should stay validating and failable"
+        )
+        #expect(
+            !relativePath.contains("public init(components: [String])"),
+            "RelativeProjectFolderPath should not reintroduce a non-validating component initializer"
+        )
     }
 
     @Test

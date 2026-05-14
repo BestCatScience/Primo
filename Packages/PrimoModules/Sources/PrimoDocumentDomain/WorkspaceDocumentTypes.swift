@@ -122,7 +122,12 @@ public struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
 public struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
     public let components: [String]
 
-    public init(components: [String]) {
+    public init?(components: [String]) {
+        guard components.allSatisfy(Self.isValidComponent(_:)) else { return nil }
+        self.components = components
+    }
+
+    package init(unchecked components: [String]) {
         self.components = components
     }
 
@@ -142,7 +147,7 @@ public struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
         guard !components.isEmpty else {
             throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
         }
-        guard components.allSatisfy({ $0 != "." && $0 != ".." }) else {
+        guard components.allSatisfy(Self.isValidComponent(_:)) else {
             throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
         }
         self.components = components
@@ -156,6 +161,35 @@ public struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
         components.reduce(rootDirectory) { partialResult, component in
             partialResult.appendingPathComponent(component, isDirectory: true)
         }
+    }
+
+    private static func isValidComponent(_ component: String) -> Bool {
+        !component.isEmpty
+            && component != "."
+            && component != ".."
+            && !component.contains("/")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case components
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let components = try container.decode([String].self, forKey: .components)
+        guard let path = Self(components: components) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .components,
+                in: container,
+                debugDescription: "Invalid relative project folder path components"
+            )
+        }
+        self = path
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(components, forKey: .components)
     }
 }
 
