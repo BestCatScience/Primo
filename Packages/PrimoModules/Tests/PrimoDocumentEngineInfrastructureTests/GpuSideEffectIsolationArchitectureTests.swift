@@ -998,6 +998,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         for token in banned {
             #expect(!body.contains(token), "Layer mutation gateways should accept validated value objects instead of \(token)")
         }
+        #expect(body.contains("func addLayerAndSelect(name: String)"))
+        #expect(!body.contains("func addLayer(name: String)"))
         #expect(!body.contains("rawValueOrSentinel"), "LayerAnchorIndex should not expose a public sentinel conversion")
     }
 

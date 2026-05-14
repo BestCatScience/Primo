@@ -253,7 +253,7 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift)
   runtime、stroke use case、GPU operation gateway を app 向けに組み合わせる composition root です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift)
-  `SwiftDocumentRuntime` を `LockedDocumentRuntimeBox` の後ろに保持し、gateway 群として公開する live engine です。
+  `SwiftDocumentRuntime` を `LockedDocumentRuntimeExecutor` の後ろに保持し、gateway 群として公開する live engine です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift)
   document store、undo / redo、dirty update、stroke commit、GPU-backed layer buffer、save / load、timelapse を扱う runtime 本体です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift)

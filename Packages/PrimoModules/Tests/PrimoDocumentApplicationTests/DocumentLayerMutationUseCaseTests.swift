@@ -45,7 +45,7 @@ struct DocumentLayerMutationUseCaseTests {
     }
 
     @Test
-    func structureUseCasePropagatesAddLayerFailureWithoutActivatingLayer() {
+    func structureUseCasePropagatesAtomicAddLayerFailure() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
             layerCount: 1,
@@ -63,11 +63,11 @@ struct DocumentLayerMutationUseCaseTests {
         )
 
         #expect(result == .failure(.bridgeMutationFailed("addLayer")))
-        #expect(gateway.activeLayerIndices.isEmpty)
+        #expect(gateway.addedLayerNames == ["Ink"])
     }
 
     @Test
-    func structureUseCasePropagatesActiveLayerFailureAfterAddingLayer() {
+    func structureUseCaseBuildsAddLayerPlanFromAtomicAddLayer() throws {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
             layerCount: 1,
@@ -75,8 +75,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayRecorder(
-            addLayerResult: .success(3),
-            activeLayerResult: .failure(.bridgeMutationFailed("setActiveLayer"))
+            addLayerResult: .success(3)
         )
 
         let result = useCase.execute(
@@ -85,8 +84,10 @@ struct DocumentLayerMutationUseCaseTests {
             gateway: gateway
         )
 
-        #expect(result == .failure(.bridgeMutationFailed("setActiveLayer")))
-        #expect(gateway.activeLayerIndices == [3])
+        let plan = try result.get()
+        #expect(plan.resultingIndex == 3)
+        #expect(plan.lifecycleEvent == .addLayer(name: "Ink", index: 3))
+        #expect(gateway.addedLayerNames == ["Ink"])
     }
 
     @Test
@@ -193,12 +194,10 @@ struct DocumentLayerMutationUseCaseTests {
 
 private struct StructureGatewayStub: LayerStructureGateway {
     var addLayerResult: DocumentLayerIndexedMutationResult = .success(0)
-    var activeLayerResult: DocumentLayerMutationResult = .success(())
     var duplicateLayerResult: DocumentLayerIndexedMutationResult = .success(5)
     var createFolderResult: DocumentLayerIndexedMutationResult = .success(9)
 
-    func addLayer(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
-    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult { activeLayerResult }
+    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { duplicateLayerResult }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
@@ -209,22 +208,17 @@ private struct StructureGatewayStub: LayerStructureGateway {
 
 private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructureGateway {
     var addLayerResult: DocumentLayerIndexedMutationResult
-    var activeLayerResult: DocumentLayerMutationResult
-    var activeLayerIndices: [Int] = []
+    var addedLayerNames: [String] = []
 
     init(
-        addLayerResult: DocumentLayerIndexedMutationResult = .success(0),
-        activeLayerResult: DocumentLayerMutationResult = .success(())
+        addLayerResult: DocumentLayerIndexedMutationResult = .success(0)
     ) {
         self.addLayerResult = addLayerResult
-        self.activeLayerResult = activeLayerResult
     }
 
-    func addLayer(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
-
-    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        activeLayerIndices.append(index.rawValue)
-        return activeLayerResult
+    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult {
+        addedLayerNames.append(name)
+        return addLayerResult
     }
 
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { .success(5) }

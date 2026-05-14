@@ -190,8 +190,7 @@ public struct LayerAttributeMutationPlan: Equatable, Sendable {
 }
 
 public protocol LayerStructureGateway: Sendable {
-    func addLayer(name: String) -> DocumentLayerIndexedMutationResult
-    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult
+    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult

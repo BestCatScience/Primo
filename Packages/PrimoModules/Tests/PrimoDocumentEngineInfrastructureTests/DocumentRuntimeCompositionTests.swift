@@ -129,15 +129,15 @@ struct DocumentRuntimeCompositionTests {
         )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
-        #expect(body.contains("let snapshot = runtimeBox.withRuntime { $0.projectSaveSnapshot(paperStyle: paperStyle) }"))
+        #expect(body.contains("let snapshot = runtimeExecutor.perform { $0.projectSaveSnapshot(paperStyle: paperStyle) }"))
         #expect(body.contains("try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)"))
-        #expect(!body.contains("try runtimeBox.withRuntime { session in\n                    try session.saveProject"))
+        #expect(!body.contains("try runtimeExecutor.perform { session in\n                    try session.saveProject"))
         #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface(\n                    forMaterializedSnapshot: snapshot"))
         #expect(body.contains("SwiftDocumentRuntime.compositePNGData(\n                    forMaterializedSnapshot: snapshot"))
     }
 
     @Test
-    func lockedRuntimeBoxGuardsAgainstReentrantAccess() throws {
+    func lockedRuntimeExecutorGuardsAgainstReentrantAccess() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -149,6 +149,8 @@ struct DocumentRuntimeCompositionTests {
         )
         let body = try String(contentsOf: supportURL, encoding: .utf8)
 
+        #expect(body.contains("package final class LockedDocumentRuntimeExecutor"))
+        #expect(body.contains("package func perform<T>("))
         #expect(body.contains("private var isExecuting = false"))
         #expect(body.contains("precondition(!isExecuting, \"Reentrant document runtime access\")"))
         #expect(body.contains("NSRecursiveLock()"))

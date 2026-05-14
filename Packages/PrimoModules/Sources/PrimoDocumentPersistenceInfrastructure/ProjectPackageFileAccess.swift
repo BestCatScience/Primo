@@ -78,19 +78,44 @@ public struct ProjectPackageReader: Sendable {
                 try fileClient.readData(file.fileURL)
             },
             enumerateFiles: { package in
-                fileClient.enumerateURLs(
+                try fileClient.enumerateURLs(
                     package.fileURL,
                     [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey],
                     []
                 )
                 .compactMap { url in
-                    let relativePath = url.path
-                        .replacingOccurrences(of: package.fileURL.path + "/", with: "")
-                    return ProjectPackageFile(package: package, relativePath: relativePath)
+                    try validatedPackageFileIfRegular(url, in: package)
                 }
             }
         )
     }
+}
+
+private func validatedPackageFileIfRegular(_ url: URL, in package: ProjectPackagePath) throws -> ProjectPackageFile? {
+    let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+    guard values.isSymbolicLink != true else {
+        throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid symbolic link in package entry")
+    }
+    guard values.isRegularFile == true else {
+        return nil
+    }
+
+    let rootURL = package.fileURL.resolvingSymlinksInPath().standardizedFileURL
+    let resolvedURL = url.resolvingSymlinksInPath().standardizedFileURL
+    guard resolvedURL.path.hasPrefix(rootURL.path + "/") else {
+        throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping package entry")
+    }
+
+    let standardizedURL = url.standardizedFileURL
+    let rootPath = package.fileURL.standardizedFileURL.path
+    guard standardizedURL.path.hasPrefix(rootPath + "/") else {
+        throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping package entry")
+    }
+    let relativePath = String(standardizedURL.path.dropFirst(rootPath.count + 1))
+    guard let file = ProjectPackageFile(package: package, relativePath: relativePath) else {
+        throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid package entry path \(relativePath)")
+    }
+    return file
 }
 
 public struct ProjectPackageWriter: Sendable {

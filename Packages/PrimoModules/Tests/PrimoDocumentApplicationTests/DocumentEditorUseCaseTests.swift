@@ -7,7 +7,7 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
     var activeLayerIndices: [Int] = []
     var lastLayerNameUpdate: (name: String, index: Int)?
 
-    func addLayer(name: String) -> DocumentLayerIndexedMutationResult {
+    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult {
         addedLayerNames.append(name)
         return .success(2)
     }
@@ -65,7 +65,7 @@ struct DocumentEditorUseCaseTests {
             )
         ))
         #expect(gateway.addedLayerNames == ["Ink"])
-        #expect(gateway.activeLayerIndices == [2])
+        #expect(gateway.activeLayerIndices.isEmpty)
     }
 
     @Test

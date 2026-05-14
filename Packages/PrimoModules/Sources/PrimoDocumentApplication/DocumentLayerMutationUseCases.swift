@@ -23,21 +23,16 @@ public struct LayerStructureUseCase: Sendable {
 
         switch validatedCommand {
         case let .addLayer(name):
-            switch gateway.addLayer(name: name.rawValue) {
+            switch gateway.addLayerAndSelect(name: name.rawValue) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(createdIndex):
-                switch gateway.setActiveLayerIndex(context.newlyCreatedLayerIndex(createdIndex)) {
-                case let .failure(failure):
-                    return .failure(failure)
-                case .success:
-                    return .success(
-                        LayerStructureMutationPlan(
-                            resultingIndex: createdIndex,
-                            lifecycleEvent: .addLayer(name: name.rawValue, index: createdIndex)
-                        )
+                return .success(
+                    LayerStructureMutationPlan(
+                        resultingIndex: createdIndex,
+                        lifecycleEvent: .addLayer(name: name.rawValue, index: createdIndex)
                     )
-                }
+                )
             }
 
         case let .duplicateLayer(index, name):

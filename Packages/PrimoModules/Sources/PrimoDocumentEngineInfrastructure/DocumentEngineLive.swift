@@ -60,7 +60,7 @@ package enum DocumentEngineFactory {
         uuidClient: PrimoCoreTypes.UUIDClient = .live,
         gpuServices: DocumentRuntimeGpuServices
     ) -> DocumentEngineLive {
-        let runtimeBox = LockedDocumentRuntimeBox(
+        let runtimeExecutor = LockedDocumentRuntimeExecutor(
             runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,
                 dateClient: dateClient,
@@ -70,98 +70,98 @@ package enum DocumentEngineFactory {
         )
 
         let queryGateway = DocumentQueryGateway(
-            lightweightPresentation: { runtimeBox.withRuntime { $0.lightweightPresentation() } },
-            presentation: { runtimeBox.withRuntime { $0.presentation() } }
+            lightweightPresentation: { runtimeExecutor.perform { $0.lightweightPresentation() } },
+            presentation: { runtimeExecutor.perform { $0.presentation() } }
         )
         let renderGateway = DocumentRenderGateway(
             compositePixelData: {
-                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
                     gpuServices: gpuServices
                 ).pixelData
             },
             compositeSurface: {
-                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
                     gpuServices: gpuServices
                 )
             },
-            pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } }
+            pixelDataForLayer: { index in runtimeExecutor.perform { $0.pixelDataForLayer(index: index) } }
         )
         let dirtyUpdateQueue = DocumentDirtyUpdateQueue(
-            consumeDirtyUpdate: { runtimeBox.withRuntime { $0.consumeDirtyUpdate() } }
+            consumeDirtyUpdate: { runtimeExecutor.perform { $0.consumeDirtyUpdate() } }
         )
 
         let mutationGateway = DocumentMutationGateway(
             resizeCanvas: { width, height in
-                performResizeCanvas(width: width, height: height, runtimeBox: runtimeBox)
+                performResizeCanvas(width: width, height: height, runtimeExecutor: runtimeExecutor)
             },
             resizeCanvasExtent: { width, height in
-                performResizeCanvasExtent(width: width, height: height, runtimeBox: runtimeBox)
+                performResizeCanvasExtent(width: width, height: height, runtimeExecutor: runtimeExecutor)
             },
-            addLayer: { name in runtimeBox.withRuntime { $0.addLayer(name: name) } },
-            deleteLayer: { index in runtimeBox.withRuntime { $0.deleteLayer(index: index) } },
-            setActiveLayer: { index in runtimeBox.withRuntime { $0.setActiveLayer(index: index) } },
-            setLayerName: { index, name in runtimeBox.withRuntime { $0.setLayerName(index: index, name: name) } },
+            addLayer: { name in runtimeExecutor.perform { $0.addLayer(name: name) } },
+            deleteLayer: { index in runtimeExecutor.perform { $0.deleteLayer(index: index) } },
+            setActiveLayer: { index in runtimeExecutor.perform { $0.setActiveLayer(index: index) } },
+            setLayerName: { index, name in runtimeExecutor.perform { $0.setLayerName(index: index, name: name) } },
             setLayerVisibility: { index, isVisible in
-                runtimeBox.withRuntime { $0.setLayerVisibility(index: index, isVisible: isVisible) }
+                runtimeExecutor.perform { $0.setLayerVisibility(index: index, isVisible: isVisible) }
             },
-            revealLayerForEditing: { index in runtimeBox.withRuntime { $0.revealLayerForEditing(index: index) } },
-            replaceLayerPixels: { index, data in runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, data: data) } },
+            revealLayerForEditing: { index in runtimeExecutor.perform { $0.revealLayerForEditing(index: index) } },
+            replaceLayerPixels: { index, data in runtimeExecutor.perform { $0.replaceLayerPixels(index: index, data: data) } },
             replaceLayerPixelsInRect: { index, rect, data in
-                runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, in: rect, data: data) }
+                runtimeExecutor.perform { $0.replaceLayerPixels(index: index, in: rect, data: data) }
             },
             applyLayerSurfaceMutation: { index, payload in
-                runtimeBox.withRuntime { $0.applyLayerSurfaceMutation(index: index, payload: payload) }
+                runtimeExecutor.perform { $0.applyLayerSurfaceMutation(index: index, payload: payload) }
             },
             applyLayerMutation: { index, payload in
-                runtimeBox.withRuntime { $0.applyLayerMutation(index: index, payload: payload) }
+                runtimeExecutor.perform { $0.applyLayerMutation(index: index, payload: payload) }
             },
             applyTextLayerMutation: { index, textLayer, payload in
-                runtimeBox.withRuntime { $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload) }
+                runtimeExecutor.perform { $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload) }
             },
-            replaceLayerMask: { index, data in runtimeBox.withRuntime { $0.replaceLayerMask(index: index, data: data) } },
-            clearLayerMask: { index in runtimeBox.withRuntime { $0.clearLayerMask(index: index) } },
-            applyLayerMask: { index in runtimeBox.withRuntime { $0.applyLayerMask(index: index) } },
-            clearLayer: { index in runtimeBox.withRuntime { $0.clearLayer(index: index) } },
+            replaceLayerMask: { index, data in runtimeExecutor.perform { $0.replaceLayerMask(index: index, data: data) } },
+            clearLayerMask: { index in runtimeExecutor.perform { $0.clearLayerMask(index: index) } },
+            applyLayerMask: { index in runtimeExecutor.perform { $0.applyLayerMask(index: index) } },
+            clearLayer: { index in runtimeExecutor.perform { $0.clearLayer(index: index) } },
             applyLayerProcessing: { index, request in
-                performLayerProcessing(index: index, request: request, runtimeBox: runtimeBox)
+                performLayerProcessing(index: index, request: request, runtimeExecutor: runtimeExecutor)
             }
         )
 
         let strokeGateway = StrokeInputGateway(
-            beginStroke: { sample, brush in runtimeBox.withRuntime { $0.beginStroke(sample: sample, brush: brush) } },
-            appendStroke: { sample in runtimeBox.withRuntime { $0.appendStroke(sample: sample) } },
+            beginStroke: { sample, brush in runtimeExecutor.perform { $0.beginStroke(sample: sample, brush: brush) } },
+            appendStroke: { sample in runtimeExecutor.perform { $0.appendStroke(sample: sample) } },
             endStroke: {
-                performCurrentStrokeCommit(runtimeBox: runtimeBox)
+                performCurrentStrokeCommit(runtimeExecutor: runtimeExecutor)
             },
-            cancelStroke: { runtimeBox.withRuntime { $0.cancelStroke() } },
+            cancelStroke: { runtimeExecutor.perform { $0.cancelStroke() } },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeBox: runtimeBox)
+                performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeExecutor: runtimeExecutor)
             },
-            endBlurStroke: { runtimeBox.withRuntime { $0.endBlurStroke() } },
-            cancelBlurStroke: { runtimeBox.withRuntime { $0.cancelBlurStroke() } },
+            endBlurStroke: { runtimeExecutor.perform { $0.endBlurStroke() } },
+            cancelBlurStroke: { runtimeExecutor.perform { $0.cancelBlurStroke() } },
             fill: { sample, brush in
-                performFill(sample: sample, brush: brush, runtimeBox: runtimeBox)
+                performFill(sample: sample, brush: brush, runtimeExecutor: runtimeExecutor)
             },
             applyGpuStrokeSurface: { samples, brush, layerIndex in
-                performStrokeCommit(samples: samples, brush: brush, layerIndex: layerIndex, runtimeBox: runtimeBox)
+                performStrokeCommit(samples: samples, brush: brush, layerIndex: layerIndex, runtimeExecutor: runtimeExecutor)
             }
         )
 
         let historyGateway = DocumentHistoryGateway(
-            canUndo: { runtimeBox.withRuntime { $0.canUndo() } },
-            canRedo: { runtimeBox.withRuntime { $0.canRedo() } },
-            undo: { runtimeBox.withRuntime { $0.undo() } },
-            redo: { runtimeBox.withRuntime { $0.redo() } },
-            trimForMemoryPressure: { runtimeBox.withRuntime { $0.trimUndoHistoryForMemoryPressure() } }
+            canUndo: { runtimeExecutor.perform { $0.canUndo() } },
+            canRedo: { runtimeExecutor.perform { $0.canRedo() } },
+            undo: { runtimeExecutor.perform { $0.undo() } },
+            redo: { runtimeExecutor.perform { $0.redo() } },
+            trimForMemoryPressure: { runtimeExecutor.perform { $0.trimUndoHistoryForMemoryPressure() } }
         )
 
         let persistenceGateway = DocumentPersistenceGateway(
             saveProject: { url, paperStyle in
-                let snapshot = runtimeBox.withRuntime { $0.projectSaveSnapshot(paperStyle: paperStyle) }
+                let snapshot = runtimeExecutor.perform { $0.projectSaveSnapshot(paperStyle: paperStyle) }
                 try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
             },
             loadProject: { url in
@@ -176,12 +176,12 @@ package enum DocumentEngineFactory {
                     presentation: runtime.presentation(),
                     paperStyle: runtime.currentPaperStyle
                 )
-                runtimeBox.replaceRuntime(with: runtime)
+                runtimeExecutor.replaceRuntime(with: runtime)
                 return loadedProject
             },
-            setPaperStyle: { style in runtimeBox.withRuntime { $0.setPaperStyle(style) } },
+            setPaperStyle: { style in runtimeExecutor.perform { $0.setPaperStyle(style) } },
             newCanvas: { width, height in
-                runtimeBox.replaceRuntime(
+                runtimeExecutor.replaceRuntime(
                     with: SwiftDocumentRuntime(
                         width: width,
                         height: height,
@@ -193,7 +193,7 @@ package enum DocumentEngineFactory {
                 )
             },
             prewarmDrawingResources: {
-                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
                 _ = SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
                     gpuServices: gpuServices
@@ -203,7 +203,7 @@ package enum DocumentEngineFactory {
 
         let exportGateway = DocumentExportGateway(
             compositeSurface: { style in
-                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeExportSurface(
                     forMaterializedSnapshot: snapshot,
                     paperStyle: style,
@@ -211,22 +211,22 @@ package enum DocumentEngineFactory {
                 )
             },
             compositePNGData: { style in
-                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositePNGData(
                     forMaterializedSnapshot: snapshot,
                     paperStyle: style,
                     gpuServices: gpuServices
                 )
             },
-            timelapseCapture: { runtimeBox.withRuntime { $0.timelapseCapture() } }
+            timelapseCapture: { runtimeExecutor.perform { $0.timelapseCapture() } }
         )
 
         let textLayerGateway = TextLayerGateway(
-            textLayerData: { index in runtimeBox.withRuntime { $0.textLayerData(index: index) } },
+            textLayerData: { index in runtimeExecutor.perform { $0.textLayerData(index: index) } },
             setTextLayer: { index, textLayer in
-                runtimeBox.withRuntime { $0.setTextLayer(index: index, textLayer: textLayer) }
+                runtimeExecutor.perform { $0.setTextLayer(index: index, textLayer: textLayer) }
             },
-            clearTextLayerData: { index in runtimeBox.withRuntime { $0.clearTextLayerData(index: index) } }
+            clearTextLayerData: { index in runtimeExecutor.perform { $0.clearTextLayerData(index: index) } }
         )
 
         return DocumentEngineLive(
@@ -239,45 +239,45 @@ package enum DocumentEngineFactory {
             persistenceGateway: persistenceGateway,
             exportGateway: exportGateway,
             textLayerGateway: textLayerGateway,
-            duplicateLayer: { index, name in runtimeBox.withRuntime { $0.duplicateLayer(index: index, name: name) } },
-            moveLayer: { index, destination in runtimeBox.withRuntime { $0.moveLayer(from: index, to: destination) } },
-            createFolder: { name, anchor in runtimeBox.withRuntime { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
-            deleteFolder: { folderID in runtimeBox.withRuntime { $0.deleteFolder(folderID: folderID) } },
+            duplicateLayer: { index, name in runtimeExecutor.perform { $0.duplicateLayer(index: index, name: name) } },
+            moveLayer: { index, destination in runtimeExecutor.perform { $0.moveLayer(from: index, to: destination) } },
+            createFolder: { name, anchor in runtimeExecutor.perform { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
+            deleteFolder: { folderID in runtimeExecutor.perform { $0.deleteFolder(folderID: folderID) } },
             setFolderVisibility: { folderID, isVisible in
-                runtimeBox.withRuntime { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) }
+                runtimeExecutor.perform { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) }
             },
-            setFolderName: { folderID, name in runtimeBox.withRuntime { $0.setFolderName(folderID: folderID, name: name) } },
+            setFolderName: { folderID, name in runtimeExecutor.perform { $0.setFolderName(folderID: folderID, name: name) } },
             setFolderExpanded: { folderID, isExpanded in
-                runtimeBox.withRuntime { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) }
+                runtimeExecutor.perform { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) }
             },
             assignLayerToFolder: { index, folderID in
-                runtimeBox.withRuntime { $0.assignLayerToFolder(index: index, folderID: folderID) }
+                runtimeExecutor.perform { $0.assignLayerToFolder(index: index, folderID: folderID) }
             },
             setLayerLocked: { index, isLocked in
-                runtimeBox.withRuntime { $0.setLayerLocked(index: index, isLocked: isLocked) }
+                runtimeExecutor.perform { $0.setLayerLocked(index: index, isLocked: isLocked) }
             },
             setLayerAlphaLocked: { index, isAlphaLocked in
-                runtimeBox.withRuntime { $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) }
+                runtimeExecutor.perform { $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) }
             },
             setLayerClipped: { index, isClipped in
-                runtimeBox.withRuntime { $0.setLayerClipped(index: index, isClipped: isClipped) }
+                runtimeExecutor.perform { $0.setLayerClipped(index: index, isClipped: isClipped) }
             },
             setLayerOpacity: { index, opacity in
-                runtimeBox.withRuntime { $0.setLayerOpacity(index: index, opacity: opacity) }
+                runtimeExecutor.perform { $0.setLayerOpacity(index: index, opacity: opacity) }
             },
             setLayerBlendMode: { index, blendMode in
-                runtimeBox.withRuntime { $0.setLayerBlendMode(index: index, blendMode: blendMode) }
+                runtimeExecutor.perform { $0.setLayerBlendMode(index: index, blendMode: blendMode) }
             },
-            mergeLayerDown: { index in runtimeBox.withRuntime { $0.mergeLayerDown(index: index) } }
+            mergeLayerDown: { index in runtimeExecutor.perform { $0.mergeLayerDown(index: index) } }
         )
     }
 
     private static func performResizeCanvas(
         width: Int,
         height: Int,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime { $0.makeResizeCanvasPlan(width: width, height: height) }
+        let planResult = runtimeExecutor.perform { $0.makeResizeCanvasPlan(width: width, height: height) }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -286,16 +286,16 @@ package enum DocumentEngineFactory {
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvas")))
             }
-            return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
+            return runtimeExecutor.perform { $0.applyResizeCanvasPlan(plan, layers: layers) }
         }
     }
 
     private static func performResizeCanvasExtent(
         width: Int,
         height: Int,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime { $0.makeResizeCanvasExtentPlan(width: width, height: height) }
+        let planResult = runtimeExecutor.perform { $0.makeResizeCanvasExtentPlan(width: width, height: height) }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -304,16 +304,16 @@ package enum DocumentEngineFactory {
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvasExtent")))
             }
-            return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
+            return runtimeExecutor.perform { $0.applyResizeCanvasPlan(plan, layers: layers) }
         }
     }
 
     private static func performLayerProcessing(
         index: Int,
         request: LayerProcessingRequest,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime { $0.makeLayerProcessingPlan(index: index, request: request) }
+        let planResult = runtimeExecutor.perform { $0.makeLayerProcessingPlan(index: index, request: request) }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -326,16 +326,16 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "applyLayerProcessing")))
             }
-            return runtimeBox.withRuntime { $0.applyLayerProcessingPlan(plan, payload: payload) }
+            return runtimeExecutor.perform { $0.applyLayerProcessingPlan(plan, payload: payload) }
         }
     }
 
     private static func performFill(
         sample: StylusSample,
         brush: BrushRuntimeSettings,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime { $0.makeFillPlan(sample: sample, brush: brush) }
+        let planResult = runtimeExecutor.perform { $0.makeFillPlan(sample: sample, brush: brush) }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -350,7 +350,7 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "fill")))
             }
-            return runtimeBox.withRuntime { $0.applyFillPlan(plan, payload: payload) }
+            return runtimeExecutor.perform { $0.applyFillPlan(plan, payload: payload) }
         }
     }
 
@@ -358,9 +358,9 @@ package enum DocumentEngineFactory {
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         layerIndex: Int,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime {
+        let planResult = runtimeExecutor.perform {
             $0.makeStrokeCommitPlan(samples: samples, brush: brush, layerIndex: layerIndex)
         }
         switch planResult {
@@ -379,14 +379,14 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "applyCommittedStroke")))
             }
-            return runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            return runtimeExecutor.perform { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
         }
     }
 
     private static func performCurrentStrokeCommit(
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime { $0.currentStrokeCommitPlan() }
+        let planResult = runtimeExecutor.perform { $0.currentStrokeCommitPlan() }
         switch planResult {
         case let .failure(failure):
             Self.logger.error("Current stroke commit plan failed: \(String(describing: failure), privacy: .public)")
@@ -408,10 +408,10 @@ package enum DocumentEngineFactory {
                 Self.logger.error("Current stroke GPU commit failed: \(String(describing: failure), privacy: .public)")
                 return .failure(failure)
             }
-            let mutationResult = runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            let mutationResult = runtimeExecutor.perform { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
             switch mutationResult {
             case .success:
-                runtimeBox.withRuntime { $0.clearCurrentStroke() }
+                runtimeExecutor.perform { $0.clearCurrentStroke() }
             case let .failure(failure):
                 Self.logger.error("Current stroke apply failed: \(String(describing: failure), privacy: .public)")
             }
@@ -424,9 +424,9 @@ package enum DocumentEngineFactory {
         brush: BrushRuntimeSettings,
         layerIndex: Int,
         captureTimelapse: Bool,
-        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeBox.withRuntime {
+        let planResult = runtimeExecutor.perform {
             $0.makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
         }
         switch planResult {
@@ -443,7 +443,7 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "blurStroke")))
             }
-            return runtimeBox.withRuntime { $0.applyBlurPlan(plan, payload: payload) }
+            return runtimeExecutor.perform { $0.applyBlurPlan(plan, payload: payload) }
         }
     }
 }
