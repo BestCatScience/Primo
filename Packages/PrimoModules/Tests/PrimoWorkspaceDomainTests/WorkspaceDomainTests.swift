@@ -28,19 +28,19 @@ private struct LoadedProject: Equatable, Sendable {
 
 final class WorkspaceDomainTests: XCTestCase {
     func testRelativeProjectFolderPathValidatesComponents() throws {
-        let root = try XCTUnwrap(RelativeProjectFolderPath(components: []))
+        let root = try RelativeProjectFolderPath(validatingComponents: [])
         XCTAssertEqual(root.components, [])
         XCTAssertEqual(root.rawValue, "")
 
-        let nested = try XCTUnwrap(RelativeProjectFolderPath(components: ["Projects", "Client"]))
+        let nested = try RelativeProjectFolderPath(validatingComponents: ["Projects", "Client"])
         XCTAssertEqual(nested.components, ["Projects", "Client"])
         XCTAssertEqual(nested.rawValue, "Projects/Client")
 
-        XCTAssertNil(RelativeProjectFolderPath(components: [""]))
-        XCTAssertNil(RelativeProjectFolderPath(components: ["."]))
-        XCTAssertNil(RelativeProjectFolderPath(components: [".."]))
-        XCTAssertNil(RelativeProjectFolderPath(components: ["a/b"]))
-        XCTAssertNil(RelativeProjectFolderPath(components: ["/abs"]))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validatingComponents: [""]))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validatingComponents: ["."]))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validatingComponents: [".."]))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validatingComponents: ["a/b"]))
+        XCTAssertThrowsError(try RelativeProjectFolderPath(validatingComponents: ["/abs"]))
     }
 
     func testRelativeProjectFolderPathValidatingStringRejectsAbsoluteAndTraversalPaths() throws {
@@ -60,7 +60,7 @@ final class WorkspaceDomainTests: XCTestCase {
     }
 
     func testRelativeProjectFolderPathCodableUsesComponentValidation() throws {
-        let path = try XCTUnwrap(RelativeProjectFolderPath(components: ["Projects", "Client"]))
+        let path = try RelativeProjectFolderPath(validatingComponents: ["Projects", "Client"])
         let data = try JSONEncoder().encode(path)
         let decoded = try JSONDecoder().decode(RelativeProjectFolderPath.self, from: data)
         XCTAssertEqual(decoded, path)

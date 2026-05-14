@@ -360,10 +360,10 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func setTextLayerUsesGpuMutationPath() {
+    func setTextLayerUsesGpuMutationPath() throws {
         let runtime = DocumentEngineFactory.live()
-        let textLayer = TextLayerData(
-            text: "GPU",
+        let textLayer = try #require(TextLayerData(
+            validatingText: "GPU",
             positionX: 8,
             positionY: 8,
             fontPostScriptName: "Helvetica",
@@ -373,7 +373,7 @@ struct PaintDocumentMutationContractTests {
             green: 1,
             blue: 1,
             alpha: 1
-        )
+        ))
         let result = runtime.textLayerGateway.setTextLayer(0, textLayer)
 
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
@@ -453,11 +453,11 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func directRasterizeTextLayerProducesPayload() {
+    func directRasterizeTextLayerProducesPayload() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let payload = client.rasterizeTextLayer(
-            TextLayerData(
-                text: "Metal",
+            try #require(TextLayerData(
+                validatingText: "Metal",
                 positionX: 4,
                 positionY: 4,
                 fontPostScriptName: "Helvetica",
@@ -467,7 +467,7 @@ struct PaintDocumentMutationContractTests {
                 green: 1,
                 blue: 1,
                 alpha: 1
-            ),
+            )),
             canvasSize: CGSize(width: 32, height: 32)
         )
 
@@ -480,11 +480,11 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func directTextLayoutRectProducesGeometry() {
+    func directTextLayoutRectProducesGeometry() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let rect = client.textLayoutRect(
-            for: TextLayerData(
-                text: "Metal",
+            for: try #require(TextLayerData(
+                validatingText: "Metal",
                 positionX: 4,
                 positionY: 6,
                 fontPostScriptName: "Helvetica",
@@ -494,7 +494,7 @@ struct PaintDocumentMutationContractTests {
                 green: 1,
                 blue: 1,
                 alpha: 1
-            ),
+            )),
             canvasSize: CGSize(width: 64, height: 64)
         )
 

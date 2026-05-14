@@ -8,18 +8,18 @@ struct AdjustmentWorkflowReducer: Reducer {
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
-    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
+    @Dependency(\.layerWorkflowEnvironment) var layerWorkflowEnvironment
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        documentLayerMutationCapability.renderingWorkflow
+        layerWorkflowEnvironment.renderingWorkflow
     }
 
     var documentMutationWorkflowService: DocumentMutationWorkflowService {
-        documentLayerMutationCapability.mutationWorkflowService
+        layerWorkflowEnvironment.mutationWorkflowService
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        documentLayerMutationCapability.presentationReader
+        layerWorkflowEnvironment.presentationReader
     }
 
     enum EditingAction: Equatable {

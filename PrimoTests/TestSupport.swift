@@ -57,7 +57,7 @@ extension LayerRowModel {
         isAlphaLocked: Bool = false
     ) -> Self {
         Self(
-            index: index,
+            validatingIndex: index,
             name: "Layer \(index + 1)",
             visible: true,
             opacity: UnitInterval(1.0)!,
@@ -69,7 +69,7 @@ extension LayerRowModel {
             hasMask: false,
             isTextLayer: false,
             textLayer: nil
-        )
+        )!
     }
 }
 

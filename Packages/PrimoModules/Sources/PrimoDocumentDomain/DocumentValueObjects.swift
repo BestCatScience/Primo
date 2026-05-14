@@ -18,6 +18,17 @@ public struct PositiveFiniteDouble: Equatable, Sendable {
     }
 }
 
+public struct TextContent: Equatable, Sendable, Codable {
+    public static let maxLength = 4096
+
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        guard rawValue.count <= Self.maxLength else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
 public struct FiniteDouble: Equatable, Sendable {
     public let rawValue: Double
 

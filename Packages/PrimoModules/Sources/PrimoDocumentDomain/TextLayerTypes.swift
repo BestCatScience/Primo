@@ -20,7 +20,7 @@ public struct TextFontOption: Identifiable, Equatable, Sendable, Codable {
 }
 
 public struct TextLayerData: Equatable, Sendable, Codable {
-    public var text: String
+    public var textContent: TextContent
     public var positionX: Double
     public var positionY: Double
     public var fontPostScriptName: String
@@ -33,6 +33,14 @@ public struct TextLayerData: Equatable, Sendable, Codable {
     public var blue: Double
     public var alpha: Double
 
+    public var text: String {
+        get { textContent.rawValue }
+        set {
+            guard let content = TextContent(newValue) else { return }
+            textContent = content
+        }
+    }
+
     public var position: CGPoint {
         get { CGPoint(x: positionX, y: positionY) }
         set {
@@ -41,8 +49,8 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         }
     }
 
-    public init(
-        text: String,
+    package init(
+        unsafeUncheckedText text: String,
         positionX: Double,
         positionY: Double,
         fontPostScriptName: String,
@@ -55,7 +63,7 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         blue: Double,
         alpha: Double
     ) {
-        self.text = text
+        self.textContent = TextContent(text)!
         self.positionX = positionX
         self.positionY = positionY
         self.fontPostScriptName = fontPostScriptName
@@ -70,7 +78,43 @@ public struct TextLayerData: Equatable, Sendable, Codable {
     }
 
     public init?(
-        text: String,
+        validatingText text: String,
+        positionX: Double,
+        positionY: Double,
+        fontPostScriptName: String,
+        fontDisplayName: String,
+        fontSize: Double,
+        scale: Double = 1.0,
+        rotationDegrees: Double = 0,
+        red: Double,
+        green: Double,
+        blue: Double,
+        alpha: Double
+    ) {
+        guard let text = TextContent(text),
+              let positionX = FiniteDouble(positionX),
+              let positionY = FiniteDouble(positionY),
+              let fontSize = PositiveFiniteDouble(fontSize),
+              let scale = PositiveFiniteDouble(scale),
+              let rotationDegrees = FiniteDouble(rotationDegrees),
+              let color = CanvasColor(red: red, green: green, blue: blue, alpha: alpha) else {
+            return nil
+        }
+        self.init(
+            text: text,
+            positionX: positionX,
+            positionY: positionY,
+            fontPostScriptName: fontPostScriptName,
+            fontDisplayName: fontDisplayName,
+            fontSize: fontSize,
+            scale: scale,
+            rotationDegrees: rotationDegrees,
+            color: color
+        )
+    }
+
+    public init?(
+        text: TextContent,
         positionX: FiniteDouble,
         positionY: FiniteDouble,
         fontPostScriptName: String,
@@ -81,7 +125,7 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         color: CanvasColor
     ) {
         self.init(
-            text: text,
+            unsafeUncheckedText: text.rawValue,
             positionX: positionX.rawValue,
             positionY: positionY.rawValue,
             fontPostScriptName: fontPostScriptName,
@@ -122,7 +166,15 @@ public struct TextLayerData: Equatable, Sendable, Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        text = try container.decode(String.self, forKey: .text)
+        let decodedText = try container.decode(String.self, forKey: .text)
+        guard let textContent = TextContent(decodedText) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .text,
+                in: container,
+                debugDescription: "Text layer content exceeds \(TextContent.maxLength) characters"
+            )
+        }
+        self.textContent = textContent
         positionX = try container.decode(Double.self, forKey: .positionX)
         positionY = try container.decode(Double.self, forKey: .positionY)
         fontPostScriptName = try container.decode(String.self, forKey: .fontPostScriptName)
@@ -134,6 +186,22 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         green = try container.decode(Double.self, forKey: .green)
         blue = try container.decode(Double.self, forKey: .blue)
         alpha = try container.decode(Double.self, forKey: .alpha)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(textContent.rawValue, forKey: .text)
+        try container.encode(positionX, forKey: .positionX)
+        try container.encode(positionY, forKey: .positionY)
+        try container.encode(fontPostScriptName, forKey: .fontPostScriptName)
+        try container.encode(fontDisplayName, forKey: .fontDisplayName)
+        try container.encode(fontSize, forKey: .fontSize)
+        try container.encode(scale, forKey: .scale)
+        try container.encode(rotationDegrees, forKey: .rotationDegrees)
+        try container.encode(red, forKey: .red)
+        try container.encode(green, forKey: .green)
+        try container.encode(blue, forKey: .blue)
+        try container.encode(alpha, forKey: .alpha)
     }
 }
 

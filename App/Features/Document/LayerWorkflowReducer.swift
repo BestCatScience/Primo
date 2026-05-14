@@ -16,35 +16,34 @@ struct LayerWorkflowReducer: Reducer {
     typealias LayerWorkflowService = DocumentFeature.LayerWorkflowService
 
     @Dependency(\.appLanguageClient) var appLanguageClient
-    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
-    @Dependency(\.documentStrokeCapability) var documentStrokeCapability
+    @Dependency(\.layerWorkflowEnvironment) var layerWorkflowEnvironment
 
     var documentContentService: DocumentContentService {
-        documentLayerMutationCapability.contentService
+        layerWorkflowEnvironment.contentService
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        documentLayerMutationCapability.renderingWorkflow
+        layerWorkflowEnvironment.renderingWorkflow
     }
 
     var documentMutationWorkflowService: DocumentMutationWorkflowService {
-        documentLayerMutationCapability.mutationWorkflowService
+        layerWorkflowEnvironment.mutationWorkflowService
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        documentLayerMutationCapability.presentationReader
+        layerWorkflowEnvironment.presentationReader
     }
 
     var canvasStrokeInteractionService: CanvasStrokeInteractionService {
-        documentStrokeCapability.canvasStrokeInteractionService
+        layerWorkflowEnvironment.canvasStrokeInteractionService
     }
 
     var documentTextLayerService: DocumentTextLayerService {
-        documentLayerMutationCapability.textLayerService
+        layerWorkflowEnvironment.textLayerService
     }
 
     var selectionWorkflowService: SelectionWorkflowService {
-        documentLayerMutationCapability.selectionWorkflowService
+        layerWorkflowEnvironment.selectionWorkflowService
     }
 
     enum EditingAction: Equatable {

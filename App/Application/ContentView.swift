@@ -4,6 +4,7 @@ import PhotosUI
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
+import PrimoDocumentRuntime
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
@@ -11,7 +12,10 @@ import UIKit
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Dependency(\.mainQueueClient) private var mainQueueClient
-    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
+    @Dependency(\.presentationRefreshEnvironment) var presentationRefreshEnvironment
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        presentationRefreshEnvironment.renderingWorkflow
+    }
     enum AIImageFocusedField: Hashable {
         case prompt
     }

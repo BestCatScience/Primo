@@ -18,46 +18,46 @@ struct CanvasEditingWorkflowReducer: Reducer {
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
     typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
 
-    @Dependency(\.documentStrokeCapability) var documentStrokeCapability
+    @Dependency(\.canvasStrokeEnvironment) var canvasStrokeEnvironment
 
     var canvasStrokeInteractionService: CanvasStrokeInteractionService {
-        documentStrokeCapability.canvasStrokeInteractionService
+        canvasStrokeEnvironment.canvasStrokeInteractionService
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        documentStrokeCapability.renderingWorkflow
+        canvasStrokeEnvironment.renderingWorkflow
     }
 
     var documentLayerCommandService: DocumentLayerCommandService {
-        documentStrokeCapability.layerCommandService
+        canvasStrokeEnvironment.layerCommandService
     }
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
-        documentStrokeCapability.persistenceGateway
+        canvasStrokeEnvironment.persistenceGateway
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        documentStrokeCapability.presentationReader
+        canvasStrokeEnvironment.presentationReader
     }
 
     var documentStrokeCommandService: DocumentStrokeCommandService {
-        documentStrokeCapability.strokeCommandService
+        canvasStrokeEnvironment.strokeCommandService
     }
 
     var canvasEditingWorkflowService: CanvasEditingWorkflowService {
-        documentStrokeCapability.canvasEditingWorkflowService
+        canvasStrokeEnvironment.canvasEditingWorkflowService
     }
 
     var documentContentService: DocumentContentService {
-        documentStrokeCapability.contentService
+        canvasStrokeEnvironment.contentService
     }
 
     var layerTransformProcessor: any LayerTransformProcessing {
-        documentStrokeCapability.layerTransformProcessor
+        canvasStrokeEnvironment.layerTransformProcessor
     }
 
     var selectionWorkflowEnvironment: SelectionWorkflowEnvironment {
-        documentStrokeCapability.selectionWorkflowEnvironment
+        canvasStrokeEnvironment.selectionWorkflowEnvironment
     }
 
     enum EditingAction: Equatable {

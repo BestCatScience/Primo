@@ -1283,10 +1283,10 @@ struct DocumentStrokeApplicationTests {
         let brush = brush ?? brushSettings()
         return DocumentStrokeContext(
             activeLayer: LayerRowModel(
-                index: layerIndex,
+                validatingIndex: layerIndex,
                 name: "Layer",
                 visible: true,
-                opacity: 1,
+                opacity: UnitInterval(1)!,
                 isLocked: false,
                 isAlphaLocked: isAlphaLocked,
                 isClipped: false,
@@ -1295,7 +1295,7 @@ struct DocumentStrokeApplicationTests {
                 hasMask: false,
                 isTextLayer: false,
                 textLayer: nil
-            ),
+            )!,
             activeLayerIndex: layerIndex,
             brush: brush,
             previewBrush: brush

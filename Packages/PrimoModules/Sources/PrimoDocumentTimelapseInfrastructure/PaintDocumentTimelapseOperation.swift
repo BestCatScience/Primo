@@ -221,14 +221,17 @@ extension TimelapseOperation {
             self = .clearLayer(index: layerIndex)
         case .setPaperStyle:
             guard let paperStyle = stored.paperStyle else { throw PrimoDocumentError.invalidDocument }
+            guard let validatedPaperStyle = CanvasPaperStyle(
+                validatingRed: Float(paperStyle.red),
+                green: Float(paperStyle.green),
+                blue: Float(paperStyle.blue),
+                alpha: Float(paperStyle.alpha),
+                isTransparent: paperStyle.isTransparent
+            ) else {
+                throw PrimoDocumentError.invalidDocument
+            }
             self = .setPaperStyle(
-                CanvasPaperStyle(
-                    red: Float(paperStyle.red),
-                    green: Float(paperStyle.green),
-                    blue: Float(paperStyle.blue),
-                    alpha: Float(paperStyle.alpha),
-                    isTransparent: paperStyle.isTransparent
-                )
+                validatedPaperStyle
             )
         }
     }

@@ -4,10 +4,10 @@ import PrimoDocumentDomain
 
 public struct LayerRowModel: Identifiable, Equatable, Sendable {
     public var id: Int { index }
-    public let index: Int
+    public let layerIndex: DocumentLayerIndex
     public let name: String
     public let visible: Bool
-    public let opacity: Double
+    public let opacityValue: UnitInterval
     public let isLocked: Bool
     public let isAlphaLocked: Bool
     public let isClipped: Bool
@@ -17,36 +17,12 @@ public struct LayerRowModel: Identifiable, Equatable, Sendable {
     public let isTextLayer: Bool
     public let textLayer: TextLayerData?
 
-    public init(
-        index: Int,
-        name: String,
-        visible: Bool,
-        opacity: Double,
-        isLocked: Bool,
-        isAlphaLocked: Bool,
-        isClipped: Bool,
-        blendMode: LayerBlendMode,
-        folderID: Int?,
-        hasMask: Bool,
-        isTextLayer: Bool,
-        textLayer: TextLayerData?
-    ) {
-        self.index = index
-        self.name = name
-        self.visible = visible
-        self.opacity = opacity
-        self.isLocked = isLocked
-        self.isAlphaLocked = isAlphaLocked
-        self.isClipped = isClipped
-        self.blendMode = blendMode
-        self.folderID = folderID
-        self.hasMask = hasMask
-        self.isTextLayer = isTextLayer
-        self.textLayer = textLayer
-    }
+    public var index: Int { layerIndex.rawValue }
+    public var opacity: Double { opacityValue.rawValue }
+    public var validatedOpacity: UnitInterval? { opacityValue }
 
-    public init(
-        index: Int,
+    package init(
+        unsafeUncheckedIndex index: Int,
         name: String,
         visible: Bool,
         opacity: UnitInterval,
@@ -59,24 +35,47 @@ public struct LayerRowModel: Identifiable, Equatable, Sendable {
         isTextLayer: Bool,
         textLayer: TextLayerData?
     ) {
-        self.init(
-            index: index,
-            name: name,
-            visible: visible,
-            opacity: opacity.rawValue,
-            isLocked: isLocked,
-            isAlphaLocked: isAlphaLocked,
-            isClipped: isClipped,
-            blendMode: blendMode,
-            folderID: folderID,
-            hasMask: hasMask,
-            isTextLayer: isTextLayer,
-            textLayer: textLayer
-        )
+        self.layerIndex = .unchecked(index)
+        self.name = name
+        self.visible = visible
+        self.opacityValue = opacity
+        self.isLocked = isLocked
+        self.isAlphaLocked = isAlphaLocked
+        self.isClipped = isClipped
+        self.blendMode = blendMode
+        self.folderID = folderID
+        self.hasMask = hasMask
+        self.isTextLayer = isTextLayer
+        self.textLayer = textLayer
     }
 
-    public var validatedOpacity: UnitInterval? {
-        UnitInterval(opacity)
+    public init?(
+        validatingIndex index: Int,
+        name: String,
+        visible: Bool,
+        opacity: UnitInterval,
+        isLocked: Bool,
+        isAlphaLocked: Bool,
+        isClipped: Bool,
+        blendMode: LayerBlendMode,
+        folderID: Int?,
+        hasMask: Bool,
+        isTextLayer: Bool,
+        textLayer: TextLayerData?
+    ) {
+        guard let layerIndex = try? DocumentLayerIndex(validating: index) else { return nil }
+        self.layerIndex = layerIndex
+        self.name = name
+        self.visible = visible
+        self.opacityValue = opacity
+        self.isLocked = isLocked
+        self.isAlphaLocked = isAlphaLocked
+        self.isClipped = isClipped
+        self.blendMode = blendMode
+        self.folderID = folderID
+        self.hasMask = hasMask
+        self.isTextLayer = isTextLayer
+        self.textLayer = textLayer
     }
 }
 
@@ -116,6 +115,36 @@ public enum LayerSidebarRowModel: Identifiable, Equatable, Sendable {
         case let .layer(layer, _):
             return "layer-\(layer.index)"
         }
+    }
+}
+
+public struct ValidatedLayerPresentation: Equatable, Sendable {
+    public let layerRows: [LayerRowModel]
+    public let layerSidebarRows: [LayerSidebarRowModel]
+    public let activeLayerIndex: DocumentLayerIndex
+
+    public init?(
+        layerRows: [LayerRowModel],
+        layerSidebarRows: [LayerSidebarRowModel],
+        activeLayerIndex: DocumentLayerIndex
+    ) {
+        guard layerRows.contains(where: { $0.layerIndex == activeLayerIndex }) else { return nil }
+        self.layerRows = layerRows
+        self.layerSidebarRows = layerSidebarRows
+        self.activeLayerIndex = activeLayerIndex
+    }
+
+    public init?(
+        layerRows: [LayerRowModel],
+        layerSidebarRows: [LayerSidebarRowModel],
+        activeLayerIndex: Int
+    ) {
+        guard let activeLayerIndex = try? DocumentLayerIndex(validating: activeLayerIndex) else { return nil }
+        self.init(
+            layerRows: layerRows,
+            layerSidebarRows: layerSidebarRows,
+            activeLayerIndex: activeLayerIndex
+        )
     }
 }
 
@@ -444,6 +473,7 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
     public var activeLayerIndex: Int
     public var layerRows: [LayerRowModel]
     public var layerSidebarRows: [LayerSidebarRowModel]
+    public var validatedLayerPresentation: ValidatedLayerPresentation?
     public var renderSnapshot: MetalDocumentSnapshot?
     public var revision: DocumentRevision
 
@@ -476,6 +506,26 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
         self.activeLayerIndex = activeLayerIndex
         self.layerRows = layerRows
         self.layerSidebarRows = layerSidebarRows
+        self.validatedLayerPresentation = ValidatedLayerPresentation(
+            layerRows: layerRows,
+            layerSidebarRows: layerSidebarRows,
+            activeLayerIndex: activeLayerIndex
+        )
+        self.renderSnapshot = renderSnapshot
+        self.revision = revision
+    }
+
+    public init(
+        geometry: PixelGeometry,
+        layerPresentation: ValidatedLayerPresentation,
+        renderSnapshot: MetalDocumentSnapshot?,
+        revision: DocumentRevision = .initial
+    ) {
+        self.canvasSize = CGSize(width: geometry.width, height: geometry.height)
+        self.activeLayerIndex = layerPresentation.activeLayerIndex.rawValue
+        self.layerRows = layerPresentation.layerRows
+        self.layerSidebarRows = layerPresentation.layerSidebarRows
+        self.validatedLayerPresentation = layerPresentation
         self.renderSnapshot = renderSnapshot
         self.revision = revision
     }
@@ -490,8 +540,12 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
     ) {
         guard let canvasWidth = Self.validatingDimension(canvasSize.width),
               let canvasHeight = Self.validatingDimension(canvasSize.height),
-              layerRows.contains(where: { $0.index == activeLayerIndex }),
-              layerRows.allSatisfy({ $0.validatedOpacity != nil }) else {
+              let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+              let layerPresentation = ValidatedLayerPresentation(
+                layerRows: layerRows,
+                layerSidebarRows: layerSidebarRows,
+                activeLayerIndex: activeLayerIndex
+              ) else {
             return nil
         }
         if let renderSnapshot {
@@ -501,10 +555,8 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
             }
         }
         self.init(
-            canvasSize: canvasSize,
-            activeLayerIndex: activeLayerIndex,
-            layerRows: layerRows,
-            layerSidebarRows: layerSidebarRows,
+            geometry: geometry,
+            layerPresentation: layerPresentation,
             renderSnapshot: renderSnapshot,
             revision: revision
         )

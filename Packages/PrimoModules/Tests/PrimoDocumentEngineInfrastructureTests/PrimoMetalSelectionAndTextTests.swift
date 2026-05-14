@@ -133,11 +133,11 @@ struct PrimoMetalSelectionAndTextTests {
     }
 
     @Test
-    func directRasterizeTextLayerProducesPixelsForMultilineRotation() {
+    func directRasterizeTextLayerProducesPixelsForMultilineRotation() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let payload = client.rasterizeTextLayer(
-            TextLayerData(
-                text: "GPU\nTEXT",
+            try #require(TextLayerData(
+                validatingText: "GPU\nTEXT",
                 positionX: 6,
                 positionY: 8,
                 fontPostScriptName: "Helvetica",
@@ -149,7 +149,7 @@ struct PrimoMetalSelectionAndTextTests {
                 green: 1,
                 blue: 1,
                 alpha: 1
-            ),
+            )),
             canvasSize: CGSize(width: 80, height: 80)
         )
 
@@ -164,11 +164,11 @@ struct PrimoMetalSelectionAndTextTests {
     }
 
     @Test
-    func directTextLayoutRectProducesRotatedBounds() {
+    func directTextLayoutRectProducesRotatedBounds() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let rect = client.textLayoutRect(
-            for: TextLayerData(
-                text: "HELLO WORLD",
+            for: try #require(TextLayerData(
+                validatingText: "HELLO WORLD",
                 positionX: 4,
                 positionY: 6,
                 fontPostScriptName: "Helvetica",
@@ -180,7 +180,7 @@ struct PrimoMetalSelectionAndTextTests {
                 green: 1,
                 blue: 1,
                 alpha: 1
-            ),
+            )),
             canvasSize: CGSize(width: 96, height: 96)
         )
 

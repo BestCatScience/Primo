@@ -38,6 +38,13 @@ struct DocumentPresentationCapability: Sendable {
     let renderingWorkflow: DocumentRenderingWorkflow
 }
 
+struct PresentationRefreshEnvironment: Sendable {
+    let presentationReader: DocumentPresentationReader
+    let persistenceGateway: DocumentPersistenceGateway
+    let exportGateway: DocumentExportGateway
+    let renderingWorkflow: DocumentRenderingWorkflow
+}
+
 struct DocumentCanvasMutationCapability: Sendable {
     let canvasCommandService: DocumentCanvasCommandService
     let historyCommandService: DocumentHistoryCommandService
@@ -55,7 +62,30 @@ struct DocumentLayerMutationCapability: Sendable {
     let selectionWorkflowService: SelectionWorkflowService
 }
 
+struct LayerWorkflowEnvironment: Sendable {
+    let contentService: DocumentContentService
+    let renderingWorkflow: DocumentRenderingWorkflow
+    let mutationWorkflowService: DocumentMutationWorkflowService
+    let presentationReader: DocumentPresentationReader
+    let textLayerService: DocumentTextLayerService
+    let selectionWorkflowService: SelectionWorkflowService
+    let canvasStrokeInteractionService: CanvasStrokeInteractionService
+}
+
 struct DocumentStrokeCapability: Sendable {
+    let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    let renderingWorkflow: DocumentRenderingWorkflow
+    let layerCommandService: DocumentLayerCommandService
+    let strokeCommandService: DocumentStrokeCommandService
+    let persistenceGateway: DocumentPersistenceGateway
+    let presentationReader: DocumentPresentationReader
+    let canvasEditingWorkflowService: CanvasEditingWorkflowService
+    let contentService: DocumentContentService
+    let layerTransformProcessor: any LayerTransformProcessing
+    let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
+}
+
+struct CanvasStrokeEnvironment: Sendable {
     let canvasStrokeInteractionService: CanvasStrokeInteractionService
     let renderingWorkflow: DocumentRenderingWorkflow
     let layerCommandService: DocumentLayerCommandService
@@ -86,9 +116,12 @@ struct DocumentPreviewRenderingCapability: Sendable {
 struct DocumentApplicationEnvironment: Sendable {
     let runtime: DocumentRuntime
     let presentationCapability: DocumentPresentationCapability
+    let presentationRefreshEnvironment: PresentationRefreshEnvironment
     let canvasMutationCapability: DocumentCanvasMutationCapability
     let layerMutationCapability: DocumentLayerMutationCapability
+    let layerWorkflowEnvironment: LayerWorkflowEnvironment
     let strokeCapability: DocumentStrokeCapability
+    let canvasStrokeEnvironment: CanvasStrokeEnvironment
     let exportCapability: DocumentExportCapability
     let persistenceCapability: DocumentPersistenceCapability
     let previewRenderingCapability: DocumentPreviewRenderingCapability
@@ -161,6 +194,12 @@ struct DocumentApplicationEnvironment: Sendable {
             exportGateway: exportGateway,
             renderingWorkflow: runtime.renderingWorkflow
         )
+        self.presentationRefreshEnvironment = PresentationRefreshEnvironment(
+            presentationReader: runtime.presentationReader,
+            persistenceGateway: persistenceGateway,
+            exportGateway: exportGateway,
+            renderingWorkflow: runtime.renderingWorkflow
+        )
         self.canvasMutationCapability = DocumentCanvasMutationCapability(
             canvasCommandService: runtime.canvasCommands,
             historyCommandService: runtime.historyCommands,
@@ -176,7 +215,28 @@ struct DocumentApplicationEnvironment: Sendable {
             textLayerService: runtime.textLayerService,
             selectionWorkflowService: runtime.selectionWorkflow
         )
+        self.layerWorkflowEnvironment = LayerWorkflowEnvironment(
+            contentService: runtime.contentService,
+            renderingWorkflow: runtime.renderingWorkflow,
+            mutationWorkflowService: runtime.mutationWorkflow,
+            presentationReader: runtime.presentationReader,
+            textLayerService: runtime.textLayerService,
+            selectionWorkflowService: runtime.selectionWorkflow,
+            canvasStrokeInteractionService: runtime.canvasStrokeInteractionService
+        )
         self.strokeCapability = DocumentStrokeCapability(
+            canvasStrokeInteractionService: runtime.canvasStrokeInteractionService,
+            renderingWorkflow: runtime.renderingWorkflow,
+            layerCommandService: runtime.layerCommands,
+            strokeCommandService: runtime.strokeCommands,
+            persistenceGateway: persistenceGateway,
+            presentationReader: runtime.presentationReader,
+            canvasEditingWorkflowService: runtime.canvasEditingWorkflow,
+            contentService: runtime.contentService,
+            layerTransformProcessor: runtime.layerTransformProcessor,
+            selectionWorkflowEnvironment: selectionWorkflowEnvironment
+        )
+        self.canvasStrokeEnvironment = CanvasStrokeEnvironment(
             canvasStrokeInteractionService: runtime.canvasStrokeInteractionService,
             renderingWorkflow: runtime.renderingWorkflow,
             layerCommandService: runtime.layerCommands,
@@ -228,6 +288,10 @@ extension DependencyValues {
         documentApplicationEnvironment.presentationCapability
     }
 
+    var presentationRefreshEnvironment: PresentationRefreshEnvironment {
+        documentApplicationEnvironment.presentationRefreshEnvironment
+    }
+
     var documentCanvasMutationCapability: DocumentCanvasMutationCapability {
         documentApplicationEnvironment.canvasMutationCapability
     }
@@ -236,8 +300,16 @@ extension DependencyValues {
         documentApplicationEnvironment.layerMutationCapability
     }
 
+    var layerWorkflowEnvironment: LayerWorkflowEnvironment {
+        documentApplicationEnvironment.layerWorkflowEnvironment
+    }
+
     var documentStrokeCapability: DocumentStrokeCapability {
         documentApplicationEnvironment.strokeCapability
+    }
+
+    var canvasStrokeEnvironment: CanvasStrokeEnvironment {
+        documentApplicationEnvironment.canvasStrokeEnvironment
     }
 
     var documentExportCapability: DocumentExportCapability {
@@ -250,30 +322,6 @@ extension DependencyValues {
 
     var documentPreviewRenderingCapability: DocumentPreviewRenderingCapability {
         documentApplicationEnvironment.previewRenderingCapability
-    }
-
-    var documentPresentationReader: DocumentPresentationReader {
-        documentApplicationEnvironment.presentationReader
-    }
-
-    var documentPersistenceGateway: DocumentPersistenceGateway {
-        documentApplicationEnvironment.persistenceGateway
-    }
-
-    var documentExportGateway: DocumentExportGateway {
-        documentApplicationEnvironment.exportGateway
-    }
-
-    var documentTextLayerService: DocumentTextLayerService {
-        documentApplicationEnvironment.textLayerService
-    }
-
-    var canvasStrokeInteractionService: CanvasStrokeInteractionService {
-        documentApplicationEnvironment.canvasStrokeInteractionService
-    }
-
-    var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        documentApplicationEnvironment.renderingWorkflow
     }
 
     var canvasPreviewRenderer: any CanvasPreviewRendering {
@@ -290,42 +338,6 @@ extension DependencyValues {
 
     var canvasPresentationEnvironment: CanvasPresentationEnvironment {
         documentApplicationEnvironment.canvasPresentationEnvironment
-    }
-
-    var documentCanvasCommandService: DocumentCanvasCommandService {
-        documentApplicationEnvironment.canvasCommandService
-    }
-
-    var documentLayerCommandService: DocumentLayerCommandService {
-        documentApplicationEnvironment.layerCommandService
-    }
-
-    var documentStrokeCommandService: DocumentStrokeCommandService {
-        documentApplicationEnvironment.strokeCommandService
-    }
-
-    var documentHistoryCommandService: DocumentHistoryCommandService {
-        documentApplicationEnvironment.historyCommandService
-    }
-
-    var documentMutationWorkflowService: DocumentMutationWorkflowService {
-        documentApplicationEnvironment.mutationWorkflowService
-    }
-
-    var documentContentService: DocumentContentService {
-        documentApplicationEnvironment.contentService
-    }
-
-    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
-        documentApplicationEnvironment.canvasEditingWorkflowService
-    }
-
-    var layerTransformProcessor: any LayerTransformProcessing {
-        documentApplicationEnvironment.layerTransformProcessor
-    }
-
-    var selectionWorkflowService: SelectionWorkflowService {
-        documentApplicationEnvironment.selectionWorkflowService
     }
 
     var selectionWorkflowEnvironment: SelectionWorkflowEnvironment {

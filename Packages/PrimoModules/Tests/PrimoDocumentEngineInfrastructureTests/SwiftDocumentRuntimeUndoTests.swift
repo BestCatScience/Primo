@@ -150,8 +150,8 @@ struct SwiftDocumentRuntimeUndoTests {
 
     @Test
     func strokeUndoRestoresTextLayerMetadataClearedByStrokeDelta() throws {
-        let textLayer = TextLayerData(
-            text: "Undo text",
+        let textLayer = try #require(TextLayerData(
+            validatingText: "Undo text",
             positionX: 1,
             positionY: 1,
             fontPostScriptName: "Helvetica",
@@ -161,7 +161,7 @@ struct SwiftDocumentRuntimeUndoTests {
             green: 1,
             blue: 1,
             alpha: 1
-        )
+        ))
         let strokePixels = Data(repeating: 0x66, count: 16)
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())

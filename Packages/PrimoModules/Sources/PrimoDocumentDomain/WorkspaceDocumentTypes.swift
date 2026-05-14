@@ -30,49 +30,59 @@ public struct DocumentCompositeSurface: Equatable, Sendable {
 }
 
 public struct CanvasPaperStyle: Equatable, Sendable {
-    public var red: Float
-    public var green: Float
-    public var blue: Float
-    public var alpha: Float
+    public var color: CanvasColor
     public var isTransparent: Bool
 
-    public init(
-        red: Float,
+    public var red: Float { Float(color.red.rawValue) }
+    public var green: Float { Float(color.green.rawValue) }
+    public var blue: Float { Float(color.blue.rawValue) }
+    public var alpha: Float { Float(color.alpha.rawValue) }
+
+    package init(
+        unsafeUncheckedRed red: Float,
         green: Float,
         blue: Float,
         alpha: Float,
         isTransparent: Bool
     ) {
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.alpha = alpha
+        self.color = CanvasColor(
+            red: UnitInterval(Double(red))!,
+            green: UnitInterval(Double(green))!,
+            blue: UnitInterval(Double(blue))!,
+            alpha: UnitInterval(Double(alpha))!
+        )
         self.isTransparent = isTransparent
     }
 
-    public init?(color: CanvasColor, isTransparent: Bool) {
-        self.init(
-            red: Float(color.red.rawValue),
-            green: Float(color.green.rawValue),
-            blue: Float(color.blue.rawValue),
-            alpha: Float(color.alpha.rawValue),
-            isTransparent: isTransparent
-        )
-    }
-
-    public var validatedColor: CanvasColor? {
-        CanvasColor(
+    public init?(
+        validatingRed red: Float,
+        green: Float,
+        blue: Float,
+        alpha: Float,
+        isTransparent: Bool
+    ) {
+        guard let color = CanvasColor(
             red: Double(red),
             green: Double(green),
             blue: Double(blue),
             alpha: Double(alpha)
-        )
+        ) else {
+            return nil
+        }
+        self.init(color: color, isTransparent: isTransparent)
     }
+
+    public init(color: CanvasColor, isTransparent: Bool) {
+        self.color = color
+        self.isTransparent = isTransparent
+    }
+
+    public var validatedColor: CanvasColor? { color }
 
     public static let `default` = CanvasPaperStyle(
         color: CanvasColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)!,
         isTransparent: false
-    )!
+    )
 }
 
 public struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
@@ -122,13 +132,19 @@ public struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
 public struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
     public let components: [String]
 
-    public init?(components: [String]) {
-        guard components.allSatisfy(Self.isValidComponent(_:)) else { return nil }
+    public init(validatingComponents components: [String]) throws {
+        guard components.allSatisfy(Self.isValidComponent(_:)) else {
+            throw DocumentWorkspaceError.invalidRelativeFolderPath(components.joined(separator: "/"))
+        }
         self.components = components
     }
 
     package init(unchecked components: [String]) {
         self.components = components
+    }
+
+    package static func unsafeUnchecked(components: [String]) -> Self {
+        Self(unchecked: components)
     }
 
     public init(validating rawValue: String?) throws {
@@ -177,14 +193,15 @@ public struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let components = try container.decode([String].self, forKey: .components)
-        guard let path = Self(components: components) else {
+        do {
+            try self.init(validatingComponents: components)
+        } catch {
             throw DecodingError.dataCorruptedError(
                 forKey: .components,
                 in: container,
                 debugDescription: "Invalid relative project folder path components"
             )
         }
-        self = path
     }
 
     public func encode(to encoder: Encoder) throws {

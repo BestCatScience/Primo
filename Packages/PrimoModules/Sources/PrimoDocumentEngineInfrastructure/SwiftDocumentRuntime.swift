@@ -68,7 +68,7 @@ struct RuntimeResizeCanvasPlan: Sendable {
             }
             if let textLayer = layer.textLayer {
                 layer.textLayer = TextLayerData(
-                    text: textLayer.text,
+                    validatingText: textLayer.text,
                     positionX: textLayer.positionX * widthScale,
                     positionY: textLayer.positionY * heightScale,
                     fontPostScriptName: textLayer.fontPostScriptName,
@@ -121,7 +121,7 @@ struct RuntimeResizeCanvasPlan: Sendable {
             }
             if let textLayer = layer.textLayer {
                 layer.textLayer = TextLayerData(
-                    text: textLayer.text,
+                    validatingText: textLayer.text,
                     positionX: textLayer.positionX + Double(offsetX),
                     positionY: textLayer.positionY + Double(offsetY),
                     fontPostScriptName: textLayer.fontPostScriptName,
@@ -2269,12 +2269,12 @@ extension SwiftDocumentRuntime {
                 canvasHeight: document.canvasHeight,
                 activeLayerIndex: min(max(document.activeLayerIndex.rawValue, 0), layers.count - 1),
                 paperStyle: CanvasPaperStyle(
-                    red: Float(document.paperStyle.red),
+                    validatingRed: Float(document.paperStyle.red),
                     green: Float(document.paperStyle.green),
                     blue: Float(document.paperStyle.blue),
                     alpha: Float(document.paperStyle.alpha),
                     isTransparent: document.paperStyle.isTransparent
-                ),
+                ) ?? .default,
                 revision: 0,
                 nextFolderID: (folders.map { $0.id }.max() ?? 0) + 1,
                 layers: layers,
@@ -2809,7 +2809,7 @@ extension SwiftDocumentRuntime {
     private func buildLayerRows() -> [LayerRowModel] {
         store.snapshot.layers.enumerated().map { index, layer in
             LayerRowModel(
-                index: index,
+                unsafeUncheckedIndex: index,
                 name: layer.name,
                 visible: layer.visible,
                 opacity: UnitInterval(layer.opacity)!,

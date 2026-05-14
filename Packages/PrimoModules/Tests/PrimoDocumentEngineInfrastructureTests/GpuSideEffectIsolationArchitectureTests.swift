@@ -651,10 +651,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             encoding: .utf8
         )
 
-        for symbol in ["UnitInterval", "PositiveFiniteDouble", "FiniteDouble", "CanvasColor"] {
+        for symbol in ["UnitInterval", "PositiveFiniteDouble", "FiniteDouble", "TextContent", "CanvasColor"] {
             #expect(valueObjects.contains("public struct \(symbol)"), "Document DTO value object \(symbol) should exist")
         }
-        #expect(paperStyle.contains("public init?(color: CanvasColor, isTransparent: Bool)"))
+        #expect(paperStyle.contains("public var color: CanvasColor"))
+        #expect(paperStyle.contains("public init(color: CanvasColor, isTransparent: Bool)"))
         #expect(paperStyle.contains("public var validatedColor: CanvasColor?"))
         #expect(textLayer.contains("public var validatedFontSize: PositiveFiniteDouble?"))
         #expect(textLayer.contains("public var validatedColor: CanvasColor?"))
@@ -1054,10 +1055,15 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         let relativePath = try #require(Self.typeBody(named: "RelativeProjectFolderPath", in: workspaceDocumentTypes))
         #expect(
-            relativePath.contains("public init?(components: [String])"),
-            "RelativeProjectFolderPath component construction should stay validating and failable"
+            relativePath.contains("public init(validatingComponents components: [String]) throws"),
+            "RelativeProjectFolderPath component construction should stay validating"
         )
         #expect(
+            relativePath.contains("package static func unsafeUnchecked(components: [String])"),
+            "RelativeProjectFolderPath unchecked component construction should stay package-scoped"
+        )
+        #expect(
+            !relativePath.contains("public init?(components: [String])") &&
             !relativePath.contains("public init(components: [String])"),
             "RelativeProjectFolderPath should not reintroduce a non-validating component initializer"
         )

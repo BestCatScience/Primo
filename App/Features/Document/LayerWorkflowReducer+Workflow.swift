@@ -395,8 +395,8 @@ extension LayerWorkflowReducer {
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
         uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        let textLayer = TextLayerData(
-            text: draft.text,
+        guard let textLayer = TextLayerData(
+            validatingText: draft.text,
             positionX: position.x,
             positionY: position.y,
             fontPostScriptName: fontOption?.postScriptName ?? draft.fontPostScriptName ?? UIFont.systemFont(ofSize: draft.fontSize).fontName,
@@ -408,7 +408,9 @@ extension LayerWorkflowReducer {
             green: green,
             blue: blue,
             alpha: alpha
-        )
+        ) else {
+            return documentMutationFeedbackEffect(for: .textLayerApplyFailed)
+        }
 
         let target: LayerContentMutationTarget
         if let existingIndex = draft.targetLayerIndex {

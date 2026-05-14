@@ -148,19 +148,20 @@ struct DocumentContentServiceTests {
             )
         )
 
+        let textLayer = try #require(TextLayerData(
+            validatingText: "Hello",
+            positionX: 10,
+            positionY: 20,
+            fontPostScriptName: "Helvetica",
+            fontDisplayName: "Helvetica",
+            fontSize: 24,
+            red: 1,
+            green: 1,
+            blue: 1,
+            alpha: 1
+        ))
         let result = service.applyTextLayer(
-            TextLayerData(
-                text: "Hello",
-                positionX: 10,
-                positionY: 20,
-                fontPostScriptName: "Helvetica",
-                fontDisplayName: "Helvetica",
-                fontSize: 24,
-                red: 1,
-                green: 1,
-                blue: 1,
-                alpha: 1
-            ),
+            textLayer,
             to: .newLayer(name: "Caption")
         )
 
@@ -211,10 +212,10 @@ private func renderGateway() -> DocumentRenderGateway {
 
 private func layerRow(index: Int) -> LayerRowModel {
     LayerRowModel(
-        index: index,
+        validatingIndex: index,
         name: "Layer \(index)",
         visible: true,
-        opacity: 1,
+        opacity: UnitInterval(1)!,
         isLocked: false,
         isAlphaLocked: false,
         isClipped: false,
@@ -223,7 +224,7 @@ private func layerRow(index: Int) -> LayerRowModel {
         hasMask: false,
         isTextLayer: false,
         textLayer: nil
-    )
+    )!
 }
 
 private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway {

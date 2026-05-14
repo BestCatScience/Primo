@@ -339,12 +339,12 @@ extension DocumentFeature {
             var alpha: CGFloat = 0
             resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             return CanvasPaperStyle(
-                red: Float(red),
+                validatingRed: Float(red),
                 green: Float(green),
                 blue: Float(blue),
                 alpha: Float(alpha),
                 isTransparent: state.brushPalette.paper.isTransparent
-            )
+            ) ?? .default
         }
     }
 }

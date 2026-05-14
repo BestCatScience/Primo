@@ -34,8 +34,8 @@ struct DocumentDTOInvariantTests {
         #expect(CanvasColor(red: -0.1, green: 0.5, blue: 0, alpha: 1) == nil)
         #expect(CanvasColor(red: 1, green: .infinity, blue: 0, alpha: 1) == nil)
 
-        let invalidPaper = CanvasPaperStyle(red: 1, green: 1, blue: 1, alpha: -10, isTransparent: false)
-        #expect(invalidPaper.validatedColor == nil)
+        let invalidPaper = CanvasPaperStyle(validatingRed: 1, green: 1, blue: 1, alpha: -10, isTransparent: false)
+        #expect(invalidPaper == nil)
         #expect(CanvasPaperStyle.default.validatedColor != nil)
     }
 
@@ -47,8 +47,9 @@ struct DocumentDTOInvariantTests {
         let scale = try #require(PositiveFiniteDouble(1))
         let rotationDegrees = try #require(FiniteDouble(0))
         let color = try #require(CanvasColor(red: 1, green: 0, blue: 0, alpha: 1))
+        let text = try #require(TextContent("Hello"))
         let validTextLayer = try #require(TextLayerData(
-            text: "Hello",
+            text: text,
             positionX: positionX,
             positionY: positionY,
             fontPostScriptName: "Helvetica",
@@ -61,8 +62,9 @@ struct DocumentDTOInvariantTests {
         #expect(validTextLayer.validatedFontSize?.rawValue == 18)
         #expect(validTextLayer.validatedColor != nil)
 
-        let invalidTextLayer = TextLayerData(
-            text: "Hello",
+        #expect(TextContent(String(repeating: "a", count: TextContent.maxLength + 1)) == nil)
+        #expect(TextLayerData(
+            validatingText: "Hello",
             positionX: .infinity,
             positionY: 20,
             fontPostScriptName: "Helvetica",
@@ -74,21 +76,17 @@ struct DocumentDTOInvariantTests {
             green: 0,
             blue: 0,
             alpha: 1
-        )
-        #expect(invalidTextLayer.validatedPositionX == nil)
-        #expect(invalidTextLayer.validatedFontSize == nil)
-        #expect(invalidTextLayer.validatedScale == nil)
-        #expect(invalidTextLayer.validatedRotationDegrees == nil)
-        #expect(invalidTextLayer.validatedColor == nil)
+        ) == nil)
     }
 
     @Test
-    func layerRowOpacityValidationRejectsOutOfRangeOpacity() throws {
-        let validLayer = LayerRowModel(
-            index: 0,
+    func layerRowRequiresValidatedIndexAndOpacity() throws {
+        let halfOpacity = try #require(UnitInterval(0.5))
+        let validLayer = try #require(LayerRowModel(
+            validatingIndex: 0,
             name: "Layer",
             visible: true,
-            opacity: try #require(UnitInterval(0.5)),
+            opacity: halfOpacity,
             isLocked: false,
             isAlphaLocked: false,
             isClipped: false,
@@ -97,15 +95,16 @@ struct DocumentDTOInvariantTests {
             hasMask: false,
             isTextLayer: false,
             textLayer: nil
-        )
+        ))
         #expect(validLayer.opacity == 0.5)
         #expect(validLayer.validatedOpacity?.rawValue == 0.5)
-
-        let invalidLayer = LayerRowModel(
-            index: 0,
+        #expect(UnitInterval(2) == nil)
+        let fullOpacity = try #require(UnitInterval(1))
+        #expect(LayerRowModel(
+            validatingIndex: -1,
             name: "Layer",
             visible: true,
-            opacity: 2,
+            opacity: fullOpacity,
             isLocked: false,
             isAlphaLocked: false,
             isClipped: false,
@@ -114,17 +113,17 @@ struct DocumentDTOInvariantTests {
             hasMask: false,
             isTextLayer: false,
             textLayer: nil
-        )
-        #expect(invalidLayer.validatedOpacity == nil)
+        ) == nil)
     }
 
     @Test
     func presentationValidationRejectsMissingActiveLayerAndSnapshotSizeMismatch() throws {
-        let layer = LayerRowModel(
-            index: 0,
+        let fullOpacity = try #require(UnitInterval(1))
+        let layer = try #require(LayerRowModel(
+            validatingIndex: 0,
             name: "Layer",
             visible: true,
-            opacity: try #require(UnitInterval(1)),
+            opacity: fullOpacity,
             isLocked: false,
             isAlphaLocked: false,
             isClipped: false,
@@ -133,7 +132,7 @@ struct DocumentDTOInvariantTests {
             hasMask: false,
             isTextLayer: false,
             textLayer: nil
-        )
+        ))
         let matchingSnapshot = try #require(MetalDocumentSnapshot(
             validatingWidth: 2,
             height: 2,

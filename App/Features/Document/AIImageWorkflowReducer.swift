@@ -20,26 +20,26 @@ struct AIImageWorkflowReducer: Reducer {
     @Dependency(\.aiImageEditUseCase) var aiImageEditUseCase
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.dateClient) var dateClient
-    @Dependency(\.documentLayerMutationCapability) var documentLayerMutationCapability
+    @Dependency(\.layerWorkflowEnvironment) var layerWorkflowEnvironment
 
     var documentContentService: DocumentContentService {
-        documentLayerMutationCapability.contentService
+        layerWorkflowEnvironment.contentService
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        documentLayerMutationCapability.renderingWorkflow
+        layerWorkflowEnvironment.renderingWorkflow
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        documentLayerMutationCapability.presentationReader
+        layerWorkflowEnvironment.presentationReader
     }
 
     var documentTextLayerService: DocumentTextLayerService {
-        documentLayerMutationCapability.textLayerService
+        layerWorkflowEnvironment.textLayerService
     }
 
     var selectionWorkflowService: SelectionWorkflowService {
-        documentLayerMutationCapability.selectionWorkflowService
+        layerWorkflowEnvironment.selectionWorkflowService
     }
     @Dependency(\.uuidClient) var uuidClient
 
