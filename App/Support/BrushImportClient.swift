@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoBrushFileFormats
 import PrimoBrushRuntime
+import PrimoBrushRuntimeContracts
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoLocalization

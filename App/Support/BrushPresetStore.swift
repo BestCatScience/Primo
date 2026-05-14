@@ -3,8 +3,8 @@ import CryptoKit
 import Foundation
 import PrimoBrushFileFormats
 import PrimoBrushDomain
+import PrimoBrushRuntimeContracts
 import PrimoCoreTypes
-import SwiftUI
 
 struct BrushPresetLibraryClient: Sendable {
     let loadSavedPresets: @Sendable () -> [BrushPreset]
@@ -43,6 +43,17 @@ private enum BrushPresetLibraryClientKey: DependencyKey {
             uuidClient: uuidClient,
             brushTipLibraryClient: brushTipLibraryClient
         )
+    }
+}
+
+private enum BrushPresetLibraryError: LocalizedError {
+    case invalidPreset(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .invalidPreset(name):
+            return "Invalid brush preset: \(name)"
+        }
     }
 }
 
@@ -539,10 +550,9 @@ private struct StoredBrushPreset: Codable {
             customTip = nil
         }
 
-        return BrushPreset(
+        guard let preset = BrushPreset(
             name: name,
             tipKind: tipKind,
-            color: Color(red: Double(red) / 255.0, green: Double(green) / 255.0, blue: Double(blue) / 255.0),
             radius: radius,
             sizeSpeedSensitivity: sizeSpeedSensitivity,
             taperIn: taperIn,
@@ -607,6 +617,9 @@ private struct StoredBrushPreset: Codable {
             red: red,
             green: green,
             blue: blue
-        )
+        ) else {
+            throw BrushPresetLibraryError.invalidPreset(name)
+        }
+        return preset
     }
 }

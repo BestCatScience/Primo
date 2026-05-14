@@ -1,7 +1,7 @@
 import PrimoBrushDomain
 import Foundation
 import PrimoBrushFileFormats
-import SwiftUI
+import PrimoBrushRuntimeContracts
 
 struct ImportedPhotoshopBrush: Equatable, Sendable {
     let name: String
@@ -17,7 +17,6 @@ extension BrushPreset {
         return BrushPreset(
             name: name,
             tipKind: .ink,
-            color: Color(red: 0.08, green: 0.08, blue: 0.09),
             radius: max(1.0, radius),
             sizeSpeedSensitivity: analysis.sizeSpeedSensitivity,
             taperIn: 0.0,
@@ -73,7 +72,7 @@ extension BrushPreset {
             red: 20,
             green: 20,
             blue: 22
-        )
+        ) ?? .defaultPencil
     }
 }
 

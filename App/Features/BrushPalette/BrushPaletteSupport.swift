@@ -1,5 +1,6 @@
 import PrimoBrushDomain
 import PrimoBrushFileFormats
+import PrimoBrushRuntimeContracts
 import PrimoDocumentDomain
 import PrimoDocumentRuntime
 import SwiftUI

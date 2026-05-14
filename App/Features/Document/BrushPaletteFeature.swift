@@ -87,7 +87,7 @@ struct BrushPaletteFeature {
             var customTip: BrushTipRaster? = BrushPreset.defaultPencil.customTip
             var pressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
             var stabilization: Double = 0.5
-            var color: Color = BrushPreset.defaultPencil.color
+            var color: Color = BrushPreset.defaultPencil.displayColor
             var secondaryColor: Color = Color(red: 0.92, green: 0.94, blue: 0.98)
             var selectedColorSlot: BrushColorSlot = .primary
 
@@ -214,13 +214,12 @@ struct BrushPaletteFeature {
                 radius = storedRadius(for: tool)
             }
 
-            func makePreset(named name: String) -> BrushPreset {
+            func makePreset(named name: String) -> BrushPreset? {
                 let storedRadius = BrushPreset.defaults.first(where: { $0.tipKind == tipKind })?.radius ?? radius
 
                 return BrushPreset(
                     name: name,
                     tipKind: tipKind,
-                    color: .white,
                     radius: storedRadius,
                     sizeSpeedSensitivity: sizeSpeedSensitivity,
                     taperIn: taperIn,
@@ -792,7 +791,10 @@ struct BrushPaletteFeature {
                 let resolvedName = isOverwritingSavedPreset
                     ? baseName
                     : brushPresetLibraryClient.uniqueName(baseName, savedNames)
-                let preset = state.brush.makePreset(named: resolvedName)
+                guard let preset = state.brush.makePreset(named: resolvedName) else {
+                    state.ui.brushLibraryErrorMessage = "Invalid brush preset"
+                    return .none
+                }
                 return .run { [brushPresetLibraryClient] send in
                     do {
                         let saved = try brushPresetLibraryClient.savePreset(
@@ -1077,7 +1079,6 @@ private extension BrushPreset {
         BrushPreset(
             name: newName,
             tipKind: tipKind,
-            color: color,
             radius: radius,
             sizeSpeedSensitivity: sizeSpeedSensitivity,
             taperIn: taperIn,
@@ -1142,6 +1143,6 @@ private extension BrushPreset {
             red: red,
             green: green,
             blue: blue
-        )
+        ) ?? self
     }
 }

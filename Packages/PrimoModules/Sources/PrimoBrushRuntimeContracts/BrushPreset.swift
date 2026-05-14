@@ -1,0 +1,1173 @@
+import CoreGraphics
+import Foundation
+import PrimoBrushDomain
+import PrimoBrushFileFormats
+
+public struct BrushPresetName: Equatable, Sendable {
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        self.rawValue = trimmed
+    }
+}
+
+public struct BrushUnitInterval: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (0.0...1.0).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct BrushPositiveFiniteDouble: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, rawValue > 0 else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct BrushFiniteDouble: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct BrushPositiveCount: Equatable, Sendable {
+    public let rawValue: Int
+
+    public init?(_ rawValue: Int) {
+        guard rawValue > 0 else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct BrushPreset: Identifiable, Equatable, Sendable {
+    public var id: String { name }
+    public let name: String
+    public let tipKind: BrushTipKind
+    public let radius: Double
+    public let sizeSpeedSensitivity: Double
+    public let taperIn: Double
+    public let taperOut: Double
+    public let opacity: Double
+    public let hardness: Double
+    public let roundness: Double
+    public let roundnessPressureSensitivity: Double
+    public let roundnessTiltSensitivity: Double
+    public let angle: Double
+    public let anglePressureSensitivity: Double
+    public let angleTiltSensitivity: Double
+    public let angleMode: BrushAngleMode
+    public let spacing: Double
+    public let spacingJitter: Double
+    public let scatterEnabled: Bool
+    public let scatterMode: BrushScatterMode
+    public let scatterLateral: Double
+    public let scatterLinear: Double
+    public let count: Int
+    public let countJitter: Double
+    public let countSizeJitter: Double
+    public let countOpacityJitter: Double
+    public let angleJitter: Double
+    public let roundnessJitter: Double
+    public let textureMode: BrushTextureMode
+    public let textureStrength: Double
+    public let flow: Double
+    public let flowPressureSensitivity: Double
+    public let flowJitter: Double
+    public let velocityInfluence: Double
+    public let wetness: Double
+    public let wetnessPressureSensitivity: Double
+    public let opacityPressureSensitivity: Double
+    public let colorMixStrength: Double
+    public let smudgeRadius: Double
+    public let paintLoad: Double
+    public let smudgeEngineEnabled: Bool
+    public let smudgeMode: BrushSmudgeMode
+    public let smudgeLength: Double
+    public let colorRate: Double
+    public let loadPressureSensitivity: Double
+    public let paintAmountPressureBypass: Double
+    public let paintDensityPressureBypass: Double
+    public let colorStretchPressureBypass: Double
+    public let dualBrushEnabled: Bool
+    public let dualTipKind: BrushTipKind
+    public let dualScale: Double
+    public let dualSpacing: Double
+    public let dualScatter: Double
+    public let dualAngle: Double
+    public let dualBlendMode: BrushDualBlendMode
+    public let grainScale: Double
+    public let grainContrast: Double
+    public let paperScale: Double
+    public let paperStrength: Double
+    public let paperThreshold: Double
+    public let flipX: Bool
+    public let flipY: Bool
+    public let customTip: BrushTipRaster?
+    public let pressureSensitivity: Double
+    public let red: UInt8
+    public let green: UInt8
+    public let blue: UInt8
+
+    public static func == (lhs: BrushPreset, rhs: BrushPreset) -> Bool {
+        lhs.name == rhs.name &&
+        lhs.tipKind == rhs.tipKind &&
+        lhs.radius == rhs.radius &&
+        lhs.sizeSpeedSensitivity == rhs.sizeSpeedSensitivity &&
+        lhs.taperIn == rhs.taperIn &&
+        lhs.taperOut == rhs.taperOut &&
+        lhs.opacity == rhs.opacity &&
+        lhs.hardness == rhs.hardness &&
+        lhs.roundness == rhs.roundness &&
+        lhs.roundnessPressureSensitivity == rhs.roundnessPressureSensitivity &&
+        lhs.roundnessTiltSensitivity == rhs.roundnessTiltSensitivity &&
+        lhs.angle == rhs.angle &&
+        lhs.anglePressureSensitivity == rhs.anglePressureSensitivity &&
+        lhs.angleTiltSensitivity == rhs.angleTiltSensitivity &&
+        lhs.angleMode == rhs.angleMode &&
+        lhs.spacing == rhs.spacing &&
+        lhs.spacingJitter == rhs.spacingJitter &&
+        lhs.scatterEnabled == rhs.scatterEnabled &&
+        lhs.scatterMode == rhs.scatterMode &&
+        lhs.scatterLateral == rhs.scatterLateral &&
+        lhs.scatterLinear == rhs.scatterLinear &&
+        lhs.count == rhs.count &&
+        lhs.countJitter == rhs.countJitter &&
+        lhs.countSizeJitter == rhs.countSizeJitter &&
+        lhs.countOpacityJitter == rhs.countOpacityJitter &&
+        lhs.angleJitter == rhs.angleJitter &&
+        lhs.roundnessJitter == rhs.roundnessJitter &&
+        lhs.textureMode == rhs.textureMode &&
+        lhs.textureStrength == rhs.textureStrength &&
+        lhs.flow == rhs.flow &&
+        lhs.flowPressureSensitivity == rhs.flowPressureSensitivity &&
+        lhs.flowJitter == rhs.flowJitter &&
+        lhs.velocityInfluence == rhs.velocityInfluence &&
+        lhs.wetness == rhs.wetness &&
+        lhs.wetnessPressureSensitivity == rhs.wetnessPressureSensitivity &&
+        lhs.opacityPressureSensitivity == rhs.opacityPressureSensitivity &&
+        lhs.colorMixStrength == rhs.colorMixStrength &&
+        lhs.smudgeRadius == rhs.smudgeRadius &&
+        lhs.paintLoad == rhs.paintLoad &&
+        lhs.smudgeEngineEnabled == rhs.smudgeEngineEnabled &&
+        lhs.smudgeMode == rhs.smudgeMode &&
+        lhs.smudgeLength == rhs.smudgeLength &&
+        lhs.colorRate == rhs.colorRate &&
+        lhs.loadPressureSensitivity == rhs.loadPressureSensitivity &&
+        lhs.paintAmountPressureBypass == rhs.paintAmountPressureBypass &&
+        lhs.paintDensityPressureBypass == rhs.paintDensityPressureBypass &&
+        lhs.colorStretchPressureBypass == rhs.colorStretchPressureBypass &&
+        lhs.dualBrushEnabled == rhs.dualBrushEnabled &&
+        lhs.dualTipKind == rhs.dualTipKind &&
+        lhs.dualScale == rhs.dualScale &&
+        lhs.dualSpacing == rhs.dualSpacing &&
+        lhs.dualScatter == rhs.dualScatter &&
+        lhs.dualAngle == rhs.dualAngle &&
+        lhs.dualBlendMode == rhs.dualBlendMode &&
+        lhs.grainScale == rhs.grainScale &&
+        lhs.grainContrast == rhs.grainContrast &&
+        lhs.paperScale == rhs.paperScale &&
+        lhs.paperStrength == rhs.paperStrength &&
+        lhs.paperThreshold == rhs.paperThreshold &&
+        lhs.flipX == rhs.flipX &&
+        lhs.flipY == rhs.flipY &&
+        lhs.customTip == rhs.customTip &&
+        lhs.pressureSensitivity == rhs.pressureSensitivity &&
+        lhs.red == rhs.red &&
+        lhs.green == rhs.green &&
+        lhs.blue == rhs.blue
+    }
+
+    public init?(
+        name: String,
+        tipKind: BrushTipKind,
+        radius: Double,
+        sizeSpeedSensitivity: Double = 0.0,
+        taperIn: Double = 0.0,
+        taperOut: Double = 0.0,
+        opacity: Double,
+        hardness: Double,
+        roundness: Double,
+        roundnessPressureSensitivity: Double = 0.0,
+        roundnessTiltSensitivity: Double = 0.0,
+        angle: Double,
+        anglePressureSensitivity: Double = 0.0,
+        angleTiltSensitivity: Double = 0.0,
+        angleMode: BrushAngleMode,
+        spacing: Double,
+        spacingJitter: Double,
+        scatterEnabled: Bool = false,
+        scatterMode: BrushScatterMode = .directional,
+        scatterLateral: Double,
+        scatterLinear: Double,
+        count: Int,
+        countJitter: Double,
+        countSizeJitter: Double = 0.0,
+        countOpacityJitter: Double = 0.0,
+        angleJitter: Double = 0.0,
+        roundnessJitter: Double = 0.0,
+        textureMode: BrushTextureMode,
+        textureStrength: Double,
+        flow: Double,
+        flowPressureSensitivity: Double = 0.0,
+        flowJitter: Double = 0.0,
+        velocityInfluence: Double = 0.0,
+        wetness: Double = 0.0,
+        wetnessPressureSensitivity: Double = 0.0,
+        opacityPressureSensitivity: Double = 0.0,
+        colorMixStrength: Double = 0.0,
+        smudgeRadius: Double = 0.0,
+        paintLoad: Double = 1.0,
+        smudgeEngineEnabled: Bool = false,
+        smudgeMode: BrushSmudgeMode = .smearing,
+        smudgeLength: Double = 0.0,
+        colorRate: Double = 1.0,
+        loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
+        dualBrushEnabled: Bool = false,
+        dualTipKind: BrushTipKind = .ink,
+        dualScale: Double = 0.72,
+        dualSpacing: Double = 0.26,
+        dualScatter: Double = 0.18,
+        dualAngle: Double = 0.0,
+        dualBlendMode: BrushDualBlendMode = .multiply,
+        grainScale: Double = 1.35,
+        grainContrast: Double = 1.7,
+        paperScale: Double = 0.12,
+        paperStrength: Double = 0.32,
+        paperThreshold: Double = 0.42,
+        flipX: Bool,
+        flipY: Bool,
+        customTip: BrushTipRaster? = nil,
+        pressureSensitivity: Double,
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8
+    ) {
+        let finiteValues = [
+            sizeSpeedSensitivity, taperIn, taperOut, angle, anglePressureSensitivity, angleTiltSensitivity,
+            scatterLateral, scatterLinear, angleJitter, roundnessJitter, velocityInfluence, smudgeRadius,
+            smudgeLength, dualAngle, grainScale, grainContrast, paperScale, paperStrength, paperThreshold
+        ]
+        let unitValues = [
+            opacity, hardness, roundness, roundnessPressureSensitivity, roundnessTiltSensitivity, spacing, spacingJitter,
+            countJitter, countSizeJitter, countOpacityJitter, textureStrength, flow, flowPressureSensitivity, flowJitter,
+            wetness, wetnessPressureSensitivity, opacityPressureSensitivity, colorMixStrength, paintLoad, colorRate,
+            loadPressureSensitivity, paintAmountPressureBypass, paintDensityPressureBypass, colorStretchPressureBypass,
+            dualScale, dualSpacing, dualScatter
+        ]
+        guard
+            let presetName = BrushPresetName(name),
+            Self.isValidPreset(radius: radius, count: count, finiteValues: finiteValues, unitValues: unitValues)
+        else { return nil }
+
+        self.name = presetName.rawValue
+        self.tipKind = tipKind
+        self.radius = radius
+        self.sizeSpeedSensitivity = sizeSpeedSensitivity
+        self.taperIn = taperIn
+        self.taperOut = taperOut
+        self.opacity = opacity
+        self.hardness = hardness
+        self.roundness = roundness
+        self.roundnessPressureSensitivity = roundnessPressureSensitivity
+        self.roundnessTiltSensitivity = roundnessTiltSensitivity
+        self.angle = angle
+        self.anglePressureSensitivity = anglePressureSensitivity
+        self.angleTiltSensitivity = angleTiltSensitivity
+        self.angleMode = angleMode
+        self.spacing = spacing
+        self.spacingJitter = spacingJitter
+        self.scatterEnabled = scatterEnabled
+        self.scatterMode = scatterMode
+        self.scatterLateral = scatterLateral
+        self.scatterLinear = scatterLinear
+        self.count = count
+        self.countJitter = countJitter
+        self.countSizeJitter = countSizeJitter
+        self.countOpacityJitter = countOpacityJitter
+        self.angleJitter = angleJitter
+        self.roundnessJitter = roundnessJitter
+        self.textureMode = textureMode
+        self.textureStrength = textureStrength
+        self.flow = flow
+        self.flowPressureSensitivity = flowPressureSensitivity
+        self.flowJitter = flowJitter
+        self.velocityInfluence = velocityInfluence
+        self.wetness = wetness
+        self.wetnessPressureSensitivity = wetnessPressureSensitivity
+        self.opacityPressureSensitivity = opacityPressureSensitivity
+        self.colorMixStrength = colorMixStrength
+        self.smudgeRadius = smudgeRadius
+        self.paintLoad = paintLoad
+        self.smudgeEngineEnabled = smudgeEngineEnabled
+        self.smudgeMode = smudgeMode
+        self.smudgeLength = smudgeLength
+        self.colorRate = colorRate
+        self.loadPressureSensitivity = loadPressureSensitivity
+        self.paintAmountPressureBypass = paintAmountPressureBypass
+        self.paintDensityPressureBypass = paintDensityPressureBypass
+        self.colorStretchPressureBypass = colorStretchPressureBypass
+        self.dualBrushEnabled = dualBrushEnabled
+        self.dualTipKind = dualTipKind
+        self.dualScale = dualScale
+        self.dualSpacing = dualSpacing
+        self.dualScatter = dualScatter
+        self.dualAngle = dualAngle
+        self.dualBlendMode = dualBlendMode
+        self.grainScale = grainScale
+        self.grainContrast = grainContrast
+        self.paperScale = paperScale
+        self.paperStrength = paperStrength
+        self.paperThreshold = paperThreshold
+        self.flipX = flipX
+        self.flipY = flipY
+        self.customTip = customTip
+        self.pressureSensitivity = pressureSensitivity
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+
+    public static let defaults: [BrushPreset] = [
+        studioPreset(
+            name: "Sketch Pencil",
+            tipKind: .pencil,
+            radius: 2.7,
+            opacity: 0.82,
+            hardness: 0.76,
+            roundness: 0.88,
+            roundnessPressureSensitivity: 0.10,
+            roundnessTiltSensitivity: 0.18,
+            angle: 0.02,
+            anglePressureSensitivity: 0.03,
+            angleTiltSensitivity: 0.12,
+            spacing: 0.11,
+            scatterLateral: 0.02,
+            scatterLinear: 0.01,
+            angleJitter: 0.02,
+            roundnessJitter: 0.03,
+            textureMode: .eachTip,
+            textureStrength: 0.84,
+            flow: 0.84,
+            flowPressureSensitivity: 0.18,
+            flowJitter: 0.03,
+            wetness: 0.05,
+            wetnessPressureSensitivity: 0.12,
+            opacityPressureSensitivity: 0.46,
+            colorMixStrength: 0.06,
+            paintLoad: 0.94,
+            loadPressureSensitivity: 0.08,
+            grainScale: 1.42,
+            grainContrast: 1.88,
+            paperScale: 0.14,
+            paperStrength: 0.42,
+            paperThreshold: 0.40,
+            pressureSensitivity: 0.70,
+            red: 30,
+            green: 30,
+            blue: 33
+        ),
+        studioPreset(
+            name: "Shade Pencil",
+            tipKind: .pencil,
+            radius: 5.2,
+            opacity: 0.56,
+            hardness: 0.54,
+            roundness: 0.94,
+            roundnessPressureSensitivity: 0.16,
+            roundnessTiltSensitivity: 0.24,
+            angle: -0.04,
+            anglePressureSensitivity: 0.05,
+            angleTiltSensitivity: 0.16,
+            spacing: 0.14,
+            scatterLateral: 0.03,
+            scatterLinear: 0.01,
+            angleJitter: 0.04,
+            roundnessJitter: 0.06,
+            textureMode: .eachTip,
+            textureStrength: 0.92,
+            flow: 0.66,
+            flowPressureSensitivity: 0.22,
+            flowJitter: 0.06,
+            wetness: 0.08,
+            wetnessPressureSensitivity: 0.14,
+            opacityPressureSensitivity: 0.60,
+            colorMixStrength: 0.10,
+            paintLoad: 0.90,
+            loadPressureSensitivity: 0.12,
+            grainScale: 1.54,
+            grainContrast: 2.02,
+            paperScale: 0.16,
+            paperStrength: 0.52,
+            paperThreshold: 0.40,
+            pressureSensitivity: 0.86,
+            red: 40,
+            green: 40,
+            blue: 43
+        ),
+        studioPreset(
+            name: "Technical Pen",
+            tipKind: .ink,
+            radius: 1.7,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 1.0,
+            hardness: 0.96,
+            roundness: 1.0,
+            angleMode: .fixed,
+            spacing: 0.05,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 0.98,
+            flowPressureSensitivity: 0.0,
+            opacityPressureSensitivity: 0.0,
+            grainScale: 1.0,
+            grainContrast: 1.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            paperThreshold: 0.5,
+            pressureSensitivity: 0.0,
+            red: 10,
+            green: 13,
+            blue: 18
+        ),
+        studioPreset(
+            name: "Brush Pen",
+            tipKind: .ink,
+            radius: 3.2,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 1.0,
+            hardness: 0.86,
+            roundness: 0.58,
+            roundnessPressureSensitivity: 0.10,
+            roundnessTiltSensitivity: 0.12,
+            angleMode: .strokeDirection,
+            spacing: 0.07,
+            spacingJitter: 0.01,
+            scatterLateral: 0.01,
+            scatterLinear: 0.01,
+            angleJitter: 0.0,
+            roundnessJitter: 0.01,
+            textureMode: .strokeLocked,
+            textureStrength: 0.03,
+            flow: 0.97,
+            flowPressureSensitivity: 0.0,
+            flowJitter: 0.0,
+            wetness: 0.0,
+            wetnessPressureSensitivity: 0.0,
+            opacityPressureSensitivity: 0.0,
+            colorMixStrength: 0.0,
+            paintLoad: 1.0,
+            loadPressureSensitivity: 0.0,
+            grainScale: 1.02,
+            grainContrast: 1.18,
+            paperScale: 0.06,
+            paperStrength: 0.02,
+            paperThreshold: 0.48,
+            pressureSensitivity: 0.18,
+            red: 15,
+            green: 18,
+            blue: 24
+        ),
+        studioPreset(
+            name: "Chisel Marker",
+            tipKind: .ink,
+            radius: 7.0,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 1.0,
+            hardness: 0.91,
+            roundness: 0.56,
+            roundnessPressureSensitivity: 0.08,
+            angle: .pi / 8,
+            angleTiltSensitivity: 0.10,
+            angleMode: .strokeDirection,
+            spacing: 0.10,
+            scatterLateral: 0.01,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 0.98,
+            opacityPressureSensitivity: 0.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            pressureSensitivity: 0.12,
+            red: 18,
+            green: 20,
+            blue: 27,
+            customTip: RuntimeContractBuiltInBrushTipFactory.ribbon
+        ),
+        studioPreset(
+            name: "Soft Airbrush",
+            tipKind: .airbrush,
+            radius: 8.0,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.16,
+            hardness: 0.08,
+            roundness: 1.0,
+            angleMode: .fixed,
+            spacing: 0.22,
+            spacingJitter: 0.02,
+            scatterEnabled: false,
+            scatterLateral: 0.02,
+            scatterLinear: 0.01,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .moving,
+            textureStrength: 0.10,
+            flow: 0.70,
+            flowPressureSensitivity: 0.28,
+            flowJitter: 0.08,
+            wetness: 0.12,
+            wetnessPressureSensitivity: 0.18,
+            opacityPressureSensitivity: 0.50,
+            colorMixStrength: 0.08,
+            paintLoad: 0.86,
+            loadPressureSensitivity: 0.18,
+            dualBrushEnabled: false,
+            grainScale: 1.24,
+            grainContrast: 1.34,
+            paperScale: 0.08,
+            paperStrength: 0.12,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.16,
+            red: 26,
+            green: 26,
+            blue: 29
+        ),
+        studioPreset(
+            name: "Texture Spray",
+            tipKind: .airbrush,
+            radius: 10.0,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.22,
+            hardness: 0.22,
+            roundness: 1.0,
+            angleMode: .strokeDirection,
+            spacing: 0.28,
+            spacingJitter: 0.08,
+            scatterEnabled: true,
+            scatterMode: .spray,
+            scatterLateral: 0.16,
+            scatterLinear: 0.08,
+            count: 2,
+            countJitter: 0.18,
+            countSizeJitter: 0.26,
+            countOpacityJitter: 0.18,
+            angleJitter: 0.5,
+            roundnessJitter: 0.0,
+            textureMode: .moving,
+            textureStrength: 0.10,
+            flow: 0.66,
+            flowPressureSensitivity: 0.20,
+            flowJitter: 0.12,
+            wetness: 0.08,
+            wetnessPressureSensitivity: 0.10,
+            opacityPressureSensitivity: 0.44,
+            colorMixStrength: 0.10,
+            paintLoad: 0.88,
+            loadPressureSensitivity: 0.12,
+            grainScale: 1.10,
+            grainContrast: 1.16,
+            paperScale: 0.06,
+            paperStrength: 0.04,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.10,
+            red: 38,
+            green: 40,
+            blue: 46,
+            customTip: RuntimeContractBuiltInBrushTipFactory.petal
+        ),
+        studioPreset(
+            name: "Flat Paint",
+            tipKind: .oil,
+            radius: 7.2,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.92,
+            hardness: 0.80,
+            roundness: 0.86,
+            roundnessPressureSensitivity: 0.03,
+            roundnessTiltSensitivity: 0.03,
+            angle: 0.0,
+            anglePressureSensitivity: 0.0,
+            angleTiltSensitivity: 0.0,
+            angleMode: .fixed,
+            spacing: 0.09,
+            spacingJitter: 0.0,
+            scatterEnabled: false,
+            scatterMode: .directional,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.22,
+            flow: 0.96,
+            flowPressureSensitivity: 0.04,
+            flowJitter: 0.0,
+            wetness: 0.16,
+            wetnessPressureSensitivity: 0.08,
+            opacityPressureSensitivity: 0.12,
+            colorMixStrength: 0.08,
+            paintLoad: 0.86,
+            smudgeEngineEnabled: true,
+            smudgeMode: .dulling,
+            smudgeLength: 0.12,
+            colorRate: 0.82,
+            smudgeRadius: 0.32,
+            loadPressureSensitivity: 0.0,
+            dualBrushEnabled: false,
+            dualTipKind: .oil,
+            dualScale: 0.64,
+            dualSpacing: 0.22,
+            dualScatter: 0.10,
+            dualAngle: 0.08,
+            dualBlendMode: .darker,
+            grainScale: 1.10,
+            grainContrast: 1.30,
+            paperScale: 0.10,
+            paperStrength: 0.08,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.18,
+            red: 59,
+            green: 69,
+            blue: 87,
+            customTip: RuntimeContractBuiltInBrushTipFactory.block
+        ),
+        studioPreset(
+            name: "Dry Bristle",
+            tipKind: .oil,
+            radius: 5.8,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.82,
+            hardness: 0.86,
+            roundness: 0.76,
+            roundnessPressureSensitivity: 0.03,
+            roundnessTiltSensitivity: 0.04,
+            angle: 0.0,
+            anglePressureSensitivity: 0.0,
+            angleTiltSensitivity: 0.0,
+            angleMode: .fixed,
+            spacing: 0.10,
+            spacingJitter: 0.0,
+            scatterEnabled: false,
+            scatterMode: .directional,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.34,
+            flow: 0.90,
+            flowPressureSensitivity: 0.05,
+            flowJitter: 0.0,
+            wetness: 0.10,
+            wetnessPressureSensitivity: 0.04,
+            opacityPressureSensitivity: 0.10,
+            colorMixStrength: 0.08,
+            paintLoad: 0.46,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.26,
+            colorRate: 0.54,
+            smudgeRadius: 0.26,
+            loadPressureSensitivity: 0.0,
+            dualBrushEnabled: false,
+            dualTipKind: .oil,
+            dualScale: 0.60,
+            dualSpacing: 0.24,
+            dualScatter: 0.12,
+            dualAngle: -0.08,
+            dualBlendMode: .darker,
+            grainScale: 1.16,
+            grainContrast: 1.42,
+            paperScale: 0.13,
+            paperStrength: 0.14,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.20,
+            red: 41,
+            green: 43,
+            blue: 46
+        ),
+        studioPreset(
+            name: "Rake Texture",
+            tipKind: .oil,
+            radius: 8.4,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.90,
+            hardness: 0.80,
+            roundness: 0.74,
+            angleMode: .strokeDirection,
+            spacing: 0.09,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.16,
+            flow: 0.94,
+            flowPressureSensitivity: 0.08,
+            wetness: 0.12,
+            wetnessPressureSensitivity: 0.08,
+            opacityPressureSensitivity: 0.10,
+            colorMixStrength: 0.10,
+            paintLoad: 0.58,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.34,
+            colorRate: 0.64,
+            smudgeRadius: 0.36,
+            loadPressureSensitivity: 0.0,
+            grainScale: 1.08,
+            grainContrast: 1.24,
+            paperScale: 0.08,
+            paperStrength: 0.06,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.16,
+            red: 46,
+            green: 50,
+            blue: 58,
+            customTip: RuntimeContractBuiltInBrushTipFactory.rake
+        ),
+        studioPreset(
+            name: "Smudge Soft",
+            tipKind: .oil,
+            radius: 10.0,
+            opacity: 0.82,
+            hardness: 0.36,
+            roundness: 0.96,
+            spacing: 0.10,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.10,
+            flow: 0.82,
+            wetness: 0.20,
+            colorMixStrength: 0.24,
+            paintLoad: 0.08,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.32,
+            colorRate: 0.08,
+            loadPressureSensitivity: 0.0,
+            pressureSensitivity: 0.12,
+            red: 46,
+            green: 47,
+            blue: 50,
+            customTip: RuntimeContractBuiltInBrushTipFactory.petal
+        ),
+        studioPreset(
+            name: "Smudge Pull",
+            tipKind: .oil,
+            radius: 12.0,
+            opacity: 0.88,
+            hardness: 0.52,
+            roundness: 0.84,
+            spacing: 0.08,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.16,
+            flow: 0.86,
+            wetness: 0.18,
+            colorMixStrength: 0.18,
+            paintLoad: 0.02,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.90,
+            colorRate: 0.02,
+            loadPressureSensitivity: 0.0,
+            pressureSensitivity: 0.18,
+            red: 40,
+            green: 42,
+            blue: 46,
+            customTip: RuntimeContractBuiltInBrushTipFactory.ribbon
+        ),
+        studioPreset(
+            name: "Dulling Mixer",
+            tipKind: .oil,
+            radius: 14.0,
+            opacity: 0.76,
+            hardness: 0.28,
+            roundness: 1.0,
+            spacing: 0.12,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 0.74,
+            wetness: 0.10,
+            colorMixStrength: 0.14,
+            paintLoad: 0.18,
+            smudgeEngineEnabled: true,
+            smudgeMode: .dulling,
+            smudgeLength: 0.58,
+            colorRate: 0.28,
+            smudgeRadius: 0.58,
+            loadPressureSensitivity: 0.0,
+            pressureSensitivity: 0.08,
+            red: 52,
+            green: 54,
+            blue: 61
+        )
+    ]
+
+    public static let defaultPencil = defaults[0]
+
+    private static func studioPreset(
+        name: String,
+        tipKind: BrushTipKind,
+        radius: Double,
+        sizeSpeedSensitivity: Double = 0.0,
+        taperIn: Double = 0.0,
+        taperOut: Double = 0.0,
+        opacity: Double,
+        hardness: Double,
+        roundness: Double,
+        roundnessPressureSensitivity: Double = 0.0,
+        roundnessTiltSensitivity: Double = 0.0,
+        angle: Double = 0.0,
+        anglePressureSensitivity: Double = 0.0,
+        angleTiltSensitivity: Double = 0.0,
+        angleMode: BrushAngleMode = .strokeDirection,
+        spacing: Double,
+        spacingJitter: Double = 0.0,
+        scatterEnabled: Bool = false,
+        scatterMode: BrushScatterMode = .directional,
+        scatterLateral: Double,
+        scatterLinear: Double,
+        count: Int = 1,
+        countJitter: Double = 0.0,
+        countSizeJitter: Double = 0.0,
+        countOpacityJitter: Double = 0.0,
+        angleJitter: Double,
+        roundnessJitter: Double,
+        textureMode: BrushTextureMode,
+        textureStrength: Double,
+        flow: Double,
+        flowPressureSensitivity: Double = 0.0,
+        flowJitter: Double = 0.0,
+        wetness: Double = 0.0,
+        wetnessPressureSensitivity: Double = 0.0,
+        opacityPressureSensitivity: Double = 0.0,
+        colorMixStrength: Double = 0.0,
+        paintLoad: Double = 1.0,
+        smudgeEngineEnabled: Bool = false,
+        smudgeMode: BrushSmudgeMode = .smearing,
+        smudgeLength: Double = 0.0,
+        colorRate: Double = 1.0,
+        smudgeRadius: Double = 0.0,
+        loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
+        dualBrushEnabled: Bool = false,
+        dualTipKind: BrushTipKind = .ink,
+        dualScale: Double = 0.72,
+        dualSpacing: Double = 0.26,
+        dualScatter: Double = 0.18,
+        dualAngle: Double = 0.0,
+        dualBlendMode: BrushDualBlendMode = .multiply,
+        grainScale: Double = 1.35,
+        grainContrast: Double = 1.7,
+        paperScale: Double = 0.12,
+        paperStrength: Double = 0.32,
+        paperThreshold: Double = 0.42,
+        pressureSensitivity: Double,
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8,
+        customTip: BrushTipRaster? = nil
+    ) -> BrushPreset {
+        guard let preset = BrushPreset(
+            name: name,
+            tipKind: tipKind,
+            radius: radius,
+            sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
+            opacity: opacity,
+            hardness: hardness,
+            roundness: roundness,
+            roundnessPressureSensitivity: roundnessPressureSensitivity,
+            roundnessTiltSensitivity: roundnessTiltSensitivity,
+            angle: angle,
+            anglePressureSensitivity: anglePressureSensitivity,
+            angleTiltSensitivity: angleTiltSensitivity,
+            angleMode: angleMode,
+            spacing: spacing,
+            spacingJitter: spacingJitter,
+            scatterEnabled: scatterEnabled,
+            scatterMode: scatterMode,
+            scatterLateral: scatterLateral,
+            scatterLinear: scatterLinear,
+            count: count,
+            countJitter: countJitter,
+            countSizeJitter: countSizeJitter,
+            countOpacityJitter: countOpacityJitter,
+            angleJitter: angleJitter,
+            roundnessJitter: roundnessJitter,
+            textureMode: textureMode,
+            textureStrength: textureStrength,
+            flow: flow,
+            flowPressureSensitivity: flowPressureSensitivity,
+            flowJitter: flowJitter,
+            wetness: wetness,
+            wetnessPressureSensitivity: wetnessPressureSensitivity,
+            opacityPressureSensitivity: opacityPressureSensitivity,
+            colorMixStrength: colorMixStrength,
+            smudgeRadius: smudgeRadius,
+            paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: smudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
+            loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
+            dualBrushEnabled: dualBrushEnabled,
+            dualTipKind: dualTipKind,
+            dualScale: dualScale,
+            dualSpacing: dualSpacing,
+            dualScatter: dualScatter,
+            dualAngle: dualAngle,
+            dualBlendMode: dualBlendMode,
+            grainScale: grainScale,
+            grainContrast: grainContrast,
+            paperScale: paperScale,
+            paperStrength: paperStrength,
+            paperThreshold: paperThreshold,
+            flipX: false,
+            flipY: false,
+            customTip: customTip,
+            pressureSensitivity: pressureSensitivity,
+            red: red,
+            green: green,
+            blue: blue
+        ) else {
+            preconditionFailure("Invalid built-in brush preset \(name)")
+        }
+        return preset
+    }
+
+    private static func isValidPreset(
+        radius: Double,
+        count: Int,
+        finiteValues: [Double],
+        unitValues: [Double]
+    ) -> Bool {
+        BrushPositiveFiniteDouble(radius) != nil &&
+        BrushPositiveCount(count) != nil &&
+        finiteValues.allSatisfy { BrushFiniteDouble($0) != nil } &&
+        unitValues.allSatisfy { BrushUnitInterval($0) != nil }
+    }
+}
+
+private enum RuntimeContractBuiltInBrushTipFactory {
+    static let block = roundedSquare(size: 96, inset: 12, cornerRadius: 16)
+    static let diamond = diamond(size: 96, inset: 12)
+    static let ribbon = ribbon(size: 96, inset: 14, angle: .pi / 6)
+    static let petal = petal(size: 96, inset: 8)
+    static let rake = rake(size: 96, inset: 10, toothCount: 4)
+    static let star = star(size: 96, points: 5, innerRadiusRatio: 0.44, outerInset: 10)
+
+    private static func roundedSquare(size: Int, inset: CGFloat, cornerRadius: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let square = rect.insetBy(dx: inset, dy: inset)
+            let path = CGPath(
+                roundedRect: square,
+                cornerWidth: cornerRadius,
+                cornerHeight: cornerRadius,
+                transform: nil
+            )
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func diamond(size: Int, inset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset)
+            let center = CGPoint(x: box.midX, y: box.midY)
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: center.x, y: box.minY))
+            path.addLine(to: CGPoint(x: box.maxX, y: center.y))
+            path.addLine(to: CGPoint(x: center.x, y: box.maxY))
+            path.addLine(to: CGPoint(x: box.minX, y: center.y))
+            path.closeSubpath()
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func ribbon(size: Int, inset: CGFloat, angle: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset * 1.6)
+            context.saveGState()
+            context.translateBy(x: rect.midX, y: rect.midY)
+            context.rotate(by: angle)
+            let ribbonRect = CGRect(
+                x: -box.width * 0.5,
+                y: -box.height * 0.22,
+                width: box.width,
+                height: box.height * 0.44
+            )
+            let path = CGPath(
+                roundedRect: ribbonRect,
+                cornerWidth: ribbonRect.height * 0.45,
+                cornerHeight: ribbonRect.height * 0.45,
+                transform: nil
+            )
+            context.addPath(path)
+            context.fillPath()
+            context.restoreGState()
+        }
+    }
+
+    private static func petal(size: Int, inset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let petalWidth = rect.width * 0.24
+            let petalHeight = rect.height * 0.50
+            let distance = rect.width * 0.12
+
+            for index in 0..<4 {
+                context.saveGState()
+                context.translateBy(x: center.x, y: center.y)
+                context.rotate(by: CGFloat(index) * (.pi / 2))
+                let petalRect = CGRect(
+                    x: -petalWidth * 0.5,
+                    y: -(petalHeight - distance),
+                    width: petalWidth,
+                    height: petalHeight
+                ).insetBy(dx: inset * 0.05, dy: inset * 0.02)
+                context.fillEllipse(in: petalRect)
+                context.restoreGState()
+            }
+
+            context.fillEllipse(
+                in: CGRect(
+                    x: center.x - rect.width * 0.10,
+                    y: center.y - rect.height * 0.10,
+                    width: rect.width * 0.20,
+                    height: rect.height * 0.20
+                )
+            )
+        }
+    }
+
+    private static func rake(size: Int, inset: CGFloat, toothCount: Int) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset)
+            let gap = box.width * 0.06
+            let toothWidth = (box.width - gap * CGFloat(toothCount - 1)) / CGFloat(toothCount)
+            let topOffsets: [CGFloat] = [0.12, 0.0, 0.08, 0.18]
+
+            for index in 0..<toothCount {
+                let topOffset = box.height * topOffsets[min(index, topOffsets.count - 1)]
+                let toothRect = CGRect(
+                    x: box.minX + CGFloat(index) * (toothWidth + gap),
+                    y: box.minY + topOffset,
+                    width: toothWidth,
+                    height: box.height - topOffset
+                )
+                let path = CGPath(
+                    roundedRect: toothRect,
+                    cornerWidth: toothWidth * 0.34,
+                    cornerHeight: toothWidth * 0.34,
+                    transform: nil
+                )
+                context.addPath(path)
+                context.fillPath()
+            }
+        }
+    }
+
+    private static func star(size: Int, points: Int, innerRadiusRatio: CGFloat, outerInset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let outerRadius = (min(rect.width, rect.height) * 0.5) - outerInset
+            let innerRadius = outerRadius * innerRadiusRatio
+            let path = CGMutablePath()
+
+            for index in 0..<(points * 2) {
+                let angle = (CGFloat(index) * .pi / CGFloat(points)) - (.pi / 2)
+                let radius = index.isMultiple(of: 2) ? outerRadius : innerRadius
+                let point = CGPoint(
+                    x: center.x + cos(angle) * radius,
+                    y: center.y + sin(angle) * radius
+                )
+                if index == 0 {
+                    path.move(to: point)
+                } else {
+                    path.addLine(to: point)
+                }
+            }
+
+            path.closeSubpath()
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func raster(size: Int, draw: (CGContext, CGRect) -> Void) -> BrushTipRaster {
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+
+        pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: size,
+                height: size,
+                bitsPerComponent: 8,
+                bytesPerRow: size,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.none.rawValue
+            ) else {
+                return
+            }
+
+            context.setAllowsAntialiasing(true)
+            context.setShouldAntialias(true)
+            context.setFillColor(gray: 1.0, alpha: 1.0)
+            draw(context, CGRect(x: 0, y: 0, width: size, height: size))
+        }
+
+        return BrushTipRaster(width: size, height: size, alphaData: Data(pixels))
+    }
+}
