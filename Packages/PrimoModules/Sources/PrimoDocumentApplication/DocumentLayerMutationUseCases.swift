@@ -26,11 +26,11 @@ public struct LayerStructureUseCase: Sendable {
             switch gateway.addLayerAndSelect(name: name.rawValue) {
             case let .failure(failure):
                 return .failure(failure)
-            case let .success(createdIndex):
+            case let .success(addedLayer):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: createdIndex,
-                        lifecycleEvent: .addLayer(name: name.rawValue, index: createdIndex)
+                        resultingIndex: addedLayer.selectedIndex,
+                        lifecycleEvent: .addLayer(name: name.rawValue, index: addedLayer.selectedIndex)
                     )
                 )
             }

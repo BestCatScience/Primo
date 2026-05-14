@@ -8,7 +8,7 @@ struct PrimoApp: App {
 
     init() {
         let documentApplicationEnvironment = DocumentApplicationEnvironment(
-            runtime: DocumentApplicationRuntimeFactory.live()
+            workflows: DocumentApplicationRuntimeFactory.liveWorkflows()
         )
         self.store = Store(initialState: PrimoRootFeature.State()) {
             PrimoRootFeature()

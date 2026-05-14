@@ -585,6 +585,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!body.contains("public let textLayerService:"))
         #expect(!body.contains("public let exportClient:"))
         #expect(!body.contains("public let persistenceClient:"))
+        #expect(!body.contains("public let stroke: CanvasStrokeRuntime"))
+        #expect(!body.contains("public var strokeEditing: StrokeEditingRuntime"))
         #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
         #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
 
@@ -593,10 +595,10 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentRuntime",
             "DocumentRuntimeFactory",
             "DocumentApplicationRuntime",
+            "DocumentApplicationWorkflowRuntime",
             "DocumentApplicationRuntimeFactory",
             "DocumentPresentationRuntime",
             "CanvasMutationRuntime",
-            "CanvasStrokeRuntime",
             "StrokeEditingRuntime",
             "LayerEditingRuntime",
             "DocumentPersistenceRuntime",

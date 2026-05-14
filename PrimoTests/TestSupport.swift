@@ -601,7 +601,7 @@ extension DocumentApplicationEnvironment {
         selectionMaskProcessor: (any SelectionMaskProcessing)? = nil
     ) -> Self {
         DocumentApplicationEnvironment(
-            runtime: DocumentApplicationRuntime.stub(
+            workflows: DocumentApplicationRuntime.stub(
                 queryGateway: queryGateway,
                 renderGateway: renderGateway,
                 mutationGateway: mutationGateway,
@@ -617,7 +617,7 @@ extension DocumentApplicationEnvironment {
                 canvasPreviewRenderer: canvasPreviewRenderer,
                 layerTransformProcessor: layerTransformProcessor,
                 selectionMaskProcessor: selectionMaskProcessor
-            )
+            ).workflows
         )
     }
 }
@@ -707,7 +707,7 @@ extension DocumentApplicationRuntime {
                 canvasCommands: canvasCommands,
                 historyCommands: historyCommands
             ),
-            stroke: CanvasStrokeRuntime(
+            strokeEditing: StrokeEditingRuntime(
                 strokeCommands: strokeCommands,
                 canvasStrokeInteractionService: canvasStrokeInteractionService
             ),

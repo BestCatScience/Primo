@@ -868,11 +868,11 @@ public struct LayerEditingRuntime: Sendable {
     public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
 }
 
-public struct CanvasStrokeRuntime: Sendable {
+package struct CanvasStrokeRuntime: Sendable {
     private let strokeCommands: DocumentStrokeCommandService
     private let canvasStrokeInteractionService: CanvasStrokeInteractionService
 
-    public init(
+    package init(
         strokeCommands: DocumentStrokeCommandService,
         canvasStrokeInteractionService: CanvasStrokeInteractionService
     ) {
@@ -909,7 +909,17 @@ public struct CanvasStrokeRuntime: Sendable {
 public struct StrokeEditingRuntime: Sendable {
     private let strokeRuntime: CanvasStrokeRuntime
 
-    public init(strokeRuntime: CanvasStrokeRuntime) {
+    public init(
+        strokeCommands: DocumentStrokeCommandService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService
+    ) {
+        self.strokeRuntime = CanvasStrokeRuntime(
+            strokeCommands: strokeCommands,
+            canvasStrokeInteractionService: canvasStrokeInteractionService
+        )
+    }
+
+    package init(strokeRuntime: CanvasStrokeRuntime) {
         self.strokeRuntime = strokeRuntime
     }
 
@@ -1171,22 +1181,30 @@ public struct CanvasPreviewRuntime: Sendable {
 }
 
 public struct DocumentApplicationRuntime: Sendable {
-    public let presentation: DocumentPresentationRuntime
-    public let canvasMutation: CanvasMutationRuntime
-    public let stroke: CanvasStrokeRuntime
-    public let layerEditing: LayerEditingRuntime
-    public let persistence: DocumentPersistenceRuntime
-    public let export: DocumentExportRuntime
-    public let preview: CanvasPreviewRuntime
+    private let presentation: DocumentPresentationRuntime
+    private let canvasMutation: CanvasMutationRuntime
+    private let strokeEditing: StrokeEditingRuntime
+    private let layerEditing: LayerEditingRuntime
+    private let persistence: DocumentPersistenceRuntime
+    private let export: DocumentExportRuntime
+    private let preview: CanvasPreviewRuntime
 
-    public var strokeEditing: StrokeEditingRuntime {
-        StrokeEditingRuntime(strokeRuntime: stroke)
+    public var workflows: DocumentApplicationWorkflowRuntime {
+        DocumentApplicationWorkflowRuntime(
+            presentation: presentation,
+            canvasMutation: canvasMutation,
+            strokeEditing: strokeEditing,
+            layerEditing: layerEditing,
+            persistence: persistence,
+            export: export,
+            preview: preview
+        )
     }
 
     public init(
         presentation: DocumentPresentationRuntime,
         canvasMutation: CanvasMutationRuntime,
-        stroke: CanvasStrokeRuntime,
+        strokeEditing: StrokeEditingRuntime,
         layerEditing: LayerEditingRuntime,
         persistence: DocumentPersistenceRuntime,
         export: DocumentExportRuntime,
@@ -1194,7 +1212,7 @@ public struct DocumentApplicationRuntime: Sendable {
     ) {
         self.presentation = presentation
         self.canvasMutation = canvasMutation
-        self.stroke = stroke
+        self.strokeEditing = strokeEditing
         self.layerEditing = layerEditing
         self.persistence = persistence
         self.export = export
@@ -1206,12 +1224,40 @@ public struct DocumentApplicationRuntime: Sendable {
         self.init(
             presentation: DocumentPresentationRuntime(services: services),
             canvasMutation: CanvasMutationRuntime(services: services),
-            stroke: CanvasStrokeRuntime(services: services),
+            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: services)),
             layerEditing: LayerEditingRuntime(services: services),
             persistence: DocumentPersistenceRuntime(services: services),
             export: DocumentExportRuntime(services: services),
             preview: CanvasPreviewRuntime(services: services)
         )
+    }
+}
+
+public struct DocumentApplicationWorkflowRuntime: Sendable {
+    public let presentation: DocumentPresentationRuntime
+    public let canvasMutation: CanvasMutationRuntime
+    public let strokeEditing: StrokeEditingRuntime
+    public let layerEditing: LayerEditingRuntime
+    public let persistence: DocumentPersistenceRuntime
+    public let export: DocumentExportRuntime
+    public let preview: CanvasPreviewRuntime
+
+    public init(
+        presentation: DocumentPresentationRuntime,
+        canvasMutation: CanvasMutationRuntime,
+        strokeEditing: StrokeEditingRuntime,
+        layerEditing: LayerEditingRuntime,
+        persistence: DocumentPersistenceRuntime,
+        export: DocumentExportRuntime,
+        preview: CanvasPreviewRuntime
+    ) {
+        self.presentation = presentation
+        self.canvasMutation = canvasMutation
+        self.strokeEditing = strokeEditing
+        self.layerEditing = layerEditing
+        self.persistence = persistence
+        self.export = export
+        self.preview = preview
     }
 }
 
@@ -1344,6 +1390,18 @@ public enum DocumentApplicationRuntimeFactory {
                 uuidClient: uuidClient
             )
         )
+    }
+
+    public static func liveWorkflows(
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) -> DocumentApplicationWorkflowRuntime {
+        live(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        ).workflows
     }
 }
 

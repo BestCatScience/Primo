@@ -175,8 +175,9 @@ extension DocumentEngineLive {
 private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     let runtime: DocumentEngineLive
 
-    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult {
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         runtime.mutationGateway.addLayer(name)
+            .map { AddedAndSelectedLayer.addedAndSelected(index: $0) }
             .mapError(mapRuntimeFailure)
     }
 

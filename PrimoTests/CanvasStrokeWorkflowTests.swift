@@ -19,7 +19,7 @@ import XCTest
 @MainActor
 final class CanvasStrokeWorkflowTests: XCTestCase {
     private func makeStrokeSessionCoordinator(
-        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().layerEditing,
+        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().workflows.layerEditing,
         strokeInteraction: StrokeEditingRuntime
     ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
         DocumentFeature.CanvasStrokeSessionCoordinator(
@@ -29,16 +29,14 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     private func makeStrokeSessionCoordinator(
-        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().layerEditing,
+        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().workflows.layerEditing,
         strokeInteraction: CanvasStrokeInteractionService
     ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
         makeStrokeSessionCoordinator(
             layerCommands: layerCommands,
             strokeInteraction: StrokeEditingRuntime(
-                strokeRuntime: CanvasStrokeRuntime(
-                    strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub()),
-                    canvasStrokeInteractionService: strokeInteraction
-                )
+                strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub()),
+                canvasStrokeInteractionService: strokeInteraction
             )
         )
     }
@@ -653,9 +651,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
+        let workflows = runtime.workflows
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: runtime.layerEditing,
-            strokeInteraction: runtime.strokeEditing
+            layerCommands: workflows.layerEditing,
+            strokeInteraction: workflows.strokeEditing
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
@@ -728,9 +727,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
+        let workflows = runtime.workflows
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: runtime.layerEditing,
-            strokeInteraction: runtime.strokeEditing
+            layerCommands: workflows.layerEditing,
+            strokeInteraction: workflows.strokeEditing
         )
         var state = DocumentEditingState()
         state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
@@ -884,13 +884,14 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
+        let workflows = runtime.workflows
         let stateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: runtime.layerEditing,
-            strokeCommands: runtime.strokeEditing
+            layerCommands: workflows.layerEditing,
+            strokeCommands: workflows.strokeEditing
         )
         let sessionCoordinator = makeStrokeSessionCoordinator(
-            layerCommands: runtime.layerEditing,
-            strokeInteraction: runtime.strokeEditing
+            layerCommands: workflows.layerEditing,
+            strokeInteraction: workflows.strokeEditing
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)

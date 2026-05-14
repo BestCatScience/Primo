@@ -75,7 +75,10 @@ public struct ProjectPackageReader: Sendable {
                 fileClient.fileExists(package.fileURL.path)
             },
             readData: { file in
-                try fileClient.readData(file.fileURL)
+                guard let validatedFile = try validatedPackageFileIfRegular(file.fileURL, in: file.package) else {
+                    throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid package file entry")
+                }
+                return try fileClient.readData(validatedFile.fileURL)
             },
             enumerateFiles: { package in
                 try fileClient.enumerateURLs(
@@ -102,13 +105,13 @@ private func validatedPackageFileIfRegular(_ url: URL, in package: ProjectPackag
 
     let rootURL = package.fileURL.resolvingSymlinksInPath().standardizedFileURL
     let resolvedURL = url.resolvingSymlinksInPath().standardizedFileURL
-    guard resolvedURL.path.hasPrefix(rootURL.path + "/") else {
+    guard resolvedURL.isContained(in: rootURL) else {
         throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping package entry")
     }
 
     let standardizedURL = url.standardizedFileURL
     let rootPath = package.fileURL.standardizedFileURL.path
-    guard standardizedURL.path.hasPrefix(rootPath + "/") else {
+    guard standardizedURL.isContained(in: package.fileURL.standardizedFileURL) else {
         throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping package entry")
     }
     let relativePath = String(standardizedURL.path.dropFirst(rootPath.count + 1))
@@ -116,6 +119,17 @@ private func validatedPackageFileIfRegular(_ url: URL, in package: ProjectPackag
         throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid package entry path \(relativePath)")
     }
     return file
+}
+
+private extension URL {
+    func isContained(in root: URL) -> Bool {
+        let fileComponents = standardizedFileURL.pathComponents
+        let rootComponents = root.standardizedFileURL.pathComponents
+        guard fileComponents.count > rootComponents.count else { return false }
+        return zip(fileComponents, rootComponents).allSatisfy { fileComponent, rootComponent in
+            fileComponent == rootComponent
+        }
+    }
 }
 
 public struct ProjectPackageWriter: Sendable {

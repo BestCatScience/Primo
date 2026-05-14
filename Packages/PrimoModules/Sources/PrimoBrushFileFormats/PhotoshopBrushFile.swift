@@ -16,9 +16,13 @@ public enum PhotoshopBrushFile {
     public static let maxABRBytes = 64 * 1024 * 1024
     public static let maxBrushSamples = 4096
 
+    public static func importABR(from sourceURL: URL) throws -> [ImportedPhotoshopBrushSample] {
+        try importABR(from: sourceURL, fileClient: .live)
+    }
+
     public static func importABR(
         from sourceURL: URL,
-        fileClient: FileClient = .live
+        fileClient: FileClient
     ) throws -> [ImportedPhotoshopBrushSample] {
         let data = try fileClient.readData(sourceURL)
         guard data.count <= maxABRBytes else {

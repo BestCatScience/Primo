@@ -7,9 +7,9 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
     var activeLayerIndices: [Int] = []
     var lastLayerNameUpdate: (name: String, index: Int)?
 
-    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult {
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         addedLayerNames.append(name)
-        return .success(2)
+        return .success(.addedAndSelected(index: 2))
     }
 
     func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {

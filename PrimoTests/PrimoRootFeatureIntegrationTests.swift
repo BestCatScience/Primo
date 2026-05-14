@@ -716,7 +716,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         )
 
         XCTAssertTrue(contents.contains("let documentApplicationEnvironment = DocumentApplicationEnvironment"))
-        XCTAssertTrue(contents.contains("runtime: DocumentApplicationRuntimeFactory.live()"))
+        XCTAssertTrue(contents.contains("workflows: DocumentApplicationRuntimeFactory.liveWorkflows()"))
         XCTAssertTrue(contents.contains("$0.documentApplicationEnvironment = documentApplicationEnvironment"))
     }
 

@@ -47,8 +47,22 @@ public enum TimelapseExportService {
     public static func exportVideo(
         from capture: TimelapseCapture,
         to directory: URL,
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
+        progress: ((TimelapseExportProgress) -> Void)? = nil
+    ) throws -> TimelapseExportResult {
+        try exportVideo(
+            from: capture,
+            to: directory,
+            fileClient: .live,
+            dateClient: .live,
+            progress: progress
+        )
+    }
+
+    public static func exportVideo(
+        from capture: TimelapseCapture,
+        to directory: URL,
+        fileClient: FileClient,
+        dateClient: DateClient,
         progress: ((TimelapseExportProgress) -> Void)? = nil
     ) throws -> TimelapseExportResult {
         try checkCancellation()
@@ -355,7 +369,7 @@ public enum TimelapseExportService {
     private static func videoDimensions(
         for capture: TimelapseCapture,
         exportFrames: [TimelapseFrame],
-        fileClient: FileClient = .live
+        fileClient: FileClient
     ) -> CGSize {
         let rawSize: CGSize
         if let firstFrame = exportFrames.first,

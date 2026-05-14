@@ -27,6 +27,28 @@ struct ProjectPackageFileAccessTests {
     }
 
     @Test
+    func readDataRejectsSymlinkPackageFile() throws {
+        let packageURL = try makePackageDirectory()
+        defer { try? FileManager.default.removeItem(at: packageURL) }
+        let outsideURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primo-package-outside-\(UUID().uuidString).bin", isDirectory: false)
+        try Data([1]).write(to: outsideURL)
+        defer { try? FileManager.default.removeItem(at: outsideURL) }
+        try FileManager.default.createSymbolicLink(
+            at: packageURL.appendingPathComponent("linked.bin", isDirectory: false),
+            withDestinationURL: outsideURL
+        )
+
+        let reader = ProjectPackageReader.live(fileClient: .live)
+        let package = ProjectPackagePath(DocumentProjectPath(packageURL))
+        let file = try #require(ProjectPackageFile(package: package, relativePath: "linked.bin"))
+
+        #expect(throws: PaintDocumentPersistenceError.self) {
+            _ = try reader.readData(file)
+        }
+    }
+
+    @Test
     func enumerateFilesSkipsDirectoryEntries() throws {
         let packageURL = try makePackageDirectory()
         defer { try? FileManager.default.removeItem(at: packageURL) }

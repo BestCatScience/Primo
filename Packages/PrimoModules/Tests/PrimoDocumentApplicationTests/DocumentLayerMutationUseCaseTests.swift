@@ -75,7 +75,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayRecorder(
-            addLayerResult: .success(3)
+            addLayerResult: .success(.addedAndSelected(index: 3))
         )
 
         let result = useCase.execute(
@@ -193,11 +193,11 @@ struct DocumentLayerMutationUseCaseTests {
 }
 
 private struct StructureGatewayStub: LayerStructureGateway {
-    var addLayerResult: DocumentLayerIndexedMutationResult = .success(0)
+    var addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(index: 0))
     var duplicateLayerResult: DocumentLayerIndexedMutationResult = .success(5)
     var createFolderResult: DocumentLayerIndexedMutationResult = .success(9)
 
-    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult { addLayerResult }
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { duplicateLayerResult }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
@@ -207,16 +207,16 @@ private struct StructureGatewayStub: LayerStructureGateway {
 }
 
 private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructureGateway {
-    var addLayerResult: DocumentLayerIndexedMutationResult
+    var addLayerResult: DocumentLayerAddSelectionResult
     var addedLayerNames: [String] = []
 
     init(
-        addLayerResult: DocumentLayerIndexedMutationResult = .success(0)
+        addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(index: 0))
     ) {
         self.addLayerResult = addLayerResult
     }
 
-    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult {
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         addedLayerNames.append(name)
         return addLayerResult
     }

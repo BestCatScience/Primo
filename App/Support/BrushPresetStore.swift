@@ -531,9 +531,7 @@ private struct StoredBrushPreset: Codable {
 
     func makePreset(
         baseDirectory: URL,
-        brushTipLibraryClient: BrushTipLibraryClient = .live(
-            fileClient: PrimoCoreTypes.FileClient.live
-        )
+        brushTipLibraryClient: BrushTipLibraryClient
     ) throws -> BrushPreset {
         let tipKind = BrushTipKind(rawValue: tipKindRawValue) ?? .ink
         let angleMode = BrushAngleMode(rawValue: angleModeRawValue) ?? .fixed

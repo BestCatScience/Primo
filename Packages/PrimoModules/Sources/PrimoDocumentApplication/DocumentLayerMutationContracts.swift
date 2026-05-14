@@ -3,6 +3,7 @@ import PrimoDocumentDomain
 
 public typealias DocumentLayerMutationResult = Result<Void, DocumentLayerMutationFailure>
 public typealias DocumentLayerIndexedMutationResult = Result<Int, DocumentLayerMutationFailure>
+public typealias DocumentLayerAddSelectionResult = Result<AddedAndSelectedLayer, DocumentLayerMutationFailure>
 
 public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case invalidLayerIndex(Int)
@@ -181,6 +182,18 @@ public struct LayerStructureMutationPlan: Equatable, Sendable {
     }
 }
 
+public struct AddedAndSelectedLayer: Equatable, Sendable {
+    public let selectedIndex: Int
+
+    private init(selectedIndex: Int) {
+        self.selectedIndex = selectedIndex
+    }
+
+    public static func addedAndSelected(index: Int) -> AddedAndSelectedLayer {
+        AddedAndSelectedLayer(selectedIndex: index)
+    }
+}
+
 public struct LayerAttributeMutationPlan: Equatable, Sendable {
     public let lifecycleEvent: DocumentLayerMutationEvent?
 
@@ -190,7 +203,7 @@ public struct LayerAttributeMutationPlan: Equatable, Sendable {
 }
 
 public protocol LayerStructureGateway: Sendable {
-    func addLayerAndSelect(name: String) -> DocumentLayerIndexedMutationResult
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult

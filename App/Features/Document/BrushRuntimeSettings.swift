@@ -5,7 +5,7 @@ import PrimoBrushRuntimeContracts
 extension BrushRuntimeSettings {
     func withCustomTip(
         from sourceURL: URL,
-        brushTipLibraryClient: BrushTipLibraryClient = .live(fileClient: .live)
+        brushTipLibraryClient: BrushTipLibraryClient
     ) throws -> BrushRuntimeSettings {
         var copy = self
         copy.customTip = try brushTipLibraryClient.loadRaster(sourceURL)

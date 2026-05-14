@@ -71,6 +71,12 @@ struct NonEmptyLayerStack: Equatable, Sendable {
         self.layers = layers
         self.activeLayer = activeLayer
     }
+
+    init?(clampingActiveLayer layers: [SwiftDocumentLayerRecord], activeLayerIndex: Int) {
+        guard !layers.isEmpty else { return nil }
+        let clampedIndex = min(max(activeLayerIndex, 0), layers.count - 1)
+        self.init(layers: layers, activeLayerIndex: clampedIndex)
+    }
 }
 
 struct SwiftDocumentLayerRecord: Equatable, Sendable {
@@ -213,18 +219,67 @@ struct SwiftDocumentFolderRecord: Equatable, Sendable {
 }
 
 struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
-    var canvasWidth: Int
-    var canvasHeight: Int
-    var activeLayerIndex: Int
+    private var geometryStorage: PixelGeometry
+    private var layerStackStorage: NonEmptyLayerStack
+    private var revisionStorage: Int
+    private var nextFolderIDStorage: Int
     var paperStyle: CanvasPaperStyle
-    var revision: Int
-    var nextFolderID: Int
-    var layers: [SwiftDocumentLayerRecord]
     var folders: [SwiftDocumentFolderRecord]
     var thumbnailCache: [Int: Data]
     var timelapseFrames: [TimelapseFrame]
     var timelapseEvents: [TimelapseOperation]
     var timelapseUsesOperationPersistence: Bool
+
+    var canvasWidth: Int {
+        geometryStorage.width
+    }
+
+    var canvasHeight: Int {
+        geometryStorage.height
+    }
+
+    var activeLayerIndex: Int {
+        get { layerStackStorage.activeLayer.rawValue }
+        set {
+            guard let stack = NonEmptyLayerStack(
+                layers: layerStackStorage.layers,
+                activeLayerIndex: newValue
+            ) else {
+                return
+            }
+            layerStackStorage = stack
+        }
+    }
+
+    var revision: Int {
+        get { revisionStorage }
+        set {
+            guard newValue >= 0 else { return }
+            revisionStorage = newValue
+        }
+    }
+
+    var nextFolderID: Int {
+        get { nextFolderIDStorage }
+        set {
+            guard newValue >= 0 else { return }
+            nextFolderIDStorage = newValue
+        }
+    }
+
+    var layers: [SwiftDocumentLayerRecord] {
+        get { layerStackStorage.layers }
+        set {
+            guard newValue.allSatisfy({ $0.isValid(for: geometryStorage) }),
+                  let stack = NonEmptyLayerStack(
+                    clampingActiveLayer: newValue,
+                    activeLayerIndex: layerStackStorage.activeLayer.rawValue
+                  ) else {
+                return
+            }
+            layerStackStorage = stack
+        }
+    }
 
     init?(
         canvasWidth: Int,
@@ -243,17 +298,15 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
         guard let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
               revision >= 0,
               nextFolderID >= 0,
-              NonEmptyLayerStack(layers: layers, activeLayerIndex: activeLayerIndex) != nil,
+              let layerStack = NonEmptyLayerStack(layers: layers, activeLayerIndex: activeLayerIndex),
               layers.allSatisfy({ $0.isValid(for: geometry) }) else {
             return nil
         }
-        self.canvasWidth = canvasWidth
-        self.canvasHeight = canvasHeight
-        self.activeLayerIndex = activeLayerIndex
+        self.geometryStorage = geometry
+        self.layerStackStorage = layerStack
+        self.revisionStorage = revision
+        self.nextFolderIDStorage = nextFolderID
         self.paperStyle = paperStyle
-        self.revision = revision
-        self.nextFolderID = nextFolderID
-        self.layers = layers
         self.folders = folders
         self.thumbnailCache = thumbnailCache
         self.timelapseFrames = timelapseFrames
@@ -262,7 +315,7 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
     }
 
     var pixelGeometry: PixelGeometry? {
-        PixelGeometry(width: canvasWidth, height: canvasHeight)
+        geometryStorage
     }
 
     var activeLayerRef: ActiveLayerRef? {

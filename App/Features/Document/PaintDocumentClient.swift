@@ -138,7 +138,7 @@ private enum DocumentApplicationEnvironmentKey: DependencyKey {
         @Dependency(\.uuidClient) var uuidClient
 
         return DocumentApplicationEnvironment(
-            runtime: DocumentApplicationRuntimeFactory.live(
+            workflows: DocumentApplicationRuntimeFactory.liveWorkflows(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient
@@ -983,7 +983,7 @@ struct DocumentApplicationEnvironment: Sendable {
     let persistenceCapability: DocumentPersistenceCapability
     let previewRenderingCapability: DocumentPreviewRenderingCapability
 
-    init(runtime: DocumentApplicationRuntime) {
+    init(workflows runtime: DocumentApplicationWorkflowRuntime) {
         let presentationWorkflowAccess = DocumentPresentationWorkflowAccess(
             presentationRuntime: runtime.presentation,
             persistenceRuntime: runtime.persistence,

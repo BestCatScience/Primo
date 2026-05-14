@@ -1743,10 +1743,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard index != destinationIndex else { return .success(()) }
         let before = undoSnapshot()
         materializeGpuBackedLayerPixels()
+        let movedLayerWasActive = store.snapshot.activeLayerIndex == index
         let layer = store.snapshot.layers.remove(at: index)
         store.snapshot.layers.insert(layer, at: destinationIndex)
         remapFoldersAfterMove(from: index, to: destinationIndex)
-        if store.snapshot.activeLayerIndex == index {
+        if movedLayerWasActive {
             store.snapshot.activeLayerIndex = destinationIndex
         }
         invalidateAllThumbnails()

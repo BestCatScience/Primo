@@ -59,13 +59,22 @@ struct SwiftDocumentStoreInvariantTests {
     }
 
     @Test
-    func restoreRejectsInvalidMutatedSnapshot() throws {
+    func snapshotAccessorsRejectInvalidRawMutation() throws {
         let store = SwiftDocumentStore(width: 2, height: 2)
-        var invalid = store.snapshot
-        invalid.activeLayerIndex = 4
+        var snapshot = store.snapshot
+        let onePixelGeometry = try #require(PixelGeometry(width: 1, height: 1))
+        let mismatchedLayer = try #require(makeLayer(geometry: onePixelGeometry))
 
-        #expect(!store.restore(invalid))
-        #expect(store.snapshot.activeLayerIndex == 0)
+        snapshot.activeLayerIndex = 4
+        #expect(snapshot.activeLayerIndex == 0)
+        snapshot.layers = []
+        #expect(snapshot.layers.count == 1)
+        snapshot.layers = [mismatchedLayer]
+        #expect(snapshot.layers.count == 1)
+        snapshot.revision = -1
+        #expect(snapshot.revision == 0)
+        snapshot.nextFolderID = -1
+        #expect(snapshot.nextFolderID == 1)
     }
 
     @Test

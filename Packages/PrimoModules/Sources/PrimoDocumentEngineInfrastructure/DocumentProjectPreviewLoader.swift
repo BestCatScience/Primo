@@ -20,11 +20,20 @@ public struct DocumentProjectPreview: Equatable, Sendable {
 }
 
 public enum DocumentProjectPreviewLoader {
+    public static func loadPreview(from url: URL) throws -> DocumentProjectPreview {
+        try loadPreview(
+            from: url,
+            fileClient: .live,
+            dateClient: .live,
+            uuidClient: .live
+        )
+    }
+
     public static func loadPreview(
         from url: URL,
-        fileClient: PrimoCoreTypes.FileClient = .live,
-        dateClient: PrimoCoreTypes.DateClient = .live,
-        uuidClient: PrimoCoreTypes.UUIDClient = .live
+        fileClient: PrimoCoreTypes.FileClient,
+        dateClient: PrimoCoreTypes.DateClient,
+        uuidClient: PrimoCoreTypes.UUIDClient
     ) throws -> DocumentProjectPreview {
         let runtime = try SwiftDocumentRuntime.loadProject(
             from: url,
