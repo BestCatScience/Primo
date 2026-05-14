@@ -673,6 +673,32 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         XCTAssertFalse(contents.contains("message(for:"))
     }
 
+    func testCrossFeatureIntegrationReducerOnlyComposesBridgeReducers() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/CrossFeatureIntegrationReducer.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(contents.contains("CombineReducers"))
+        XCTAssertTrue(contents.contains("ApplicationWorkspaceBridge()"))
+        XCTAssertTrue(contents.contains("WorkspaceDocumentBridge()"))
+        XCTAssertTrue(contents.contains("ImportExportWorkspaceBridge()"))
+        XCTAssertTrue(contents.contains("AIImageDocumentBridge()"))
+        XCTAssertTrue(contents.contains("DocumentApplicationFeedbackBridge()"))
+        XCTAssertFalse(contents.contains("switch action"))
+    }
+
+    func testDocumentApplicationEnvironmentDoesNotStoreWholeRuntime() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/PaintDocumentClient.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(contents.contains("let runtime: DocumentRuntime"))
+        XCTAssertFalse(contents.contains("@Dependency(\\.canvasPreviewRenderer)"))
+        XCTAssertFalse(contents.contains("@Dependency(\\.canvasPresentationEnvironment)"))
+    }
+
     func testCanvasLifecycleFailureNoLongerEmbedsPresentationFeedback() throws {
         let contents = try String(
             contentsOf: repoRoot.appendingPathComponent("App/Features/Document/DocumentLifecycleReducer+Workflow.swift"),

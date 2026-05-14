@@ -5,7 +5,7 @@ import PrimoDocumentDomain
 import SwiftUI
 
 struct CanvasView: UIViewRepresentable {
-    @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
+    @Dependency(\.documentPreviewRenderingCapability) var previewRenderingCapability
 
     let store: StoreOf<CanvasFeature>
     var allowsFingerTouchInput = false
@@ -15,7 +15,7 @@ struct CanvasView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> CanvasPresentationContainerView {
-        let view = CanvasPresentationContainerView(environment: canvasPresentationEnvironment)
+        let view = CanvasPresentationContainerView(environment: previewRenderingCapability.canvasPresentationEnvironment)
         view.actionSink = CanvasPresentationActionSink { action in
             context.coordinator.store.send(CanvasFeature.Action(action))
         }

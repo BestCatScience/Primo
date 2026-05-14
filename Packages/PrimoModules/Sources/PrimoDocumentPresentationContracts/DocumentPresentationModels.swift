@@ -471,8 +471,8 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
 public struct PaintDocumentPresentation: Equatable, Sendable {
     public let geometry: PixelGeometry
     public let layerPresentation: ValidatedLayerPresentation
-    public var renderSnapshot: MetalDocumentSnapshot?
-    public var revision: DocumentRevision
+    public let renderSnapshot: MetalDocumentSnapshot?
+    public let revision: DocumentRevision
 
     public var canvasSize: CGSize {
         CGSize(width: geometry.width, height: geometry.height)

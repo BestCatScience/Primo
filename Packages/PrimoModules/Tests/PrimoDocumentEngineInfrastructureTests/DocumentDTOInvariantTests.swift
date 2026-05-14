@@ -40,6 +40,35 @@ struct DocumentDTOInvariantTests {
     }
 
     @Test
+    func priorityDTOsDoNotExposeMutableInvariantFields() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources")
+        let domainModels = try String(
+            contentsOf: sourceRoot.appendingPathComponent("PrimoDocumentDomain/WorkspaceDocumentTypes.swift"),
+            encoding: .utf8
+        )
+        let textLayerTypes = try String(
+            contentsOf: sourceRoot.appendingPathComponent("PrimoDocumentDomain/TextLayerTypes.swift"),
+            encoding: .utf8
+        )
+        let presentationModels = try String(
+            contentsOf: sourceRoot.appendingPathComponent("PrimoDocumentPresentationContracts/DocumentPresentationModels.swift"),
+            encoding: .utf8
+        )
+
+        #expect(!domainModels.contains("public var color: CanvasColor"))
+        #expect(!domainModels.contains("public var isTransparent: Bool"))
+        #expect(textLayerTypes.contains("public let textContent: TextContent"))
+        #expect(textLayerTypes.contains("public let positionXValue: FiniteDouble"))
+        #expect(textLayerTypes.contains("public let fontSizeValue: PositiveFiniteDouble"))
+        #expect(!presentationModels.contains("public var renderSnapshot: MetalDocumentSnapshot?"))
+        #expect(!presentationModels.contains("public var revision: DocumentRevision"))
+    }
+
+    @Test
     func textLayerDataExposesValidatedScalarsAndColor() throws {
         let positionX = try #require(FiniteDouble(10))
         let positionY = try #require(FiniteDouble(20))
@@ -48,7 +77,7 @@ struct DocumentDTOInvariantTests {
         let rotationDegrees = try #require(FiniteDouble(0))
         let color = try #require(CanvasColor(red: 1, green: 0, blue: 0, alpha: 1))
         let text = try #require(TextContent("Hello"))
-        let validTextLayer = try #require(TextLayerData(
+        let validTextLayer = TextLayerData(
             text: text,
             positionX: positionX,
             positionY: positionY,
@@ -58,7 +87,7 @@ struct DocumentDTOInvariantTests {
             scale: scale,
             rotationDegrees: rotationDegrees,
             color: color
-        ))
+        )
         #expect(validTextLayer.validatedFontSize?.rawValue == 18)
         #expect(validTextLayer.validatedColor != nil)
 

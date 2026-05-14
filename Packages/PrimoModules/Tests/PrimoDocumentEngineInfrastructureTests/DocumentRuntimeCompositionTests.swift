@@ -14,9 +14,9 @@ struct DocumentRuntimeCompositionTests {
         let initial = await iterator.next()
         #expect(initial?.canvasSize.width != 3)
 
-        let outcome = await runtime.execute(.canvas(.resize(width: 3, height: 3)))
+        let outcome = await runtime.execute(.canvas(.create(width: 3, height: 3)))
         guard case .mutation(.success) = outcome else {
-            Issue.record("Expected resize command to succeed")
+            Issue.record("Expected create command to succeed")
             return
         }
 

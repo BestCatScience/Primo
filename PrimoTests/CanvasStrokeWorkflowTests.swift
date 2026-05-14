@@ -1582,9 +1582,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 }
 
 private struct DerivedGpuDependencyProbe {
-    @Dependency(\.canvasPreviewRenderer) var previewRenderer
-    @Dependency(\.selectionMaskProcessor) var selectionMaskProcessor
-    @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
+    @Dependency(\.documentPreviewRenderingCapability) var previewRenderingCapability
 
     func outputs() -> [Data?] {
         let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
@@ -1596,22 +1594,22 @@ private struct DerivedGpuDependencyProbe {
         )
 
         return [
-            previewRenderer.compositePreviewImageData(
+            previewRenderingCapability.canvasPreviewRenderer.compositePreviewImageData(
                 snapshot: snapshot,
                 activeLayerIndex: 0,
                 adjustedActiveLayerPixels: Data(count: 4)
             ),
-            selectionMaskProcessor.selectionOverlaySurface(
+            previewRenderingCapability.selectionMaskProcessor.selectionOverlaySurface(
                 maskData: Data([255]),
                 width: 1,
                 height: 1
             )?.pixelData,
-            canvasPresentationEnvironment.previewRenderer.compositePreviewImageData(
+            previewRenderingCapability.canvasPresentationEnvironment.previewRenderer.compositePreviewImageData(
                 snapshot: snapshot,
                 activeLayerIndex: 0,
                 adjustedActiveLayerPixels: Data(count: 4)
             ),
-            canvasPresentationEnvironment.selectionProcessor.selectionOverlaySurface(
+            previewRenderingCapability.canvasPresentationEnvironment.selectionProcessor.selectionOverlaySurface(
                 maskData: Data([255]),
                 width: 1,
                 height: 1

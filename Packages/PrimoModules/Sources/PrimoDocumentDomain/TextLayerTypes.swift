@@ -20,15 +20,15 @@ public struct TextFontOption: Identifiable, Equatable, Sendable, Codable {
 }
 
 public struct TextLayerData: Equatable, Sendable, Codable {
-    public var textContent: TextContent
-    public var positionXValue: FiniteDouble
-    public var positionYValue: FiniteDouble
-    public var fontPostScriptName: String
-    public var fontDisplayName: String
-    public var fontSizeValue: PositiveFiniteDouble
-    public var scaleValue: PositiveFiniteDouble
-    public var rotationDegreesValue: FiniteDouble
-    public var color: CanvasColor
+    public let textContent: TextContent
+    public let positionXValue: FiniteDouble
+    public let positionYValue: FiniteDouble
+    public let fontPostScriptName: String
+    public let fontDisplayName: String
+    public let fontSizeValue: PositiveFiniteDouble
+    public let scaleValue: PositiveFiniteDouble
+    public let rotationDegreesValue: FiniteDouble
+    public let color: CanvasColor
 
     public var text: String {
         textContent.rawValue
@@ -109,7 +109,7 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         )
     }
 
-    public init?(
+    public init(
         text: TextContent,
         positionX: FiniteDouble,
         positionY: FiniteDouble,
@@ -120,24 +120,19 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         rotationDegrees: FiniteDouble = FiniteDouble(0)!,
         color: CanvasColor
     ) {
-        self.init(
-            unsafeUncheckedText: text.rawValue,
-            positionX: positionX.rawValue,
-            positionY: positionY.rawValue,
-            fontPostScriptName: fontPostScriptName,
-            fontDisplayName: fontDisplayName,
-            fontSize: fontSize.rawValue,
-            scale: scale.rawValue,
-            rotationDegrees: rotationDegrees.rawValue,
-            red: color.red.rawValue,
-            green: color.green.rawValue,
-            blue: color.blue.rawValue,
-            alpha: color.alpha.rawValue
-        )
+        self.textContent = text
+        self.positionXValue = positionX
+        self.positionYValue = positionY
+        self.fontPostScriptName = fontPostScriptName
+        self.fontDisplayName = fontDisplayName
+        self.fontSizeValue = fontSize
+        self.scaleValue = scale
+        self.rotationDegreesValue = rotationDegrees
+        self.color = color
     }
 
-    public var validatedPositionX: FiniteDouble? { FiniteDouble(positionX) }
-    public var validatedPositionY: FiniteDouble? { FiniteDouble(positionY) }
+    public var validatedPositionX: FiniteDouble? { positionXValue }
+    public var validatedPositionY: FiniteDouble? { positionYValue }
     public var validatedFontSize: PositiveFiniteDouble? { fontSizeValue }
     public var validatedScale: PositiveFiniteDouble? { scaleValue }
     public var validatedRotationDegrees: FiniteDouble? { rotationDegreesValue }

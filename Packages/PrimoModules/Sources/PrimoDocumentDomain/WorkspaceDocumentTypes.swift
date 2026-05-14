@@ -30,8 +30,8 @@ public struct DocumentCompositeSurface: Equatable, Sendable {
 }
 
 public struct CanvasPaperStyle: Equatable, Sendable {
-    public var color: CanvasColor
-    public var isTransparent: Bool
+    public let color: CanvasColor
+    public let isTransparent: Bool
 
     public var red: Float { Float(color.red.rawValue) }
     public var green: Float { Float(color.green.rawValue) }
