@@ -759,7 +759,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
 
         #expect(body.contains("struct DocumentApplicationEnvironment: Sendable"))
-        #expect(body.contains("struct SelectionWorkflowEnvironment: Sendable"))
+        #expect(body.contains("protocol SelectionWorkflowRequesting: Sendable"))
+        #expect(body.contains("typealias CanvasStrokeWorkflowAccess"))
         #expect(body.contains("private enum DocumentApplicationEnvironmentKey: DependencyKey"))
         for key in bannedKeys {
             #expect(!body.contains(key), "PaintDocumentClient should derive \(key) from DocumentApplicationEnvironment")

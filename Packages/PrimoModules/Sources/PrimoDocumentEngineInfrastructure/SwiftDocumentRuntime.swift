@@ -837,25 +837,33 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {
-        PaintDocumentPresentation(
+        let snapshot = store.validatedSnapshot()
+        guard let presentation = PaintDocumentPresentation(
             canvasSize: canvasSize,
-            activeLayerIndex: store.snapshot.activeLayerIndex,
-            layerRows: buildLayerRows(),
-            layerSidebarRows: buildSidebarRows(),
+            activeLayerIndex: snapshot.activeLayerIndex,
+            layerRows: buildLayerRows(from: snapshot),
+            layerSidebarRows: buildSidebarRows(from: snapshot),
             renderSnapshot: nil,
-            revision: DocumentRevision(store.snapshot.revision)
-        )!
+            revision: DocumentRevision(snapshot.revision)
+        ) else {
+            preconditionFailure("SwiftDocumentStore produced an invalid lightweight presentation")
+        }
+        return presentation
     }
 
     func presentation() -> PaintDocumentPresentation {
-        PaintDocumentPresentation(
+        let snapshot = store.validatedSnapshot()
+        guard let presentation = PaintDocumentPresentation(
             canvasSize: canvasSize,
-            activeLayerIndex: store.snapshot.activeLayerIndex,
-            layerRows: buildLayerRows(),
-            layerSidebarRows: buildSidebarRows(),
+            activeLayerIndex: snapshot.activeLayerIndex,
+            layerRows: buildLayerRows(from: snapshot),
+            layerSidebarRows: buildSidebarRows(from: snapshot),
             renderSnapshot: makeRenderSnapshot(),
-            revision: DocumentRevision(store.snapshot.revision)
-        )!
+            revision: DocumentRevision(snapshot.revision)
+        ) else {
+            preconditionFailure("SwiftDocumentStore produced an invalid presentation")
+        }
+        return presentation
     }
 
     func prewarmDrawingResources() {
@@ -1044,8 +1052,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func addLayer(name: String) -> DocumentIndexedMutationResult {
         let before = undoSnapshot()
-        let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
-        let layer = SwiftDocumentLayerRecord(
+        guard let geometry = store.snapshot.pixelGeometry,
+              let layer = SwiftDocumentLayerRecord(
             name: name,
             visible: true,
             locked: false,
@@ -1055,9 +1063,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             blendMode: .normal,
             folderID: nil,
             textLayer: nil,
-            pixelData: Data(count: size.rgbaByteCount),
+            geometry: geometry,
+            pixelData: Data(count: geometry.rgbaByteCount),
             maskData: nil
-        )
+              ) else {
+            return .failure(.bridgeMutationFailed("addLayerInvalidStoreGeometry"))
+        }
         store.snapshot.layers.append(layer)
         let index = store.snapshot.layers.count - 1
         store.snapshot.activeLayerIndex = index
@@ -2203,13 +2214,14 @@ extension SwiftDocumentRuntime {
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
         let manifestData = try fileClient.readData(manifestURL)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: manifestData)
-        guard document.canvasWidth > 0, document.canvasHeight > 0, !document.layers.isEmpty else {
+        guard let geometry = PixelGeometry(width: document.canvasWidth, height: document.canvasHeight),
+              !document.layers.isEmpty else {
             throw PrimoDocumentError.invalidDocument
         }
 
         let sortedLayers = document.layers.sorted { $0.index.rawValue < $1.index.rawValue }
-        let expectedLayerBytes = document.canvasWidth * document.canvasHeight * 4
-        let expectedMaskBytes = document.canvasWidth * document.canvasHeight
+        let expectedLayerBytes = geometry.rgbaByteCount
+        let expectedMaskBytes = geometry.maskByteCount
         let layers = try sortedLayers.map { layer -> SwiftDocumentLayerRecord in
             let pixelData = try fileClient.readData(url.appendingPathComponent(layer.pixelFilename, isDirectory: false))
             guard pixelData.count == expectedLayerBytes else { throw PrimoDocumentError.invalidDocument }
@@ -2221,7 +2233,7 @@ extension SwiftDocumentRuntime {
             } else {
                 maskData = nil
             }
-            return SwiftDocumentLayerRecord(
+            guard let layerRecord = SwiftDocumentLayerRecord(
                 name: layer.name,
                 visible: layer.visible,
                 locked: layer.locked,
@@ -2231,9 +2243,13 @@ extension SwiftDocumentRuntime {
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID?.rawValue,
                 textLayer: layer.textLayer,
+                geometry: geometry,
                 pixelData: pixelData,
                 maskData: maskData
-            )
+                  ) else {
+                throw PrimoDocumentError.invalidDocument
+            }
+            return layerRecord
         }
         let folders = document.folders.map {
             SwiftDocumentFolderRecord(
@@ -2263,8 +2279,7 @@ extension SwiftDocumentRuntime {
         } else {
             timelapseFrames = []
         }
-        runtime.store.restore(
-            SwiftDocumentStoreSnapshot(
+        guard let loadedSnapshot = SwiftDocumentStoreSnapshot(
                 canvasWidth: document.canvasWidth,
                 canvasHeight: document.canvasHeight,
                 activeLayerIndex: min(max(document.activeLayerIndex.rawValue, 0), layers.count - 1),
@@ -2283,8 +2298,10 @@ extension SwiftDocumentRuntime {
                 timelapseFrames: timelapseFrames,
                 timelapseEvents: timelapseEvents,
                 timelapseUsesOperationPersistence: !timelapseEvents.isEmpty
-            )
-        )
+              ),
+              runtime.store.restore(loadedSnapshot) else {
+            throw PrimoDocumentError.invalidDocument
+        }
         runtime.thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         return runtime
     }
@@ -2807,12 +2824,19 @@ extension SwiftDocumentRuntime {
     }
 
     private func buildLayerRows() -> [LayerRowModel] {
-        store.snapshot.layers.enumerated().map { index, layer in
-            LayerRowModel(
+        buildLayerRows(from: store.validatedSnapshot())
+    }
+
+    private func buildLayerRows(from snapshot: SwiftDocumentStoreSnapshot) -> [LayerRowModel] {
+        snapshot.layers.enumerated().map { index, layer in
+            guard let opacity = layer.validatedOpacity()?.value else {
+                preconditionFailure("SwiftDocumentStore produced an invalid layer opacity")
+            }
+            return LayerRowModel(
                 unsafeUncheckedIndex: index,
                 name: layer.name,
                 visible: layer.visible,
-                opacity: UnitInterval(layer.opacity)!,
+                opacity: opacity,
                 isLocked: layer.locked,
                 isAlphaLocked: layer.alphaLocked,
                 isClipped: layer.clipped,
@@ -2826,16 +2850,20 @@ extension SwiftDocumentRuntime {
     }
 
     private func buildSidebarRows() -> [LayerSidebarRowModel] {
-        let layerRows = buildLayerRows()
+        buildSidebarRows(from: store.validatedSnapshot())
+    }
+
+    private func buildSidebarRows(from snapshot: SwiftDocumentStoreSnapshot) -> [LayerSidebarRowModel] {
+        let layerRows = buildLayerRows(from: snapshot)
         let layerRowsByIndex = Dictionary(uniqueKeysWithValues: layerRows.map { ($0.index, $0) })
-        let orderedFolders = store.snapshot.folders.map { folder in
+        let orderedFolders = snapshot.folders.map { folder in
             LayerFolderModel(
                 id: folder.id,
                 name: folder.name,
                 visible: folder.visible,
                 isExpanded: folder.expanded,
                 anchorLayerIndex: folder.anchorLayerIndex,
-                childLayerIndices: store.snapshot.layers.enumerated().compactMap { index, layer in
+                childLayerIndices: snapshot.layers.enumerated().compactMap { index, layer in
                     layer.folderID == folder.id ? index : nil
                 }.sorted(by: >)
             )

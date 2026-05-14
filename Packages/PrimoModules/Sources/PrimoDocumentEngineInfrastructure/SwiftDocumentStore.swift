@@ -4,6 +4,75 @@ import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
+struct LayerPixelBuffer: Equatable, Sendable {
+    let surface: RgbaSurface
+
+    init?(geometry: PixelGeometry, data: Data) {
+        guard let surface = RgbaSurface(geometry: geometry, data: data) else {
+            return nil
+        }
+        self.surface = surface
+    }
+
+    var data: Data { surface.data }
+}
+
+struct LayerMaskBuffer: Equatable, Sendable {
+    let surface: MaskSurface
+
+    init?(geometry: PixelGeometry, data: Data) {
+        guard let surface = MaskSurface(geometry: geometry, data: data) else {
+            return nil
+        }
+        self.surface = surface
+    }
+
+    var data: Data { surface.data }
+}
+
+struct DocumentLayerOpacity: Equatable, Sendable {
+    let value: UnitInterval
+
+    init?(_ rawValue: Double) {
+        guard let value = UnitInterval(rawValue) else {
+            return nil
+        }
+        self.value = value
+    }
+
+    var rawValue: Double { value.rawValue }
+}
+
+struct ActiveLayerRef: Equatable, Sendable {
+    let index: DocumentLayerIndex
+
+    init?(rawValue: Int, layerCount: Int) {
+        guard layerCount > 0,
+              rawValue >= 0,
+              rawValue < layerCount,
+              let index = try? DocumentLayerIndex(validating: rawValue) else {
+            return nil
+        }
+        self.index = index
+    }
+
+    var rawValue: Int { index.rawValue }
+}
+
+struct NonEmptyLayerStack: Equatable, Sendable {
+    let layers: [SwiftDocumentLayerRecord]
+    let activeLayer: ActiveLayerRef
+
+    init?(layers: [SwiftDocumentLayerRecord], activeLayerIndex: Int) {
+        guard !layers.isEmpty,
+              let activeLayer = ActiveLayerRef(rawValue: activeLayerIndex, layerCount: layers.count) else {
+            return nil
+        }
+        self.layers = layers
+        self.activeLayer = activeLayer
+    }
+}
+
 struct SwiftDocumentLayerRecord: Equatable, Sendable {
     var name: String
     var visible: Bool
@@ -17,7 +86,7 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
     var pixelData: Data
     var maskData: Data?
 
-    init(
+    init?(
         name: String,
         visible: Bool,
         locked: Bool,
@@ -27,20 +96,62 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
         blendMode: LayerBlendMode,
         folderID: Int?,
         textLayer: TextLayerData?,
+        geometry: PixelGeometry,
         pixelData: Data,
         maskData: Data?
+    ) {
+        guard let opacity = DocumentLayerOpacity(opacity),
+              let pixels = LayerPixelBuffer(geometry: geometry, data: pixelData) else {
+            return nil
+        }
+        let mask: LayerMaskBuffer?
+        if let maskData {
+            guard let validatedMask = LayerMaskBuffer(geometry: geometry, data: maskData) else {
+                return nil
+            }
+            mask = validatedMask
+        } else {
+            mask = nil
+        }
+        self.init(
+            uncheckedName: name,
+            visible: visible,
+            locked: locked,
+            alphaLocked: alphaLocked,
+            clipped: clipped,
+            opacity: opacity,
+            blendMode: blendMode,
+            folderID: folderID,
+            textLayer: textLayer,
+            pixelBuffer: pixels,
+            maskBuffer: mask
+        )
+    }
+
+    private init(
+        uncheckedName name: String,
+        visible: Bool,
+        locked: Bool,
+        alphaLocked: Bool,
+        clipped: Bool,
+        opacity: DocumentLayerOpacity,
+        blendMode: LayerBlendMode,
+        folderID: Int?,
+        textLayer: TextLayerData?,
+        pixelBuffer: LayerPixelBuffer,
+        maskBuffer: LayerMaskBuffer?
     ) {
         self.name = name
         self.visible = visible
         self.locked = locked
         self.alphaLocked = alphaLocked
         self.clipped = clipped
-        self.opacity = opacity
+        self.opacity = opacity.rawValue
         self.blendMode = blendMode
         self.folderID = folderID
         self.textLayer = textLayer
-        self.pixelData = pixelData
-        self.maskData = maskData
+        self.pixelData = pixelBuffer.data
+        self.maskData = maskBuffer?.data
     }
 }
 
@@ -80,7 +191,7 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
     var timelapseEvents: [TimelapseOperation]
     var timelapseUsesOperationPersistence: Bool
 
-    init(
+    init?(
         canvasWidth: Int,
         canvasHeight: Int,
         activeLayerIndex: Int,
@@ -94,6 +205,13 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
         timelapseEvents: [TimelapseOperation],
         timelapseUsesOperationPersistence: Bool
     ) {
+        guard let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+              revision >= 0,
+              nextFolderID >= 0,
+              NonEmptyLayerStack(layers: layers, activeLayerIndex: activeLayerIndex) != nil,
+              layers.allSatisfy({ $0.isValid(for: geometry) }) else {
+            return nil
+        }
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.activeLayerIndex = activeLayerIndex
@@ -106,6 +224,52 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
         self.timelapseFrames = timelapseFrames
         self.timelapseEvents = timelapseEvents
         self.timelapseUsesOperationPersistence = timelapseUsesOperationPersistence
+    }
+
+    var pixelGeometry: PixelGeometry? {
+        PixelGeometry(width: canvasWidth, height: canvasHeight)
+    }
+
+    var activeLayerRef: ActiveLayerRef? {
+        ActiveLayerRef(rawValue: activeLayerIndex, layerCount: layers.count)
+    }
+
+    func validated() -> SwiftDocumentStoreSnapshot? {
+        SwiftDocumentStoreSnapshot(
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            activeLayerIndex: activeLayerIndex,
+            paperStyle: paperStyle,
+            revision: revision,
+            nextFolderID: nextFolderID,
+            layers: layers,
+            folders: folders,
+            thumbnailCache: thumbnailCache,
+            timelapseFrames: timelapseFrames,
+            timelapseEvents: timelapseEvents,
+            timelapseUsesOperationPersistence: timelapseUsesOperationPersistence
+        )
+    }
+}
+
+extension SwiftDocumentLayerRecord {
+    func validatedOpacity() -> DocumentLayerOpacity? {
+        DocumentLayerOpacity(opacity)
+    }
+
+    func pixelBuffer(for geometry: PixelGeometry) -> LayerPixelBuffer? {
+        LayerPixelBuffer(geometry: geometry, data: pixelData)
+    }
+
+    func maskBuffer(for geometry: PixelGeometry) -> LayerMaskBuffer? {
+        guard let maskData else { return nil }
+        return LayerMaskBuffer(geometry: geometry, data: maskData)
+    }
+
+    func isValid(for geometry: PixelGeometry) -> Bool {
+        validatedOpacity() != nil &&
+            pixelBuffer(for: geometry) != nil &&
+            (maskData == nil || maskBuffer(for: geometry) != nil)
     }
 }
 
@@ -147,8 +311,22 @@ final class SwiftDocumentStore: @unchecked Sendable {
     ) {
         let clampedWidth = max(width, 1)
         let clampedHeight = max(height, 1)
-        let pixelData = Data(count: clampedWidth * clampedHeight * 4)
-        self.snapshot = SwiftDocumentStoreSnapshot(
+        guard let geometry = PixelGeometry(width: clampedWidth, height: clampedHeight),
+              let initialLayer = SwiftDocumentLayerRecord(
+                name: "Layer 1",
+                visible: true,
+                locked: false,
+                alphaLocked: false,
+                clipped: false,
+                opacity: 1.0,
+                blendMode: .normal,
+                folderID: nil,
+                textLayer: nil,
+                geometry: geometry,
+                pixelData: Data(count: geometry.rgbaByteCount),
+                maskData: nil
+              ),
+              let snapshot = SwiftDocumentStoreSnapshot(
             canvasWidth: clampedWidth,
             canvasHeight: clampedHeight,
             activeLayerIndex: 0,
@@ -156,29 +334,32 @@ final class SwiftDocumentStore: @unchecked Sendable {
             revision: 0,
             nextFolderID: 1,
             layers: [
-                SwiftDocumentLayerRecord(
-                    name: "Layer 1",
-                    visible: true,
-                    locked: false,
-                    alphaLocked: false,
-                    clipped: false,
-                    opacity: 1.0,
-                    blendMode: .normal,
-                    folderID: nil,
-                    textLayer: nil,
-                    pixelData: pixelData,
-                    maskData: nil
-                )
+                initialLayer
             ],
             folders: [],
             thumbnailCache: [:],
             timelapseFrames: [],
             timelapseEvents: [],
             timelapseUsesOperationPersistence: true
-        )
+              ) else {
+            preconditionFailure("SwiftDocumentStore failed to create a valid initial snapshot")
+        }
+        self.snapshot = snapshot
     }
 
-    func restore(_ snapshot: SwiftDocumentStoreSnapshot) {
-        self.snapshot = snapshot
+    @discardableResult
+    func restore(_ snapshot: SwiftDocumentStoreSnapshot) -> Bool {
+        guard let validatedSnapshot = snapshot.validated() else {
+            return false
+        }
+        self.snapshot = validatedSnapshot
+        return true
+    }
+
+    func validatedSnapshot() -> SwiftDocumentStoreSnapshot {
+        guard let validatedSnapshot = snapshot.validated() else {
+            preconditionFailure("SwiftDocumentStore snapshot invariant was violated")
+        }
+        return validatedSnapshot
     }
 }
