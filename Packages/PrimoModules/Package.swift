@@ -489,6 +489,9 @@ let package = Package(
                 "PrimoDocumentEngineInfrastructure",
                 "PrimoDocumentRuntime",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+            ],
+            exclude: [
+                "__Snapshots__"
             ]
         ),
         .testTarget(

@@ -49,6 +49,39 @@ settings:
     SWIFT_ENABLE_EXPLICIT_MODULES: NO
     SWIFT_VERSION: 6.0
 targets:
+  PrimoAppSupport:
+    type: framework
+    platform: iOS
+    sources:
+      - path: App/Support
+        excludes:
+          - ThirdPartyNotices.json
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo.support
+        PRODUCT_NAME: PrimoAppSupport
+        IPHONEOS_DEPLOYMENT_TARGET: 26.0
+        CLANG_ENABLE_OBJC_ARC: YES
+    dependencies:
+      - package: ComposableArchitecture
+      - package: Dependencies
+        product: Dependencies
+      - package: PrimoModules
+        product: PrimoCoreTypes
+      - package: PrimoModules
+        product: PrimoLocalization
+      - package: PrimoModules
+        product: PrimoDocumentDomain
+      - package: PrimoModules
+        product: PrimoBrushFileFormats
+      - package: PrimoModules
+        product: PrimoBrushRuntime
+      - package: PrimoModules
+        product: PrimoWorkspaceRuntime
+      - package: PrimoModules
+        product: PrimoAIImageRuntime
+      - sdk: Foundation.framework
+      - sdk: UIKit.framework
   Primo:
     type: application
     platform: iOS
@@ -68,6 +101,7 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: 26.0
         CLANG_ENABLE_OBJC_ARC: YES
     dependencies:
+      - target: PrimoAppSupport
       - package: ComposableArchitecture
       - package: CasePaths
         product: CasePaths
@@ -97,17 +131,11 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentRuntime
       - package: PrimoModules
-        product: PrimoBrushRuntime
-      - package: PrimoModules
-        product: PrimoWorkspaceRuntime
-      - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
         product: PrimoAIImageDomain
       - package: PrimoModules
         product: PrimoAIImageApplication
-      - package: PrimoModules
-        product: PrimoAIImageRuntime
       - sdk: AVFoundation.framework
       - sdk: AppIntents.framework
       - sdk: CoreGraphics.framework

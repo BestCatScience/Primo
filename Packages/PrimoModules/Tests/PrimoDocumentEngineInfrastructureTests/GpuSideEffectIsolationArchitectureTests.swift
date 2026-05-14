@@ -440,6 +440,53 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func projectTargetGraphRoutesRuntimeWiringThroughAppSupport() throws {
+        let repoRoot = try Self.repoRoot()
+        let projectYML = try String(
+            contentsOf: repoRoot.appendingPathComponent("project.yml", isDirectory: false),
+            encoding: .utf8
+        )
+        let appSupportBlock = try #require(Self.yamlTargetBlock(named: "PrimoAppSupport", in: projectYML))
+        let appTargetBlock = try #require(Self.yamlTargetBlock(named: "Primo", in: projectYML))
+
+        #expect(appSupportBlock.contains("type: framework"))
+        #expect(appSupportBlock.contains("path: App/Support"))
+        #expect(appTargetBlock.contains("- target: PrimoAppSupport"))
+
+        let runtimeWiringProducts = [
+            "PrimoBrushRuntime",
+            "PrimoWorkspaceRuntime",
+            "PrimoAIImageRuntime"
+        ]
+        for product in runtimeWiringProducts {
+            #expect(
+                appSupportBlock.contains("product: \(product)"),
+                "PrimoAppSupport should own live runtime wiring dependency \(product)"
+            )
+            #expect(
+                !appTargetBlock.contains("product: \(product)"),
+                "Primo app target should depend on \(product) through PrimoAppSupport"
+            )
+        }
+
+        let stillAppFacingProducts = [
+            "PrimoWorkspaceApplication",
+            "PrimoCanvasInputDomain",
+            "PrimoCanvasPresentationDomain",
+            "PrimoDocumentRuntime",
+            "PrimoDocumentStrokeApplication",
+            "PrimoAIImageDomain",
+            "PrimoAIImageApplication"
+        ]
+        for product in stillAppFacingProducts {
+            #expect(
+                appTargetBlock.contains("product: \(product)"),
+                "Primo app target should keep direct access only to App-facing product \(product)"
+            )
+        }
+    }
+
+    @Test
     func packageDoesNotPublishInfrastructureProducts() throws {
         let repoRoot = try Self.repoRoot()
         let package = try String(
@@ -448,6 +495,32 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         for product in Self.infrastructureProductNames(in: package) {
             #expect(!product.hasSuffix("Infrastructure"), "\(product) should remain an internal target, not a library product")
+        }
+    }
+
+    @Test
+    func publicRuntimeFacadeSymbolGraphsMatchSnapshots() throws {
+        let repoRoot = try Self.repoRoot()
+        let moduleNames = [
+            "PrimoDocumentRuntime",
+            "PrimoWorkspaceRuntime"
+        ]
+        let generatedSnapshots = try Self.generatedPublicSymbolSnapshots(
+            for: moduleNames,
+            repoRoot: repoRoot
+        )
+
+        for moduleName in moduleNames {
+            let expectedURL = repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/__Snapshots__/SymbolGraphs/\(moduleName).symbols.tsv",
+                isDirectory: false
+            )
+            let expected = try String(contentsOf: expectedURL, encoding: .utf8)
+            let actual = try #require(generatedSnapshots[moduleName])
+            #expect(
+                actual == expected,
+                "\(moduleName) public symbol graph drifted. Run scripts/update-symbol-snapshots.sh if the API change is intentional."
+            )
         }
     }
 
@@ -1266,6 +1339,143 @@ struct GpuSideEffectIsolationArchitectureTests {
         let manifest = repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false)
         let body = try String(contentsOf: manifest, encoding: .utf8)
         return PackageManifestTargetParser.parseTargetDependencies(from: body)
+    }
+
+    private static func generatedPublicSymbolSnapshots(
+        for moduleNames: [String],
+        repoRoot: URL
+    ) throws -> [String: String] {
+        let packageRoot = repoRoot.appendingPathComponent("Packages/PrimoModules", isDirectory: true)
+        let scratchRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "primo-symbolgraph-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: scratchRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratchRoot) }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+        process.arguments = [
+            "package",
+            "--package-path",
+            packageRoot.path,
+            "--scratch-path",
+            scratchRoot.path,
+            "dump-symbol-graph",
+            "--minimum-access-level",
+            "public",
+            "--skip-synthesized-members"
+        ]
+        var environment = ProcessInfo.processInfo.environment
+        environment["DEVELOPER_DIR"] = environment["DEVELOPER_DIR"] ?? "/Applications/Xcode.app/Contents/Developer"
+        process.environment = environment
+
+        let outputURL = scratchRoot.appendingPathComponent("symbolgraph-extract.log", isDirectory: false)
+        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+        let outputHandle = try FileHandle(forWritingTo: outputURL)
+        defer { try? outputHandle.close() }
+        process.standardOutput = outputHandle
+        process.standardError = outputHandle
+        try process.run()
+        process.waitUntilExit()
+
+        let requestedSymbolGraphs = try moduleNames.map { moduleName in
+            try #require(Self.symbolGraphURL(for: moduleName, under: scratchRoot))
+        }
+
+        if process.terminationStatus != 0, requestedSymbolGraphs.count != moduleNames.count {
+            let message = try String(contentsOf: outputURL, encoding: .utf8)
+            throw SymbolSnapshotError.symbolGraphExtractionFailed(message)
+        }
+
+        var snapshots: [String: String] = [:]
+        for (moduleName, symbolGraph) in zip(moduleNames, requestedSymbolGraphs) {
+            snapshots[moduleName] = try Self.normalizedPublicSymbolSnapshot(at: symbolGraph)
+        }
+        return snapshots
+    }
+
+    private static func symbolGraphURL(for moduleName: String, under root: URL) -> URL? {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+        for item in enumerator {
+            guard let url = item as? URL else { continue }
+            guard url.lastPathComponent == "\(moduleName).symbols.json" else { continue }
+            return url
+        }
+        return nil
+    }
+
+    private static func normalizedPublicSymbolSnapshot(at url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        guard
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let symbols = root["symbols"] as? [[String: Any]]
+        else {
+            throw SymbolSnapshotError.invalidSymbolGraph(url.path)
+        }
+        let records = symbols.compactMap(SymbolSnapshotRecord.init(symbol:))
+        return records.sorted().map(\.line).joined(separator: "\n") + "\n"
+    }
+}
+
+private enum SymbolSnapshotError: Error, CustomStringConvertible {
+    case symbolGraphExtractionFailed(String)
+    case invalidSymbolGraph(String)
+
+    var description: String {
+        switch self {
+        case let .symbolGraphExtractionFailed(message):
+            return "symbol graph extraction failed: \(message)"
+        case let .invalidSymbolGraph(path):
+            return "invalid symbol graph: \(path)"
+        }
+    }
+}
+
+private struct SymbolSnapshotRecord: Comparable {
+    let kind: String
+    let preciseIdentifier: String
+    let path: String
+    let title: String
+    let declaration: String
+
+    init?(symbol: [String: Any]) {
+        guard symbol["accessLevel"] as? String == "public" else { return nil }
+        guard
+            let kind = (symbol["kind"] as? [String: Any])?["identifier"] as? String,
+            let preciseIdentifier = (symbol["identifier"] as? [String: Any])?["precise"] as? String,
+            let pathComponents = symbol["pathComponents"] as? [String],
+            let title = (symbol["names"] as? [String: Any])?["title"] as? String
+        else {
+            return nil
+        }
+        self.kind = kind
+        self.preciseIdentifier = preciseIdentifier
+        self.path = pathComponents.joined(separator: ".")
+        self.title = title
+        self.declaration = (symbol["declarationFragments"] as? [[String: Any]])?
+            .compactMap { $0["spelling"] as? String }
+            .joined() ?? ""
+    }
+
+    static func < (lhs: SymbolSnapshotRecord, rhs: SymbolSnapshotRecord) -> Bool {
+        lhs.line < rhs.line
+    }
+
+    var line: String {
+        [
+            kind,
+            preciseIdentifier,
+            path,
+            title,
+            declaration
+        ].joined(separator: "\t")
     }
 }
 
