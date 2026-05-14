@@ -125,17 +125,35 @@ private final class CallRecorder: @unchecked Sendable {
 }
 
 private func queryGateway() -> DocumentQueryGateway {
+    let row = layerRow(index: 0)
     let presentation = PaintDocumentPresentation(
-        canvasSize: CGSize(width: 64, height: 64),
+        validatingCanvasSize: CGSize(width: 64, height: 64),
         activeLayerIndex: 0,
-        layerRows: [],
-        layerSidebarRows: [],
+        layerRows: [row],
+        layerSidebarRows: [.layer(row, depth: 0)],
         renderSnapshot: nil
-    )
+    )!
     return DocumentQueryGateway(
         lightweightPresentation: { presentation },
         presentation: { presentation }
     )
+}
+
+private func layerRow(index: Int) -> LayerRowModel {
+    LayerRowModel(
+        validatingIndex: index,
+        name: "Layer \(index)",
+        visible: true,
+        opacity: UnitInterval(1)!,
+        isLocked: false,
+        isAlphaLocked: false,
+        isClipped: false,
+        blendMode: .normal,
+        folderID: nil,
+        hasMask: false,
+        isTextLayer: false,
+        textLayer: nil
+    )!
 }
 
 private func renderGateway() -> DocumentRenderGateway {

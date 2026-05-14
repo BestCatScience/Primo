@@ -469,32 +469,32 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
 }
 
 public struct PaintDocumentPresentation: Equatable, Sendable {
-    public var canvasSize: CGSize
-    public var activeLayerIndex: Int
-    public var layerRows: [LayerRowModel]
-    public var layerSidebarRows: [LayerSidebarRowModel]
-    public var validatedLayerPresentation: ValidatedLayerPresentation?
+    public let geometry: PixelGeometry
+    public let layerPresentation: ValidatedLayerPresentation
     public var renderSnapshot: MetalDocumentSnapshot?
     public var revision: DocumentRevision
 
-    public init(
-        canvasSize: CGSize,
-        activeLayerIndex: Int,
-        layerRows: [LayerRowModel],
-        layerSidebarRows: [LayerSidebarRowModel],
-        renderSnapshot: MetalDocumentSnapshot?
-    ) {
-        self.init(
-            canvasSize: canvasSize,
-            activeLayerIndex: activeLayerIndex,
-            layerRows: layerRows,
-            layerSidebarRows: layerSidebarRows,
-            renderSnapshot: renderSnapshot,
-            revision: .initial
-        )
+    public var canvasSize: CGSize {
+        CGSize(width: geometry.width, height: geometry.height)
     }
 
-    public init(
+    public var activeLayerIndex: Int {
+        layerPresentation.activeLayerIndex.rawValue
+    }
+
+    public var layerRows: [LayerRowModel] {
+        layerPresentation.layerRows
+    }
+
+    public var layerSidebarRows: [LayerSidebarRowModel] {
+        layerPresentation.layerSidebarRows
+    }
+
+    public var validatedLayerPresentation: ValidatedLayerPresentation? {
+        layerPresentation
+    }
+
+    package init?(
         canvasSize: CGSize,
         activeLayerIndex: Int,
         layerRows: [LayerRowModel],
@@ -502,30 +502,30 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
         renderSnapshot: MetalDocumentSnapshot?,
         revision: DocumentRevision
     ) {
-        self.canvasSize = canvasSize
-        self.activeLayerIndex = activeLayerIndex
-        self.layerRows = layerRows
-        self.layerSidebarRows = layerSidebarRows
-        self.validatedLayerPresentation = ValidatedLayerPresentation(
+        self.init(
+            validatingCanvasSize: canvasSize,
+            activeLayerIndex: activeLayerIndex,
             layerRows: layerRows,
             layerSidebarRows: layerSidebarRows,
-            activeLayerIndex: activeLayerIndex
+            renderSnapshot: renderSnapshot,
+            revision: revision
         )
-        self.renderSnapshot = renderSnapshot
-        self.revision = revision
     }
 
-    public init(
+    public init?(
         geometry: PixelGeometry,
         layerPresentation: ValidatedLayerPresentation,
         renderSnapshot: MetalDocumentSnapshot?,
         revision: DocumentRevision = .initial
     ) {
-        self.canvasSize = CGSize(width: geometry.width, height: geometry.height)
-        self.activeLayerIndex = layerPresentation.activeLayerIndex.rawValue
-        self.layerRows = layerPresentation.layerRows
-        self.layerSidebarRows = layerPresentation.layerSidebarRows
-        self.validatedLayerPresentation = layerPresentation
+        if let renderSnapshot {
+            guard renderSnapshot.width == geometry.width,
+                  renderSnapshot.height == geometry.height else {
+                return nil
+            }
+        }
+        self.geometry = geometry
+        self.layerPresentation = layerPresentation
         self.renderSnapshot = renderSnapshot
         self.revision = revision
     }
@@ -554,12 +554,15 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
                 return nil
             }
         }
-        self.init(
+        guard let presentation = Self(
             geometry: geometry,
             layerPresentation: layerPresentation,
             renderSnapshot: renderSnapshot,
             revision: revision
-        )
+        ) else {
+            return nil
+        }
+        self = presentation
     }
 
     private static func validatingDimension(_ value: CGFloat) -> Int? {

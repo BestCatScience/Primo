@@ -91,17 +91,19 @@ public struct CanvasEditingWorkflowService: Sendable {
         )
 
         if context.selection == nil,
-           var textLayer = context.activeTextLayer {
-            textLayer.position = CGPoint(
-                x: textLayer.position.x + translation.width,
-                y: textLayer.position.y + translation.height
-            )
-            textLayer.scale = min(
-                max(textLayer.scale * Double((context.transformPreviewScaleX + context.transformPreviewScaleY) * 0.5), 0.2),
-                6.0
-            )
-            textLayer.rotationDegrees += context.transformPreviewRotationDegrees
-            switch documentContentService.setTextLayer(context.activeLayerIndex, textLayer) {
+           let textLayer = context.activeTextLayer {
+            guard let scaleFactor = PositiveFiniteDouble(Double((context.transformPreviewScaleX + context.transformPreviewScaleY) * 0.5)),
+                  let rotationDeltaDegrees = FiniteDouble(context.transformPreviewRotationDegrees) else {
+                return .resetTransformPreview
+            }
+            guard let transformedTextLayer = textLayer.transformed(
+                translation: translation,
+                scaleFactor: scaleFactor,
+                rotationDeltaDegrees: rotationDeltaDegrees
+            ) else {
+                return .resetTransformPreview
+            }
+            switch documentContentService.setTextLayer(context.activeLayerIndex, transformedTextLayer) {
             case .success:
                 return .appliedTextTransform
             case let .failure(failure):

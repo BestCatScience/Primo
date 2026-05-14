@@ -844,7 +844,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             layerSidebarRows: buildSidebarRows(),
             renderSnapshot: nil,
             revision: DocumentRevision(store.snapshot.revision)
-        )
+        )!
     }
 
     func presentation() -> PaintDocumentPresentation {
@@ -855,7 +855,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             layerSidebarRows: buildSidebarRows(),
             renderSnapshot: makeRenderSnapshot(),
             revision: DocumentRevision(store.snapshot.revision)
-        )
+        )!
     }
 
     func prewarmDrawingResources() {

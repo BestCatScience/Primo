@@ -189,13 +189,18 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
 }
 
 private func queryGateway(activeLayerIndex: Int, layerCount: Int) -> DocumentQueryGateway {
+    var indices = Array(0..<layerCount)
+    if !indices.contains(activeLayerIndex) {
+        indices.append(activeLayerIndex)
+    }
+    let rows = indices.map(layerRow)
     let presentation = PaintDocumentPresentation(
-        canvasSize: CGSize(width: 64, height: 64),
+        validatingCanvasSize: CGSize(width: 64, height: 64),
         activeLayerIndex: activeLayerIndex,
-        layerRows: (0..<layerCount).map(layerRow),
-        layerSidebarRows: [],
+        layerRows: rows,
+        layerSidebarRows: rows.map { .layer($0, depth: 0) },
         renderSnapshot: nil
-    )
+    )!
     return DocumentQueryGateway(
         lightweightPresentation: { presentation },
         presentation: { presentation }

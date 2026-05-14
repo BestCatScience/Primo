@@ -769,7 +769,7 @@ struct BrushPaletteFeature {
                 let trimmed = state.text.content.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return .none }
                 guard let position = state.text.position else { return .none }
-                let draft = TextLayerDraft(
+                guard let draft = TextLayerDraft(
                     targetLayerIndex: state.text.targetLayerIndex,
                     text: trimmed,
                     position: position,
@@ -778,7 +778,7 @@ struct BrushPaletteFeature {
                     fontSize: state.text.fontSize,
                     scale: state.text.scale,
                     rotationDegrees: state.text.rotationDegrees
-                )
+                ) else { return .none }
                 return .send(.delegate(.applyText(draft)))
 
             case .saveCurrentBrushButtonTapped:

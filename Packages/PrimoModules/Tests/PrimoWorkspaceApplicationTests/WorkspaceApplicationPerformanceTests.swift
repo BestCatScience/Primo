@@ -29,7 +29,13 @@ final class WorkspaceApplicationPerformanceTests: XCTestCase {
                 saveProject: { _, _ in },
                 loadProject: { _ in
                     LoadedPaintProject(
-                        presentation: PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil),
+                        presentation: PaintDocumentPresentation(
+                            validatingCanvasSize: CGSize(width: 1, height: 1),
+                            activeLayerIndex: 0,
+                            layerRows: [layerRow(index: 0)],
+                            layerSidebarRows: [.layer(layerRow(index: 0), depth: 0)],
+                            renderSnapshot: nil
+                        )!,
                         paperStyle: .default
                     )
                 },
@@ -86,4 +92,21 @@ final class WorkspaceApplicationPerformanceTests: XCTestCase {
             }
         }
     }
+}
+
+private func layerRow(index: Int) -> LayerRowModel {
+    LayerRowModel(
+        validatingIndex: index,
+        name: "Layer \(index)",
+        visible: true,
+        opacity: UnitInterval(1)!,
+        isLocked: false,
+        isAlphaLocked: false,
+        isClipped: false,
+        blendMode: .normal,
+        folderID: nil,
+        hasMask: false,
+        isTextLayer: false,
+        textLayer: nil
+    )!
 }

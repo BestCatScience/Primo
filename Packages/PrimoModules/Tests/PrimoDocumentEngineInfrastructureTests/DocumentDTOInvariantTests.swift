@@ -80,6 +80,40 @@ struct DocumentDTOInvariantTests {
     }
 
     @Test
+    func textLayerDraftRejectsInvalidTextAndScalars() {
+        #expect(TextLayerDraft(
+            targetLayerIndex: nil,
+            text: "Caption",
+            position: CGPoint(x: 1, y: 2),
+            fontPostScriptName: nil,
+            fontDisplayName: nil,
+            fontSize: 24,
+            scale: 1,
+            rotationDegrees: 0
+        ) != nil)
+        #expect(TextLayerDraft(
+            targetLayerIndex: nil,
+            text: String(repeating: "a", count: TextContent.maxLength + 1),
+            position: CGPoint(x: 1, y: 2),
+            fontPostScriptName: nil,
+            fontDisplayName: nil,
+            fontSize: 24,
+            scale: 1,
+            rotationDegrees: 0
+        ) == nil)
+        #expect(TextLayerDraft(
+            targetLayerIndex: nil,
+            text: "Caption",
+            position: CGPoint(x: CGFloat.infinity, y: 2),
+            fontPostScriptName: nil,
+            fontDisplayName: nil,
+            fontSize: 0,
+            scale: .nan,
+            rotationDegrees: .infinity
+        ) == nil)
+    }
+
+    @Test
     func layerRowRequiresValidatedIndexAndOpacity() throws {
         let halfOpacity = try #require(UnitInterval(0.5))
         let validLayer = try #require(LayerRowModel(
