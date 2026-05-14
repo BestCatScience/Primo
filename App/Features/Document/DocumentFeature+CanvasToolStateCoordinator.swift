@@ -19,8 +19,8 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeSessionCoordinator {
-        let layerCommands: LayerEditingRuntime
-        let strokeInteraction: CanvasStrokeRuntime
+        let layerCommands: any LayerMutationSubmitting
+        let strokeInteraction: any StrokePreviewResolving & StrokePreviewLeasing
 
         func resolveAppendedStrokePreview(
             state: DocumentEditingState,
@@ -147,8 +147,26 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeStateCoordinator {
-        let layerCommands: LayerEditingRuntime
-        let strokeCommands: CanvasStrokeRuntime
+        let layerCommands: any LayerMutationSubmitting
+        let strokeCommands: any StrokeMutationSubmitting
+
+        init(
+            layerCommands: any LayerMutationSubmitting,
+            strokeCommands: any StrokeMutationSubmitting
+        ) {
+            self.layerCommands = layerCommands
+            self.strokeCommands = strokeCommands
+        }
+
+        init(
+            layerCommands: DocumentLayerCommandService,
+            strokeCommands: DocumentStrokeCommandService
+        ) {
+            self.init(
+                layerCommands: DocumentLayerCommandMutationSubmitter(service: layerCommands),
+                strokeCommands: DocumentStrokeCommandMutationSubmitter(service: strokeCommands)
+            )
+        }
 
         func resetPreview(state: inout DocumentEditingState) {
             state.canvas.resetStrokePreview()

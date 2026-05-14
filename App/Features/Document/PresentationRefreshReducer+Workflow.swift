@@ -13,7 +13,7 @@ extension PresentationRefreshReducer {
     }
 
     func startupPresentationBootstrapEffect() -> Effect<Action> {
-        .run { [documentPersistenceGateway, documentPresentationReader, processEnvironmentClient] send in
+        .run { [presentationWorkflowAccess, documentPresentationReader, processEnvironmentClient] send in
             let startupClock = ContinuousClock()
             let bootstrapStart = startupClock.now
 
@@ -30,7 +30,7 @@ extension PresentationRefreshReducer {
                 processEnvironmentClient: processEnvironmentClient
             )
             await send(.bootstrapPresentationLoaded(lightweightPresentation))
-            documentPersistenceGateway.prewarmDrawingResources()
+            presentationWorkflowAccess.prewarmDrawingResources()
             await send(.deferredPresentationLoadRequested)
         }
     }
@@ -70,8 +70,8 @@ extension PresentationRefreshReducer {
     }
 
     func synchronizePaperStyleEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
-        .run { [documentPersistenceGateway] _ in
-            documentPersistenceGateway.setPaperStyle(paperStyle)
+        .run { [presentationWorkflowAccess] _ in
+            presentationWorkflowAccess.setPaperStyle(paperStyle)
         }
     }
 

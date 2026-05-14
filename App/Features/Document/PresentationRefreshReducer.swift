@@ -11,23 +11,19 @@ struct PresentationRefreshReducer: Reducer {
     typealias State = DocumentEditingState
     typealias WorkspaceDocumentSnapshot = DocumentFeature.WorkspaceDocumentSnapshot
 
-    @Dependency(\.presentationRefreshEnvironment) var presentationRefreshEnvironment
+    @Dependency(\.presentationWorkflowAccess) var presentationWorkflowAccess
     @Dependency(\.processEnvironmentClient) var processEnvironmentClient
 
     var documentExportGateway: DocumentExportGateway {
-        presentationRefreshEnvironment.exportGateway
+        presentationWorkflowAccess.exportGateway
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        presentationRefreshEnvironment.renderingWorkflow
-    }
-
-    var documentPersistenceGateway: DocumentPersistenceGateway {
-        presentationRefreshEnvironment.persistenceGateway
+        presentationWorkflowAccess.renderingWorkflow
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        presentationRefreshEnvironment.presentationReader
+        presentationWorkflowAccess.presentationReader
     }
 
     enum Action: Equatable {

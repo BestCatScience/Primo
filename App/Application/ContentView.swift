@@ -12,9 +12,9 @@ import UIKit
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Dependency(\.mainQueueClient) private var mainQueueClient
-    @Dependency(\.presentationRefreshEnvironment) var presentationRefreshEnvironment
+    @Dependency(\.presentationWorkflowAccess) var presentationWorkflowAccess
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        presentationRefreshEnvironment.renderingWorkflow
+        presentationWorkflowAccess.renderingWorkflow
     }
     enum AIImageFocusedField: Hashable {
         case prompt

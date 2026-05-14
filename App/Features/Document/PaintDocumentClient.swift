@@ -1,9 +1,13 @@
 import ComposableArchitecture
+import CoreGraphics
 import Foundation
+import PrimoBrushRuntimeContracts
 import PrimoCanvasPresentationDomain
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
@@ -27,24 +31,61 @@ private enum DocumentApplicationEnvironmentKey: DependencyKey {
     }
 }
 
-struct SelectionWorkflowEnvironment: Sendable {
-    let workflow: LayerEditingRuntime
+protocol PresentationReadable: Sendable {
+    func lightweightPresentation() -> PaintDocumentPresentation
+    func presentation() -> PaintDocumentPresentation
+}
 
-    init(workflow: LayerEditingRuntime) {
-        self.workflow = workflow
+protocol DirtyRefreshRequesting: Sendable {
+    func setPaperStyle(_ paperStyle: CanvasPaperStyle)
+    func prewarmDrawingResources()
+}
+
+protocol WorkspaceSnapshotRendering: Sendable {
+    var exportGateway: DocumentExportGateway { get }
+    var renderingWorkflow: DocumentRenderingWorkflow { get }
+}
+
+typealias PresentationWorkflowAccess = PresentationReadable & DirtyRefreshRequesting & WorkspaceSnapshotRendering
+
+struct DocumentPresentationWorkflowAccess: PresentationWorkflowAccess {
+    private let presentationRuntime: DocumentPresentationRuntime
+    private let persistenceRuntime: DocumentPersistenceRuntime
+    private let exportRuntime: DocumentExportRuntime
+
+    init(
+        presentationRuntime: DocumentPresentationRuntime,
+        persistenceRuntime: DocumentPersistenceRuntime,
+        exportRuntime: DocumentExportRuntime
+    ) {
+        self.presentationRuntime = presentationRuntime
+        self.persistenceRuntime = persistenceRuntime
+        self.exportRuntime = exportRuntime
     }
-}
 
-struct DocumentPresentationCapability: Sendable {
-    let presentationRuntime: DocumentPresentationRuntime
-    let persistenceRuntime: DocumentPersistenceRuntime
-    let exportRuntime: DocumentExportRuntime
-}
+    func lightweightPresentation() -> PaintDocumentPresentation {
+        presentationRuntime.lightweightPresentation()
+    }
 
-struct PresentationRefreshEnvironment: Sendable {
-    let presentationRuntime: DocumentPresentationRuntime
-    let persistenceRuntime: DocumentPersistenceRuntime
-    let exportRuntime: DocumentExportRuntime
+    func presentation() -> PaintDocumentPresentation {
+        presentationRuntime.presentation()
+    }
+
+    func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+        persistenceRuntime.setPaperStyle(paperStyle)
+    }
+
+    func prewarmDrawingResources() {
+        persistenceRuntime.prewarmDrawingResources()
+    }
+
+    var exportGateway: DocumentExportGateway {
+        exportRuntime.gateway
+    }
+
+    var renderingWorkflow: DocumentRenderingWorkflow {
+        presentationRuntime.renderingWorkflow
+    }
 }
 
 struct DocumentCanvasMutationCapability: Sendable {
@@ -64,20 +105,170 @@ struct LayerWorkflowEnvironment: Sendable {
     let strokeRuntime: CanvasStrokeRuntime
 }
 
-struct DocumentStrokeCapability: Sendable {
-    let strokeRuntime: CanvasStrokeRuntime
-    let layerEditingRuntime: LayerEditingRuntime
-    let presentationRuntime: DocumentPresentationRuntime
-    let persistenceRuntime: DocumentPersistenceRuntime
-    let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
+protocol StrokePreviewLeasing: Sendable {
+    func cancel() -> GpuStrokeSessionOutcome
+    func discardPreviewLease(_ lease: StrokePreviewLease)
+    func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease
 }
 
-struct CanvasStrokeEnvironment: Sendable {
-    let strokeRuntime: CanvasStrokeRuntime
-    let layerEditingRuntime: LayerEditingRuntime
-    let presentationRuntime: DocumentPresentationRuntime
-    let persistenceRuntime: DocumentPersistenceRuntime
-    let selectionWorkflowEnvironment: SelectionWorkflowEnvironment
+protocol StrokePreviewResolving: Sendable {
+    func beginPreview(
+        sample: StylusSample,
+        baseSnapshot: MetalDocumentSnapshot?,
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome
+
+    func appendPreview(
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome
+
+    func finish(
+        renderState: StrokeSessionRenderState?,
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        allowsApproximatePreviewCommit: Bool,
+        refreshViaDirtyPresentation: Bool
+    ) -> GpuStrokeSessionOutcome
+}
+
+protocol StrokeMutationSubmitting: Sendable {
+    func cancelStroke()
+    func blurStroke(
+        _ samples: [StylusSample],
+        _ brush: BrushRuntimeSettings,
+        _ layerIndex: Int,
+        _ clearSelectionAfterBlur: Bool
+    ) -> DocumentMutationResult
+    func endBlurStroke() -> DocumentMutationResult
+    func cancelBlurStroke()
+    func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
+}
+
+protocol LayerMutationSubmitting: Sendable {
+    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult
+    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult
+    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+}
+
+protocol LayerContentSubmitting: Sendable {
+    func pixelDataForLayer(_ index: Int) -> Data
+    func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult
+}
+
+protocol CanvasEditingExecuting: Sendable {
+    func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome
+}
+
+protocol SelectionWorkflowRequesting: Sendable {
+    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection?
+    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection?
+    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection?
+    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection?
+    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection?
+    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection?
+    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection?
+    func makeAutoSelection(
+        at point: CGPoint,
+        snapshot: MetalDocumentSnapshot?,
+        layerIndex: Int,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> CanvasSelection?
+    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]?
+}
+
+typealias CanvasStrokeWorkflowAccess =
+    PresentationReadable
+    & DirtyRefreshRequesting
+    & WorkspaceSnapshotRendering
+    & StrokePreviewLeasing
+    & StrokePreviewResolving
+    & StrokeMutationSubmitting
+    & LayerMutationSubmitting
+    & LayerContentSubmitting
+    & CanvasEditingExecuting
+    & SelectionWorkflowRequesting
+    & LayerTransformProcessing
+
+struct DocumentCanvasStrokeWorkflowAccess: CanvasStrokeWorkflowAccess {
+    private let strokeRuntime: CanvasStrokeRuntime
+    private let layerEditingRuntime: LayerEditingRuntime
+    private let presentationAccess: DocumentPresentationWorkflowAccess
+
+    init(
+        strokeRuntime: CanvasStrokeRuntime,
+        layerEditingRuntime: LayerEditingRuntime,
+        presentationAccess: DocumentPresentationWorkflowAccess
+    ) {
+        self.strokeRuntime = strokeRuntime
+        self.layerEditingRuntime = layerEditingRuntime
+        self.presentationAccess = presentationAccess
+    }
+}
+
+extension CanvasStrokeRuntime: StrokePreviewLeasing, StrokePreviewResolving, StrokeMutationSubmitting {}
+
+extension LayerEditingRuntime:
+    LayerMutationSubmitting,
+    LayerContentSubmitting,
+    CanvasEditingExecuting,
+    SelectionWorkflowRequesting
+{}
+
+struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting {
+    let service: DocumentLayerCommandService
+
+    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
+        service.revealLayerForEditing(index)
+    }
+
+    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
+        service.ensureLayerVisible(index)
+    }
+
+    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        service.applyLayerSurfaceMutation(index, payload)
+    }
+}
+
+struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting {
+    let service: DocumentStrokeCommandService
+
+    func cancelStroke() {
+        service.cancelStroke()
+    }
+
+    func blurStroke(
+        _ samples: [StylusSample],
+        _ brush: BrushRuntimeSettings,
+        _ layerIndex: Int,
+        _ clearSelectionAfterBlur: Bool
+    ) -> DocumentMutationResult {
+        service.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+    }
+
+    func endBlurStroke() -> DocumentMutationResult {
+        service.endBlurStroke()
+    }
+
+    func cancelBlurStroke() {
+        service.cancelBlurStroke()
+    }
+
+    func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
+        service.fill(sample, brush)
+    }
 }
 
 struct DocumentExportCapability: Sendable {
@@ -92,47 +283,15 @@ struct DocumentPreviewRenderingCapability: Sendable {
     let previewRuntime: CanvasPreviewRuntime
 }
 
-extension DocumentPresentationCapability {
+extension PresentationReadable {
     var presentationReader: DocumentPresentationReader {
         DocumentPresentationReader(
-            lightweightPresentation: presentationRuntime.lightweightPresentation,
-            presentation: presentationRuntime.presentation
+            lightweightPresentation: lightweightPresentation,
+            presentation: presentation
         )
-    }
-
-    var persistenceGateway: DocumentPersistenceGateway {
-        persistenceRuntime.gateway
-    }
-
-    var exportGateway: DocumentExportGateway {
-        exportRuntime.gateway
-    }
-
-    var renderingWorkflow: DocumentRenderingWorkflow {
-        presentationRuntime.renderingWorkflow
     }
 }
 
-extension PresentationRefreshEnvironment {
-    var presentationReader: DocumentPresentationReader {
-        DocumentPresentationReader(
-            lightweightPresentation: presentationRuntime.lightweightPresentation,
-            presentation: presentationRuntime.presentation
-        )
-    }
-
-    var persistenceGateway: DocumentPersistenceGateway {
-        persistenceRuntime.gateway
-    }
-
-    var exportGateway: DocumentExportGateway {
-        exportRuntime.gateway
-    }
-
-    var renderingWorkflow: DocumentRenderingWorkflow {
-        presentationRuntime.renderingWorkflow
-    }
-}
 
 extension DocumentCanvasMutationCapability {
     var canvasCommandService: CanvasMutationRuntime {
@@ -221,85 +380,262 @@ extension LayerWorkflowEnvironment {
     }
 }
 
-extension DocumentStrokeCapability {
-    var canvasStrokeInteractionService: CanvasStrokeRuntime {
-        strokeRuntime
+extension DocumentCanvasStrokeWorkflowAccess {
+    func lightweightPresentation() -> PaintDocumentPresentation {
+        presentationAccess.lightweightPresentation()
+    }
+
+    func presentation() -> PaintDocumentPresentation {
+        presentationAccess.presentation()
+    }
+
+    func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+        presentationAccess.setPaperStyle(paperStyle)
+    }
+
+    func prewarmDrawingResources() {
+        presentationAccess.prewarmDrawingResources()
+    }
+
+    var exportGateway: DocumentExportGateway {
+        presentationAccess.exportGateway
     }
 
     var renderingWorkflow: DocumentRenderingWorkflow {
-        presentationRuntime.renderingWorkflow
+        presentationAccess.renderingWorkflow
     }
 
-    var layerCommandService: LayerEditingRuntime {
-        layerEditingRuntime
+    func cancel() -> GpuStrokeSessionOutcome {
+        strokeRuntime.cancel()
     }
 
-    var strokeCommandService: CanvasStrokeRuntime {
-        strokeRuntime
+    func discardPreviewLease(_ lease: StrokePreviewLease) {
+        strokeRuntime.discardPreviewLease(lease)
     }
 
-    var persistenceGateway: DocumentPersistenceGateway {
-        persistenceRuntime.gateway
+    func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease {
+        strokeRuntime.previewLease(for: mutation)
     }
 
-    var presentationReader: DocumentPresentationReader {
-        DocumentPresentationReader(
-            lightweightPresentation: presentationRuntime.lightweightPresentation,
-            presentation: presentationRuntime.presentation
+    func beginPreview(
+        sample: StylusSample,
+        baseSnapshot: MetalDocumentSnapshot?,
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.beginPreview(
+            sample: sample,
+            baseSnapshot: baseSnapshot,
+            context: context,
+            usesResponsivePreview: usesResponsivePreview
         )
     }
 
-    var canvasEditingWorkflowService: LayerEditingRuntime {
-        layerEditingRuntime
-    }
-
-    var contentService: LayerEditingRuntime {
-        layerEditingRuntime
-    }
-
-    var layerTransformProcessor: LayerEditingRuntime {
-        layerEditingRuntime
-    }
-}
-
-extension CanvasStrokeEnvironment {
-    var canvasStrokeInteractionService: CanvasStrokeRuntime {
-        strokeRuntime
-    }
-
-    var renderingWorkflow: DocumentRenderingWorkflow {
-        presentationRuntime.renderingWorkflow
-    }
-
-    var layerCommandService: LayerEditingRuntime {
-        layerEditingRuntime
-    }
-
-    var strokeCommandService: CanvasStrokeRuntime {
-        strokeRuntime
-    }
-
-    var persistenceGateway: DocumentPersistenceGateway {
-        persistenceRuntime.gateway
-    }
-
-    var presentationReader: DocumentPresentationReader {
-        DocumentPresentationReader(
-            lightweightPresentation: presentationRuntime.lightweightPresentation,
-            presentation: presentationRuntime.presentation
+    func appendPreview(
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.appendPreview(
+            baseSnapshot: baseSnapshot,
+            renderSnapshot: renderSnapshot,
+            renderState: renderState,
+            samples: samples,
+            fullSamples: fullSamples,
+            context: context,
+            usesResponsivePreview: usesResponsivePreview
         )
     }
 
-    var canvasEditingWorkflowService: LayerEditingRuntime {
-        layerEditingRuntime
+    func finish(
+        renderState: StrokeSessionRenderState?,
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        allowsApproximatePreviewCommit: Bool,
+        refreshViaDirtyPresentation: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.finish(
+            renderState: renderState,
+            baseSnapshot: baseSnapshot,
+            renderSnapshot: renderSnapshot,
+            samples: samples,
+            context: context,
+            allowsApproximatePreviewCommit: allowsApproximatePreviewCommit,
+            refreshViaDirtyPresentation: refreshViaDirtyPresentation
+        )
     }
 
-    var contentService: LayerEditingRuntime {
-        layerEditingRuntime
+    func cancelStroke() {
+        strokeRuntime.cancelStroke()
     }
 
-    var layerTransformProcessor: LayerEditingRuntime {
-        layerEditingRuntime
+    func blurStroke(
+        _ samples: [StylusSample],
+        _ brush: BrushRuntimeSettings,
+        _ layerIndex: Int,
+        _ clearSelectionAfterBlur: Bool
+    ) -> DocumentMutationResult {
+        strokeRuntime.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+    }
+
+    func endBlurStroke() -> DocumentMutationResult {
+        strokeRuntime.endBlurStroke()
+    }
+
+    func cancelBlurStroke() {
+        strokeRuntime.cancelBlurStroke()
+    }
+
+    func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
+        strokeRuntime.fill(sample, brush)
+    }
+
+    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
+        layerEditingRuntime.revealLayerForEditing(index)
+    }
+
+    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
+        layerEditingRuntime.ensureLayerVisible(index)
+    }
+
+    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        layerEditingRuntime.applyLayerSurfaceMutation(index, payload)
+    }
+
+    func pixelDataForLayer(_ index: Int) -> Data {
+        layerEditingRuntime.pixelDataForLayer(index)
+    }
+
+    func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult {
+        layerEditingRuntime.replaceLayerPixels(index, pixelData)
+    }
+
+    func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome {
+        layerEditingRuntime.execute(command, state: context)
+    }
+
+    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? {
+        layerEditingRuntime.invertedSelection(selection, canvasSize: canvasSize, mode: mode)
+    }
+
+    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? {
+        layerEditingRuntime.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted)
+    }
+
+    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? {
+        layerEditingRuntime.featheredSelection(selection, canvasSize: canvasSize, radius: radius)
+    }
+
+    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? {
+        layerEditingRuntime.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode)
+    }
+
+    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? {
+        layerEditingRuntime.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize)
+    }
+
+    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? {
+        layerEditingRuntime.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize)
+    }
+
+    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
+        layerEditingRuntime.makeLassoSelection(from: points, canvasSize: canvasSize)
+    }
+
+    func makeAutoSelection(
+        at point: CGPoint,
+        snapshot: MetalDocumentSnapshot?,
+        layerIndex: Int,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> CanvasSelection? {
+        layerEditingRuntime.makeAutoSelection(
+            at: point,
+            snapshot: snapshot,
+            layerIndex: layerIndex,
+            thresholdMode: thresholdMode,
+            opacityTolerance: opacityTolerance,
+            colorTolerance: colorTolerance,
+            expansion: expansion
+        )
+    }
+
+    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+        layerEditingRuntime.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    }
+
+    func transformedLayerPixels(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        layerEditingRuntime.transformedLayerPixels(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            selection: selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets
+        )
+    }
+
+    func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        layerEditingRuntime.transformedSelection(
+            selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets,
+            canvasSize: canvasSize
+        )
+    }
+
+    func transformationBounds(
+        selection: CanvasSelection?,
+        pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> CGRect? {
+        layerEditingRuntime.transformationBounds(
+            selection: selection,
+            pixelData: pixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
     }
 }
 
@@ -452,29 +788,22 @@ extension DocumentPreviewRenderingCapability {
 }
 
 struct DocumentApplicationEnvironment: Sendable {
-    let presentationCapability: DocumentPresentationCapability
-    let presentationRefreshEnvironment: PresentationRefreshEnvironment
+    let presentationWorkflowAccess: any PresentationWorkflowAccess
     let canvasMutationCapability: DocumentCanvasMutationCapability
     let layerMutationCapability: DocumentLayerMutationCapability
     let layerWorkflowEnvironment: LayerWorkflowEnvironment
-    let strokeCapability: DocumentStrokeCapability
-    let canvasStrokeEnvironment: CanvasStrokeEnvironment
+    let canvasStrokeWorkflowAccess: any CanvasStrokeWorkflowAccess
     let exportCapability: DocumentExportCapability
     let persistenceCapability: DocumentPersistenceCapability
     let previewRenderingCapability: DocumentPreviewRenderingCapability
 
     init(runtime: DocumentApplicationRuntime) {
-        let selectionWorkflowEnvironment = SelectionWorkflowEnvironment(workflow: runtime.layerEditing)
-        self.presentationCapability = DocumentPresentationCapability(
+        let presentationWorkflowAccess = DocumentPresentationWorkflowAccess(
             presentationRuntime: runtime.presentation,
             persistenceRuntime: runtime.persistence,
             exportRuntime: runtime.export
         )
-        self.presentationRefreshEnvironment = PresentationRefreshEnvironment(
-            presentationRuntime: runtime.presentation,
-            persistenceRuntime: runtime.persistence,
-            exportRuntime: runtime.export
-        )
+        self.presentationWorkflowAccess = presentationWorkflowAccess
         self.canvasMutationCapability = DocumentCanvasMutationCapability(
             canvasMutationRuntime: runtime.canvasMutation,
             presentationRuntime: runtime.presentation,
@@ -489,19 +818,10 @@ struct DocumentApplicationEnvironment: Sendable {
             presentationRuntime: runtime.presentation,
             strokeRuntime: runtime.stroke
         )
-        self.strokeCapability = DocumentStrokeCapability(
+        self.canvasStrokeWorkflowAccess = DocumentCanvasStrokeWorkflowAccess(
             strokeRuntime: runtime.stroke,
             layerEditingRuntime: runtime.layerEditing,
-            presentationRuntime: runtime.presentation,
-            persistenceRuntime: runtime.persistence,
-            selectionWorkflowEnvironment: selectionWorkflowEnvironment
-        )
-        self.canvasStrokeEnvironment = CanvasStrokeEnvironment(
-            strokeRuntime: runtime.stroke,
-            layerEditingRuntime: runtime.layerEditing,
-            presentationRuntime: runtime.presentation,
-            persistenceRuntime: runtime.persistence,
-            selectionWorkflowEnvironment: selectionWorkflowEnvironment
+            presentationAccess: presentationWorkflowAccess
         )
         self.exportCapability = DocumentExportCapability(exportRuntime: runtime.export)
         self.persistenceCapability = DocumentPersistenceCapability(persistenceRuntime: runtime.persistence)
@@ -519,12 +839,8 @@ extension DependencyValues {
         set { self[DocumentApplicationEnvironmentKey.self] = newValue }
     }
 
-    var documentPresentationCapability: DocumentPresentationCapability {
-        documentApplicationEnvironment.presentationCapability
-    }
-
-    var presentationRefreshEnvironment: PresentationRefreshEnvironment {
-        documentApplicationEnvironment.presentationRefreshEnvironment
+    var presentationWorkflowAccess: any PresentationWorkflowAccess {
+        documentApplicationEnvironment.presentationWorkflowAccess
     }
 
     var documentCanvasMutationCapability: DocumentCanvasMutationCapability {
@@ -539,12 +855,8 @@ extension DependencyValues {
         documentApplicationEnvironment.layerWorkflowEnvironment
     }
 
-    var documentStrokeCapability: DocumentStrokeCapability {
-        documentApplicationEnvironment.strokeCapability
-    }
-
-    var canvasStrokeEnvironment: CanvasStrokeEnvironment {
-        documentApplicationEnvironment.canvasStrokeEnvironment
+    var canvasStrokeWorkflowAccess: any CanvasStrokeWorkflowAccess {
+        documentApplicationEnvironment.canvasStrokeWorkflowAccess
     }
 
     var documentExportCapability: DocumentExportCapability {

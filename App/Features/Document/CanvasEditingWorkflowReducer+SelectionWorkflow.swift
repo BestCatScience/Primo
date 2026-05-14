@@ -7,10 +7,6 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 
 extension CanvasEditingWorkflowReducer {
-    var selectionWorkflowService: LayerEditingRuntime {
-        selectionWorkflowEnvironment.workflow
-    }
-
     func handleInvertSelection(state: inout State) {
         state.canvas.replaceSelection(
             selectionWorkflowService.invertedSelection(

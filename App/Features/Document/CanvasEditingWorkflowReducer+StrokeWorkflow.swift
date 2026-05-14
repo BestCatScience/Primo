@@ -11,8 +11,8 @@ import PrimoDocumentStrokeApplication
 
 extension CanvasEditingWorkflowReducer {
     func synchronizePaperStyleEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
-        .run { [documentPersistenceGateway] _ in
-            documentPersistenceGateway.setPaperStyle(paperStyle)
+        .run { [canvasStrokeWorkflowAccess] _ in
+            canvasStrokeWorkflowAccess.setPaperStyle(paperStyle)
         }
     }
 
@@ -259,10 +259,9 @@ extension CanvasEditingWorkflowReducer {
     }
 
     var documentCanvasStrokeSessionCoordinator: DocumentFeature.CanvasStrokeSessionCoordinator {
-        let strokeInteraction = canvasStrokeInteractionService
         return DocumentFeature.CanvasStrokeSessionCoordinator(
             layerCommands: documentLayerCommandService,
-            strokeInteraction: strokeInteraction
+            strokeInteraction: canvasStrokeInteractionService
         )
     }
 

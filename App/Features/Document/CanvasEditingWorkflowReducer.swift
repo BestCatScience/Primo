@@ -18,46 +18,42 @@ struct CanvasEditingWorkflowReducer: Reducer {
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
     typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
 
-    @Dependency(\.canvasStrokeEnvironment) var canvasStrokeEnvironment
+    @Dependency(\.canvasStrokeWorkflowAccess) var canvasStrokeWorkflowAccess
 
-    var canvasStrokeInteractionService: CanvasStrokeRuntime {
-        canvasStrokeEnvironment.canvasStrokeInteractionService
+    var canvasStrokeInteractionService: any StrokePreviewLeasing & StrokePreviewResolving {
+        canvasStrokeWorkflowAccess
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        canvasStrokeEnvironment.renderingWorkflow
+        canvasStrokeWorkflowAccess.renderingWorkflow
     }
 
-    var documentLayerCommandService: LayerEditingRuntime {
-        canvasStrokeEnvironment.layerCommandService
-    }
-
-    var documentPersistenceGateway: DocumentPersistenceGateway {
-        canvasStrokeEnvironment.persistenceGateway
+    var documentLayerCommandService: any LayerMutationSubmitting {
+        canvasStrokeWorkflowAccess
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        canvasStrokeEnvironment.presentationReader
+        canvasStrokeWorkflowAccess.presentationReader
     }
 
-    var documentStrokeCommandService: CanvasStrokeRuntime {
-        canvasStrokeEnvironment.strokeCommandService
+    var documentStrokeCommandService: any StrokeMutationSubmitting {
+        canvasStrokeWorkflowAccess
     }
 
-    var canvasEditingWorkflowService: LayerEditingRuntime {
-        canvasStrokeEnvironment.canvasEditingWorkflowService
+    var canvasEditingWorkflowService: any CanvasEditingExecuting {
+        canvasStrokeWorkflowAccess
     }
 
-    var documentContentService: LayerEditingRuntime {
-        canvasStrokeEnvironment.contentService
+    var documentContentService: any LayerContentSubmitting {
+        canvasStrokeWorkflowAccess
     }
 
-    var layerTransformProcessor: LayerEditingRuntime {
-        canvasStrokeEnvironment.layerTransformProcessor
+    var layerTransformProcessor: any LayerTransformProcessing {
+        canvasStrokeWorkflowAccess
     }
 
-    var selectionWorkflowEnvironment: SelectionWorkflowEnvironment {
-        canvasStrokeEnvironment.selectionWorkflowEnvironment
+    var selectionWorkflowService: any SelectionWorkflowRequesting {
+        canvasStrokeWorkflowAccess
     }
 
     enum EditingAction: Equatable {
