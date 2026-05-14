@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentInfrastructure
 import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
 import Testing
@@ -157,6 +158,65 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func lockedRuntimeExecutorSerializesConcurrentSynchronousAccess() async {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<1_000 {
+                group.addTask {
+                    executor.perform { runtime in
+                        let nextValue = runtime.value + 1
+                        runtime.value = nextValue
+                    }
+                }
+            }
+        }
+
+        #expect(executor.perform { $0.value } == 1_000)
+    }
+
+    @Test
+    func lockedRuntimeExecutorReplacementUsesSameSynchronousBoundary() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+
+        executor.replaceRuntime(with: RuntimeCounter(value: 42))
+
+        #expect(executor.perform { $0.value } == 42)
+    }
+
+    @Test
+    func liveGatewayKeepsGpuWorkBetweenRuntimeLockSections() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+        let body = try String(contentsOf: factoryURL, encoding: .utf8)
+        let gpuOperations = [
+            "plan.gpuServices.processLayer(",
+            "plan.gpuServices.fillPixels(",
+            "plan.gpuServices.commitStrokeMutation(",
+            "plan.gpuServices.blurPixels("
+        ]
+
+        for operation in gpuOperations {
+            #expect(body.contains(operation), "DocumentEngineLive should keep \(operation) visible outside runtime executor bodies")
+        }
+        #expect(body.contains("let planResult = runtimeExecutor.perform { $0.makeLayerProcessingPlan"))
+        #expect(body.contains("return runtimeExecutor.perform { $0.applyLayerProcessingPlan"))
+        #expect(body.contains("let planResult = runtimeExecutor.perform { $0.makeFillPlan"))
+        #expect(body.contains("return runtimeExecutor.perform { $0.applyFillPlan"))
+        #expect(body.contains("let planResult = runtimeExecutor.perform {\n            $0.makeStrokeCommitPlan"))
+        #expect(body.contains("return runtimeExecutor.perform { $0.applyStrokeCommitPlan"))
+        #expect(body.contains("let planResult = runtimeExecutor.perform {\n            $0.makeBlurPlan"))
+        #expect(body.contains("return runtimeExecutor.perform { $0.applyBlurPlan"))
+    }
+
+    @Test
     func runtimeFailureMappingPreservesTypedFailures() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -179,5 +239,13 @@ struct DocumentRuntimeCompositionTests {
         #expect(!body.contains("bridgeMutationFailed(\"emptyInput\")"))
         #expect(!body.contains("bridgeMutationFailed(\"noUndoState\")"))
         #expect(!body.contains("bridgeMutationFailed(\"incompatibleLayerType\")"))
+    }
+}
+
+private final class RuntimeCounter {
+    var value: Int
+
+    init(value: Int = 0) {
+        self.value = value
     }
 }

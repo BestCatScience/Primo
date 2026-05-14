@@ -47,6 +47,8 @@
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003D /* PaintDocumentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PaintDocumentClient.swift */; };
+		A00000000000000000000120 /* PaintDocumentValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000122 /* PaintDocumentValidation.swift */; };
+		A00000000000000000000121 /* PaintDocumentDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000123 /* PaintDocumentDependencies.swift */; };
 		A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* BrushPaletteFeature.swift */; };
 		A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* LayerSidebarFeature.swift */; };
 		A00000000000000000000043 /* CanvasFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001B /* CanvasFeature.swift */; };
@@ -243,6 +245,8 @@
 		A00000000000000000000015 /* BrushRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushRuntimeSettings.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PaintDocumentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPresentation.swift; sourceTree = "<group>"; };
 		A00000000000000000000018 /* PaintDocumentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000122 /* PaintDocumentValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentValidation.swift; sourceTree = "<group>"; };
+		A00000000000000000000123 /* PaintDocumentDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentDependencies.swift; sourceTree = "<group>"; };
 		A00000000000000000000019 /* BrushPaletteFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001A /* LayerSidebarFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001B /* CanvasFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeature.swift; sourceTree = "<group>"; };
@@ -597,6 +601,8 @@
 				4D100000000000000000000A /* LayerWorkflowReducer.swift */,
 				1686F75A86724FBA8A0DAAE8 /* LayerWorkflowReducer+Workflow.swift */,
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
+				A00000000000000000000123 /* PaintDocumentDependencies.swift */,
+				A00000000000000000000122 /* PaintDocumentValidation.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				4D1000000000000000000007 /* PresentationRefreshReducer.swift */,
 				A00000000000000000000107 /* PresentationRefreshReducer+Workflow.swift */,
@@ -896,6 +902,8 @@
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				L10000000000000000000001 /* ThirdPartyLicensesView.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
+				A00000000000000000000121 /* PaintDocumentDependencies.swift in Sources */,
+				A00000000000000000000120 /* PaintDocumentValidation.swift in Sources */,
 				A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */,
 				A000000000000000000000B6 /* AIImageClient.swift in Sources */,
 				E70000000000000000000013 /* AIImageFeature.swift in Sources */,

@@ -853,7 +853,7 @@ extension ContentView {
                             Text("\(Int(hsbAdjustmentSettings.hueDegrees.rounded()))°")
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $hsbAdjustmentSettings.hueDegrees, in: -180...180, step: 1)
+                        Slider(value: hsbAdjustmentBinding(\.hueDegrees), in: -180...180, step: 1)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -863,7 +863,7 @@ extension ContentView {
                             Text(String(format: "%.2f", hsbAdjustmentSettings.saturation))
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $hsbAdjustmentSettings.saturation, in: 0...2, step: 0.01)
+                        Slider(value: hsbAdjustmentBinding(\.saturation), in: 0...2, step: 0.01)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -873,7 +873,7 @@ extension ContentView {
                             Text(String(format: "%.2f", hsbAdjustmentSettings.brightness))
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $hsbAdjustmentSettings.brightness, in: -1...1, step: 0.01)
+                        Slider(value: hsbAdjustmentBinding(\.brightness), in: -1...1, step: 0.01)
                     }
                 }
             }
@@ -916,7 +916,7 @@ extension ContentView {
                             Text(String(format: "%.2f", brightnessContrastSettings.brightness))
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $brightnessContrastSettings.brightness, in: -1...1, step: 0.01)
+                        Slider(value: brightnessContrastBinding(\.brightness), in: -1...1, step: 0.01)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -926,7 +926,7 @@ extension ContentView {
                             Text(String(format: "%.2f", brightnessContrastSettings.contrast))
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $brightnessContrastSettings.contrast, in: 0...2, step: 0.01)
+                        Slider(value: brightnessContrastBinding(\.contrast), in: 0...2, step: 0.01)
                     }
                 }
             }
@@ -965,31 +965,31 @@ extension ContentView {
                     adjustmentSlider(
                         title: StudioStrings.inputBlack(language),
                         valueText: String(format: "%.2f", levelsAdjustmentSettings.inputBlack),
-                        value: $levelsAdjustmentSettings.inputBlack,
+                        value: levelsAdjustmentBinding(\.inputBlack),
                         range: 0...0.95
                     )
                     adjustmentSlider(
                         title: StudioStrings.inputWhite(language),
                         valueText: String(format: "%.2f", levelsAdjustmentSettings.inputWhite),
-                        value: $levelsAdjustmentSettings.inputWhite,
+                        value: levelsAdjustmentBinding(\.inputWhite),
                         range: 0.05...1
                     )
                     adjustmentSlider(
                         title: StudioStrings.gamma(language),
                         valueText: String(format: "%.2f", levelsAdjustmentSettings.gamma),
-                        value: $levelsAdjustmentSettings.gamma,
+                        value: levelsAdjustmentBinding(\.gamma),
                         range: 0.2...3
                     )
                     adjustmentSlider(
                         title: StudioStrings.outputBlack(language),
                         valueText: String(format: "%.2f", levelsAdjustmentSettings.outputBlack),
-                        value: $levelsAdjustmentSettings.outputBlack,
+                        value: levelsAdjustmentBinding(\.outputBlack),
                         range: 0...0.95
                     )
                     adjustmentSlider(
                         title: StudioStrings.outputWhite(language),
                         valueText: String(format: "%.2f", levelsAdjustmentSettings.outputWhite),
-                        value: $levelsAdjustmentSettings.outputWhite,
+                        value: levelsAdjustmentBinding(\.outputWhite),
                         range: 0.05...1
                     )
                 }
@@ -2248,13 +2248,57 @@ extension ContentView {
     }
 
     var normalizedLevelsSettings: LevelsAdjustmentSettings {
-        var settings = levelsAdjustmentSettings
-        settings.inputBlack = min(settings.inputBlack, settings.inputWhite - 0.001)
-        settings.inputWhite = max(settings.inputWhite, settings.inputBlack + 0.001)
-        settings.outputBlack = min(settings.outputBlack, settings.outputWhite)
-        settings.outputWhite = max(settings.outputWhite, settings.outputBlack)
-        settings.gamma = max(settings.gamma, 0.01)
-        return settings
+        let inputBlack = min(levelsAdjustmentSettings.inputBlack, levelsAdjustmentSettings.inputWhite - 0.001)
+        let inputWhite = max(levelsAdjustmentSettings.inputWhite, inputBlack + 0.001)
+        let outputBlack = min(levelsAdjustmentSettings.outputBlack, levelsAdjustmentSettings.outputWhite)
+        let outputWhite = max(levelsAdjustmentSettings.outputWhite, outputBlack)
+        return LevelsAdjustmentSettings(
+            inputBlack: inputBlack,
+            inputWhite: inputWhite,
+            gamma: max(levelsAdjustmentSettings.gamma, 0.01),
+            outputBlack: outputBlack,
+            outputWhite: outputWhite
+        )
+    }
+
+    func hsbAdjustmentBinding(_ keyPath: KeyPath<HueSaturationBrightnessSettings, Double>) -> Binding<Double> {
+        Binding(
+            get: { hsbAdjustmentSettings[keyPath: keyPath] },
+            set: { value in
+                hsbAdjustmentSettings = HueSaturationBrightnessSettings(
+                    hueDegrees: keyPath == \.hueDegrees ? value : hsbAdjustmentSettings.hueDegrees,
+                    saturation: keyPath == \.saturation ? value : hsbAdjustmentSettings.saturation,
+                    brightness: keyPath == \.brightness ? value : hsbAdjustmentSettings.brightness
+                )
+            }
+        )
+    }
+
+    func brightnessContrastBinding(_ keyPath: KeyPath<BrightnessContrastSettings, Double>) -> Binding<Double> {
+        Binding(
+            get: { brightnessContrastSettings[keyPath: keyPath] },
+            set: { value in
+                brightnessContrastSettings = BrightnessContrastSettings(
+                    brightness: keyPath == \.brightness ? value : brightnessContrastSettings.brightness,
+                    contrast: keyPath == \.contrast ? value : brightnessContrastSettings.contrast
+                )
+            }
+        )
+    }
+
+    func levelsAdjustmentBinding(_ keyPath: KeyPath<LevelsAdjustmentSettings, Double>) -> Binding<Double> {
+        Binding(
+            get: { levelsAdjustmentSettings[keyPath: keyPath] },
+            set: { value in
+                levelsAdjustmentSettings = LevelsAdjustmentSettings(
+                    inputBlack: keyPath == \.inputBlack ? value : levelsAdjustmentSettings.inputBlack,
+                    inputWhite: keyPath == \.inputWhite ? value : levelsAdjustmentSettings.inputWhite,
+                    gamma: keyPath == \.gamma ? value : levelsAdjustmentSettings.gamma,
+                    outputBlack: keyPath == \.outputBlack ? value : levelsAdjustmentSettings.outputBlack,
+                    outputWhite: keyPath == \.outputWhite ? value : levelsAdjustmentSettings.outputWhite
+                )
+            }
+        )
     }
 
     var canSelectPreviousLayer: Bool {

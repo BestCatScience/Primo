@@ -498,6 +498,43 @@ struct GpuSideEffectIsolationArchitectureTests {
         }
     }
 
+    @Test
+    func architectureSourceParsersIgnoreNonSemanticTokens() {
+        let imports = Self.swiftImports(
+            in: """
+            // import PrimoDocumentEngineInfrastructure
+            let example = "import PrimoDocumentRenderingInfrastructure"
+            @testable import PrimoDocumentRuntime
+            @_exported import PrimoWorkspaceRuntime
+            import struct Foundation.URL
+            import PrimoDocumentApplication
+            """
+        )
+
+        #expect(imports == Set([
+            "PrimoDocumentRuntime",
+            "PrimoWorkspaceRuntime",
+            "Foundation",
+            "PrimoDocumentApplication"
+        ]))
+
+        let products = Self.infrastructureProductNames(
+            in: """
+            // .library(name: "PrimoDocumentEngineInfrastructure", targets: ["Ignored"])
+            let ignored = ".library(name: \\"PrimoWorkspaceInfrastructure\\", targets: [])"
+            products: [
+                .library(
+                    name: "PrimoDocumentRuntime",
+                    targets: ["PrimoDocumentRuntime"]
+                ),
+                .library(name: "PrimoWorkspaceInfrastructure", targets: ["PrimoWorkspaceInfrastructure"]),
+            ]
+            """
+        )
+
+        #expect(products == ["PrimoWorkspaceInfrastructure"])
+    }
+
     #if os(macOS)
         @Test
         func publicRuntimeFacadeSymbolGraphsMatchSnapshots() throws {
@@ -774,11 +811,33 @@ struct GpuSideEffectIsolationArchitectureTests {
     @Test
     func appDocumentDependenciesAreAggregatedThroughRuntimeEnvironment() throws {
         let repoRoot = try Self.repoRoot()
+        let dependencyComposition = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/PaintDocumentDependencies.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let capabilityAccess = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/PaintDocumentClient.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let validation = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/PaintDocumentValidation.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let body = [dependencyComposition, capabilityAccess, validation].joined(separator: "\n")
         let paintDocumentClient = repoRoot.appendingPathComponent(
             "App/Features/Document/PaintDocumentClient.swift",
             isDirectory: false
         )
-        let body = try String(contentsOf: paintDocumentClient, encoding: .utf8)
+        let paintDocumentClientBody = try String(contentsOf: paintDocumentClient, encoding: .utf8)
         let bannedKeys = [
             "DocumentCanvasCommandServiceKey",
             "DocumentLayerCommandServiceKey",
@@ -797,6 +856,9 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(body.contains("protocol SelectionWorkflowRequesting: Sendable"))
         #expect(body.contains("typealias CanvasStrokeWorkflowAccess"))
         #expect(body.contains("private enum DocumentApplicationEnvironmentKey: DependencyKey"))
+        #expect(validation.contains("struct DocumentWorkflowCommandValidator: Sendable"))
+        #expect(!paintDocumentClientBody.contains("struct DocumentWorkflowCommandValidator"))
+        #expect(!paintDocumentClientBody.contains("private enum DocumentApplicationEnvironmentKey"))
         for key in bannedKeys {
             #expect(!body.contains(key), "PaintDocumentClient should derive \(key) from DocumentApplicationEnvironment")
         }
@@ -1105,6 +1167,96 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func rawDocumentGatewaysDoNotExposePublicClosureFields() throws {
+        let repoRoot = try Self.repoRoot()
+        let renderingContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRenderingContracts/DocumentRenderingRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let mutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        let rawRenderingBodies = try [
+            #require(Self.typeBody(named: "DocumentReadGateway", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentRenderGateway", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentDirtyUpdateQueue", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentGpuOperationGateway", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentCanvasPreviewRenderingOperations", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentSelectionMaskOperations", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentLayerTransformOperations", in: renderingContracts)),
+            #require(Self.typeBody(named: "DocumentRenderingOperations", in: renderingContracts))
+        ]
+        let rawMutationBodies = try [
+            #require(Self.typeBody(named: "StrokeInputGateway", in: mutationContracts)),
+            #require(Self.typeBody(named: "DocumentHistoryGateway", in: mutationContracts)),
+            #require(Self.typeBody(named: "TextLayerGateway", in: mutationContracts)),
+            #require(Self.typeBody(named: "DocumentLayerEffectsGateway", in: mutationContracts))
+        ]
+
+        for body in rawRenderingBodies + rawMutationBodies {
+            #expect(!body.contains("public let"), "Raw gateway closures should stay package-scoped")
+        }
+        #expect(rawRenderingBodies[0].contains("package let presentation"))
+        #expect(rawRenderingBodies[1].contains("package let compositeSurface"))
+        #expect(rawRenderingBodies[2].contains("package let consumeDirtyUpdate"))
+        #expect(rawRenderingBodies[3].contains("package let compositedPreviewPixelData"))
+        #expect(rawRenderingBodies[4].contains("package let shapePreviewSurface"))
+        #expect(rawRenderingBodies[5].contains("package let transformedSelectionMask"))
+        #expect(rawRenderingBodies[6].contains("package let transformedLayerPixelData"))
+        #expect(rawRenderingBodies[7].contains("package let processedLayerPixelData"))
+        #expect(rawMutationBodies[0].contains("package let beginStroke"))
+        #expect(rawMutationBodies[1].contains("package let undo"))
+        #expect(rawMutationBodies[2].contains("package let setTextLayer"))
+        #expect(rawMutationBodies[3].contains("package let mergeLayerDown"))
+    }
+
+    @Test
+    func adjustmentSettingsStoreValidatedValueObjectsInsteadOfRawPublicDoubles() throws {
+        let repoRoot = try Self.repoRoot()
+        let mutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        for typeName in [
+            "HueSaturationBrightnessSettings",
+            "BrightnessContrastSettings",
+            "LevelsAdjustmentSettings"
+        ] {
+            let body = try #require(Self.typeBody(named: typeName, in: mutationContracts))
+            #expect(!body.contains("public var") || body.contains(".rawValue"), "\(typeName) should expose raw scalars as read-only projections")
+        }
+        for token in [
+            "public var hueDegrees: Double =",
+            "public var saturation: Double =",
+            "public var brightness: Double =",
+            "public var contrast: Double =",
+            "public var inputBlack: Double =",
+            "public var inputWhite: Double =",
+            "public var gamma: Double =",
+            "public var outputBlack: Double =",
+            "public var outputWhite: Double ="
+        ] {
+            #expect(!mutationContracts.contains(token), "Adjustment settings should not store \(token)")
+        }
+        #expect(mutationContracts.contains("public struct HueAdjustmentDegrees"))
+        #expect(mutationContracts.contains("public struct AdjustmentScale"))
+        #expect(mutationContracts.contains("public struct AdjustmentOffset"))
+        #expect(mutationContracts.contains("public let gammaValue: PositiveFiniteDouble"))
+    }
+
+    @Test
     func domainUncheckedConstructorsStayPackageScoped() throws {
         let repoRoot = try Self.repoRoot()
         let domainRoot = repoRoot.appendingPathComponent(
@@ -1337,13 +1489,96 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func swiftImports(in source: String) -> Set<String> {
-        Set(source.split(separator: "\n").compactMap { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let importKinds: Set<String> = [
+            "class",
+            "enum",
+            "func",
+            "let",
+            "protocol",
+            "struct",
+            "typealias",
+            "var"
+        ]
+        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
+        return Set(code.split(separator: "\n").compactMap { line in
+            var trimmed = line.trimmingCharacters(in: .whitespaces)
+            while trimmed.hasPrefix("@"),
+                  let attributeEnd = trimmed.firstIndex(where: { $0 == " " || $0 == "\t" }) {
+                trimmed = String(trimmed[attributeEnd...]).trimmingCharacters(in: .whitespaces)
+            }
             guard trimmed.hasPrefix("import ") else { return nil }
-            let remainder = trimmed.dropFirst("import ".count)
-            let module = remainder.split(whereSeparator: { $0 == " " || $0 == "." }).first
-            return module.map(String.init)
+            var parts = trimmed.dropFirst("import ".count)
+                .split(whereSeparator: { $0 == " " || $0 == "." })
+            guard let first = parts.first else { return nil }
+            if importKinds.contains(String(first)) {
+                parts.removeFirst()
+            }
+            return parts.first.map(String.init)
         })
+    }
+
+    private static func swiftCodeWithCommentsAndStringsBlanked(in source: String) -> String {
+        var output = ""
+        var cursor = source.startIndex
+        var blockCommentDepth = 0
+        var isInsideLineComment = false
+        var isInsideString = false
+        var escaped = false
+
+        func appendBlankOrNewline(_ character: Character) {
+            output.append(character == "\n" ? "\n" : " ")
+        }
+
+        while cursor < source.endIndex {
+            let character = source[cursor]
+            let next = source.index(after: cursor)
+            let nextCharacter = next < source.endIndex ? source[next] : nil
+
+            if isInsideLineComment {
+                isInsideLineComment = character != "\n"
+                appendBlankOrNewline(character)
+            } else if blockCommentDepth > 0 {
+                if character == "/", nextCharacter == "*" {
+                    blockCommentDepth += 1
+                    output.append("  ")
+                    cursor = source.index(after: next)
+                    continue
+                }
+                if character == "*", nextCharacter == "/" {
+                    blockCommentDepth -= 1
+                    output.append("  ")
+                    cursor = source.index(after: next)
+                    continue
+                }
+                appendBlankOrNewline(character)
+            } else if isInsideString {
+                appendBlankOrNewline(character)
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+            } else if character == "/", nextCharacter == "/" {
+                isInsideLineComment = true
+                output.append("  ")
+                cursor = source.index(after: next)
+                continue
+            } else if character == "/", nextCharacter == "*" {
+                blockCommentDepth = 1
+                output.append("  ")
+                cursor = source.index(after: next)
+                continue
+            } else if character == "\"" {
+                isInsideString = true
+                output.append(" ")
+            } else {
+                output.append(character)
+            }
+            cursor = next
+        }
+        return output
     }
 
     private static func yamlTargetBlock(named targetName: String, in yaml: String) -> String? {
@@ -1378,13 +1613,8 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func infrastructureProductNames(in source: String) -> [String] {
-        source.split(separator: "\n").compactMap { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix(".library(name: ") else { return nil }
-            let parts = trimmed.split(separator: "\"")
-            guard parts.count > 1 else { return nil }
-            return String(parts[1])
-        }
+        PackageManifestProductParser.libraryProductNames(in: source)
+            .filter { $0.hasSuffix("Infrastructure") }
     }
 
     private static func typeBody(named typeName: String, in source: String) -> String? {
@@ -1555,6 +1785,137 @@ private struct SymbolSnapshotRecord: Comparable {
             title,
             declaration
         ].joined(separator: "\t")
+    }
+}
+
+private enum PackageManifestProductParser {
+    static func libraryProductNames(in manifest: String) -> [String] {
+        callBlocks(named: ".library", in: manifest).compactMap { block in
+            firstQuotedValue(after: "name:", in: block)
+        }
+    }
+
+    private static func callBlocks(named marker: String, in text: String) -> [String] {
+        var blocks: [String] = []
+        var cursor = text.startIndex
+        var isInsideLineComment = false
+        var blockCommentDepth = 0
+        var isInsideString = false
+        var escaped = false
+
+        while cursor < text.endIndex {
+            let character = text[cursor]
+            let next = text.index(after: cursor)
+            let nextCharacter = next < text.endIndex ? text[next] : nil
+
+            if isInsideLineComment {
+                isInsideLineComment = character != "\n"
+            } else if blockCommentDepth > 0 {
+                if character == "/", nextCharacter == "*" {
+                    blockCommentDepth += 1
+                    cursor = text.index(after: next)
+                    continue
+                }
+                if character == "*", nextCharacter == "/" {
+                    blockCommentDepth -= 1
+                    cursor = text.index(after: next)
+                    continue
+                }
+            } else if isInsideString {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+            } else if character == "/", nextCharacter == "/" {
+                isInsideLineComment = true
+                cursor = text.index(after: next)
+                continue
+            } else if character == "/", nextCharacter == "*" {
+                blockCommentDepth = 1
+                cursor = text.index(after: next)
+                continue
+            } else if character == "\"" {
+                isInsideString = true
+            } else if text[cursor...].hasPrefix(marker),
+                      let openParen = text[cursor...].firstIndex(of: "("),
+                      let closeParen = matchingDelimiter(in: text, open: openParen, opening: "(", closing: ")") {
+                blocks.append(String(text[cursor...closeParen]))
+                cursor = text.index(after: closeParen)
+                continue
+            }
+            cursor = next
+        }
+
+        return blocks
+    }
+
+    private static func firstQuotedValue(after label: String, in block: String) -> String? {
+        guard let labelRange = block.range(of: label) else { return nil }
+        return quotedStrings(in: String(block[labelRange.upperBound...])).first
+    }
+
+    private static func quotedStrings(in text: String) -> [String] {
+        var output: [String] = []
+        var index = text.startIndex
+        while let opening = text[index...].firstIndex(of: "\"") {
+            var cursor = text.index(after: opening)
+            var value = ""
+            var escaped = false
+            while cursor < text.endIndex {
+                let character = text[cursor]
+                if escaped {
+                    value.append(character)
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    output.append(value)
+                    index = text.index(after: cursor)
+                    break
+                } else {
+                    value.append(character)
+                }
+                cursor = text.index(after: cursor)
+            }
+            if cursor >= text.endIndex { break }
+        }
+        return output
+    }
+
+    private static func matchingDelimiter(
+        in text: String,
+        open: String.Index,
+        opening: Character,
+        closing: Character
+    ) -> String.Index? {
+        var depth = 0
+        var cursor = open
+        var isInsideString = false
+        var escaped = false
+        while cursor < text.endIndex {
+            let character = text[cursor]
+            if isInsideString {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+            } else if character == "\"" {
+                isInsideString = true
+            } else if character == opening {
+                depth += 1
+            } else if character == closing {
+                depth -= 1
+                if depth == 0 { return cursor }
+            }
+            cursor = text.index(after: cursor)
+        }
+        return nil
     }
 }
 

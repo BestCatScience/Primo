@@ -6,8 +6,8 @@ import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
 public struct DocumentReadGateway: Sendable {
-    public let lightweightPresentation: @Sendable () -> PaintDocumentPresentation
-    public let presentation: @Sendable () -> PaintDocumentPresentation
+    package let lightweightPresentation: @Sendable () -> PaintDocumentPresentation
+    package let presentation: @Sendable () -> PaintDocumentPresentation
 
     public init(
         lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
@@ -23,9 +23,9 @@ public typealias DocumentQueryGateway = DocumentReadGateway
 public struct DocumentRenderGateway: Sendable {
     /// Legacy convenience retained for callers that still expect raw bytes.
     /// Live query paths should prefer `compositeSurface`.
-    public let compositePixelData: @Sendable () -> Data
-    public let compositeSurface: @Sendable () -> DocumentCompositeSurface
-    public let pixelDataForLayer: @Sendable (Int) -> Data
+    package let compositePixelData: @Sendable () -> Data
+    package let compositeSurface: @Sendable () -> DocumentCompositeSurface
+    package let pixelDataForLayer: @Sendable (Int) -> Data
 
     public init(
         compositePixelData: @escaping @Sendable () -> Data,
@@ -39,7 +39,7 @@ public struct DocumentRenderGateway: Sendable {
 }
 
 public struct DocumentDirtyUpdateQueue: Sendable {
-    public let consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
+    package let consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
     public init(
         consumeDirtyUpdate: @escaping @Sendable () -> IncrementalLayerUpdate?
@@ -202,31 +202,31 @@ public extension Result where Failure == DocumentRenderingFailure {
 }
 
 public struct DocumentGpuOperationGateway: Sendable {
-    public let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
-    public let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
-    public let compositedPreviewIncrementalUpdate: @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> DocumentRenderingResult<IncrementalLayerUpdate>
-    public let selectionOverlayRGBA: @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>
-    public let eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>
-    public let shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>
-    public let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
-    public let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
-    public let processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
-    public let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
-    public let combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
-    public let lassoSelection: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
-    public let colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
-    public let expandedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let contractedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let featheredMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
-    public let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
-    public let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
-    public let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
-    public let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
-    public let releaseSurfaceHandle: @Sendable (MetalBufferHandle?) -> Void
+    package let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    package let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    package let compositedPreviewIncrementalUpdate: @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> DocumentRenderingResult<IncrementalLayerUpdate>
+    package let selectionOverlayRGBA: @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>
+    package let eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>
+    package let shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>
+    package let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
+    package let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
+    package let processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
+    package let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    package let combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    package let lassoSelection: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
+    package let colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
+    package let expandedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let contractedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let featheredMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
+    package let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    package let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
+    package let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    package let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    package let releaseSurfaceHandle: @Sendable (MetalBufferHandle?) -> Void
 
     public init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
@@ -284,13 +284,13 @@ public struct DocumentGpuOperationGateway: Sendable {
 }
 
 public struct DocumentCanvasPreviewRenderingOperations: Sendable {
-    public let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
-    public let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
-    public let selectionOverlayRGBA: @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>
-    public let eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>
-    public let shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>
-    public let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
-    public let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
+    package let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    package let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    package let selectionOverlayRGBA: @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>
+    package let eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>
+    package let shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>
+    package let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
+    package let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
 
     public init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
@@ -312,18 +312,18 @@ public struct DocumentCanvasPreviewRenderingOperations: Sendable {
 }
 
 public struct DocumentSelectionMaskOperations: Sendable {
-    public let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
-    public let combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
-    public let lassoSelection: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
-    public let colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
-    public let expandedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let contractedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let featheredMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
-    public let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    package let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    package let combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    package let lassoSelection: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
+    package let colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
+    package let expandedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let contractedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let featheredMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
+    package let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
 
     public init(
         alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
@@ -355,7 +355,7 @@ public struct DocumentSelectionMaskOperations: Sendable {
 }
 
 public struct DocumentLayerTransformOperations: Sendable {
-    public let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
+    package let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
 
     public init(
         transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
@@ -365,13 +365,13 @@ public struct DocumentLayerTransformOperations: Sendable {
 }
 
 public struct DocumentRenderingOperations: Sendable {
-    public let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
-    public let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
-    public let processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
-    public let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
-    public let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
-    public let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
-    public let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    package let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    package let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    package let processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
+    package let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    package let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    package let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    package let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
 
     public init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,

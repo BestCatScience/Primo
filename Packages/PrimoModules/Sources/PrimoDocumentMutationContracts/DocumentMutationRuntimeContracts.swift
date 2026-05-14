@@ -51,38 +51,151 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
 }
 
-public struct HueSaturationBrightnessSettings: Equatable, Sendable {
-    public var hueDegrees: Double = 0
-    public var saturation: Double = 1
-    public var brightness: Double = 0
-    public init(hueDegrees: Double = 0, saturation: Double = 1, brightness: Double = 0) {
-        self.hueDegrees = hueDegrees
-        self.saturation = saturation
-        self.brightness = brightness
+public struct HueAdjustmentDegrees: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (-180...180).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
     }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 0
+            return
+        }
+        self.rawValue = min(max(rawValue, -180), 180)
+    }
+}
+
+public struct AdjustmentScale: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (0...2).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 1
+            return
+        }
+        self.rawValue = min(max(rawValue, 0), 2)
+    }
+}
+
+public struct AdjustmentOffset: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (-1...1).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 0
+            return
+        }
+        self.rawValue = min(max(rawValue, -1), 1)
+    }
+}
+
+public struct HueSaturationBrightnessSettings: Equatable, Sendable {
+    public let hueDegreesValue: HueAdjustmentDegrees
+    public let saturationValue: AdjustmentScale
+    public let brightnessValue: AdjustmentOffset
+
+    public init(hueDegrees: Double = 0, saturation: Double = 1, brightness: Double = 0) {
+        self.init(
+            hueDegrees: HueAdjustmentDegrees(clamping: hueDegrees),
+            saturation: AdjustmentScale(clamping: saturation),
+            brightness: AdjustmentOffset(clamping: brightness)
+        )
+    }
+
+    public init(
+        hueDegrees: HueAdjustmentDegrees,
+        saturation: AdjustmentScale,
+        brightness: AdjustmentOffset
+    ) {
+        self.hueDegreesValue = hueDegrees
+        self.saturationValue = saturation
+        self.brightnessValue = brightness
+    }
+
+    public var hueDegrees: Double { hueDegreesValue.rawValue }
+    public var saturation: Double { saturationValue.rawValue }
+    public var brightness: Double { brightnessValue.rawValue }
 }
 
 public struct BrightnessContrastSettings: Equatable, Sendable {
-    public var brightness: Double = 0
-    public var contrast: Double = 1
+    public let brightnessValue: AdjustmentOffset
+    public let contrastValue: AdjustmentScale
+
     public init(brightness: Double = 0, contrast: Double = 1) {
-        self.brightness = brightness
-        self.contrast = contrast
+        self.init(
+            brightness: AdjustmentOffset(clamping: brightness),
+            contrast: AdjustmentScale(clamping: contrast)
+        )
     }
+
+    public init(brightness: AdjustmentOffset, contrast: AdjustmentScale) {
+        self.brightnessValue = brightness
+        self.contrastValue = contrast
+    }
+
+    public var brightness: Double { brightnessValue.rawValue }
+    public var contrast: Double { contrastValue.rawValue }
 }
 
 public struct LevelsAdjustmentSettings: Equatable, Sendable {
-    public var inputBlack: Double = 0
-    public var inputWhite: Double = 1
-    public var gamma: Double = 1
-    public var outputBlack: Double = 0
-    public var outputWhite: Double = 1
-    public init(inputBlack: Double = 0, inputWhite: Double = 1, gamma: Double = 1, outputBlack: Double = 0, outputWhite: Double = 1) {
-        self.inputBlack = inputBlack
-        self.inputWhite = inputWhite
-        self.gamma = gamma
-        self.outputBlack = outputBlack
-        self.outputWhite = outputWhite
+    public let inputBlackValue: UnitInterval
+    public let inputWhiteValue: UnitInterval
+    public let gammaValue: PositiveFiniteDouble
+    public let outputBlackValue: UnitInterval
+    public let outputWhiteValue: UnitInterval
+
+    public init(
+        inputBlack: Double = 0,
+        inputWhite: Double = 1,
+        gamma: Double = 1,
+        outputBlack: Double = 0,
+        outputWhite: Double = 1
+    ) {
+        self.init(
+            inputBlack: Self.clampedUnitInterval(inputBlack, fallback: 0),
+            inputWhite: Self.clampedUnitInterval(inputWhite, fallback: 1),
+            gamma: PositiveFiniteDouble(gamma) ?? PositiveFiniteDouble(1)!,
+            outputBlack: Self.clampedUnitInterval(outputBlack, fallback: 0),
+            outputWhite: Self.clampedUnitInterval(outputWhite, fallback: 1)
+        )
+    }
+
+    public init(
+        inputBlack: UnitInterval,
+        inputWhite: UnitInterval,
+        gamma: PositiveFiniteDouble,
+        outputBlack: UnitInterval,
+        outputWhite: UnitInterval
+    ) {
+        self.inputBlackValue = inputBlack
+        self.inputWhiteValue = inputWhite
+        self.gammaValue = gamma
+        self.outputBlackValue = outputBlack
+        self.outputWhiteValue = outputWhite
+    }
+
+    public var inputBlack: Double { inputBlackValue.rawValue }
+    public var inputWhite: Double { inputWhiteValue.rawValue }
+    public var gamma: Double { gammaValue.rawValue }
+    public var outputBlack: Double { outputBlackValue.rawValue }
+    public var outputWhite: Double { outputWhiteValue.rawValue }
+
+    private static func clampedUnitInterval(_ value: Double, fallback: Double) -> UnitInterval {
+        guard value.isFinite else { return UnitInterval(fallback)! }
+        return UnitInterval(min(max(value, 0), 1))!
     }
 }
 
@@ -246,15 +359,15 @@ public struct DocumentMutationGateway: Sendable {
 }
 
 public struct StrokeInputGateway: Sendable {
-    public let beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
-    public let appendStroke: @Sendable (StylusSample) -> Void
-    public let endStroke: @Sendable () -> DocumentMutationResult
-    public let cancelStroke: @Sendable () -> Void
-    public let blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
-    public let endBlurStroke: @Sendable () -> DocumentMutationResult
-    public let cancelBlurStroke: @Sendable () -> Void
-    public let fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
-    public let applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
+    package let beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
+    package let appendStroke: @Sendable (StylusSample) -> Void
+    package let endStroke: @Sendable () -> DocumentMutationResult
+    package let cancelStroke: @Sendable () -> Void
+    package let blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
+    package let endBlurStroke: @Sendable () -> DocumentMutationResult
+    package let cancelBlurStroke: @Sendable () -> Void
+    package let fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
+    package let applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
     public init(
         beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> Void,
@@ -280,11 +393,11 @@ public struct StrokeInputGateway: Sendable {
 }
 
 public struct DocumentHistoryGateway: Sendable {
-    public let canUndo: @Sendable () -> Bool
-    public let canRedo: @Sendable () -> Bool
-    public let undo: @Sendable () -> DocumentMutationResult
-    public let redo: @Sendable () -> DocumentMutationResult
-    public let trimForMemoryPressure: @Sendable () -> Void
+    package let canUndo: @Sendable () -> Bool
+    package let canRedo: @Sendable () -> Bool
+    package let undo: @Sendable () -> DocumentMutationResult
+    package let redo: @Sendable () -> DocumentMutationResult
+    package let trimForMemoryPressure: @Sendable () -> Void
 
     public init(
         canUndo: @escaping @Sendable () -> Bool,
@@ -302,9 +415,9 @@ public struct DocumentHistoryGateway: Sendable {
 }
 
 public struct TextLayerGateway: Sendable {
-    public let textLayerData: @Sendable (Int) -> TextLayerData?
-    public let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    public let clearTextLayerData: @Sendable (Int) -> Void
+    package let textLayerData: @Sendable (Int) -> TextLayerData?
+    package let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
+    package let clearTextLayerData: @Sendable (Int) -> Void
 
     public init(
         textLayerData: @escaping @Sendable (Int) -> TextLayerData?,
@@ -318,7 +431,7 @@ public struct TextLayerGateway: Sendable {
 }
 
 public struct DocumentLayerEffectsGateway: Sendable {
-    public let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    package let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
 
     public init(
         mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult
