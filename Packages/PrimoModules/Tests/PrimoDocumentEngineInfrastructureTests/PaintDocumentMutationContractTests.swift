@@ -14,6 +14,19 @@ import Testing
 
 struct PaintDocumentMutationContractTests {
     @Test
+    func posterizeSettingsStoreValidatedLevelCount() throws {
+        #expect(PosterizeLevelCount(1) == nil)
+        #expect(PosterizeLevelCount(2)?.rawValue == 2)
+        #expect(PosterizeLevelCount(256)?.rawValue == 256)
+        #expect(PosterizeLevelCount(257) == nil)
+        #expect(PosterizeLevelCount(rounding: .infinity) == nil)
+        #expect(PosterizeSettings(levels: -8).levelsValue.rawValue == 2)
+        #expect(PosterizeSettings(levels: 6.4).levelsValue.rawValue == 6)
+        #expect(PosterizeSettings(levels: .nan).levelsValue.rawValue == 6)
+        #expect(PosterizeSettings(levels: 999).levelsValue.rawValue == 256)
+    }
+
+    @Test
     func redoRejectsMissingHistory() {
         let runtime = DocumentEngineFactory.live()
         #expect(runtime.historyGateway.canRedo() == false)

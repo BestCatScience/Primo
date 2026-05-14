@@ -1169,7 +1169,7 @@ extension ContentView {
                     adjustmentSlider(
                         title: StudioStrings.levelCount(language),
                         valueText: "\(Int(posterizeSettings.levels.rounded()))",
-                        value: $posterizeSettings.levels,
+                        value: posterizeLevelBinding,
                         range: 2...32,
                         step: 1
                     )
@@ -2297,6 +2297,15 @@ extension ContentView {
                     outputBlack: keyPath == \.outputBlack ? value : levelsAdjustmentSettings.outputBlack,
                     outputWhite: keyPath == \.outputWhite ? value : levelsAdjustmentSettings.outputWhite
                 )
+            }
+        )
+    }
+
+    var posterizeLevelBinding: Binding<Double> {
+        Binding(
+            get: { posterizeSettings.levels },
+            set: { value in
+                posterizeSettings = PosterizeSettings(levels: value)
             }
         )
     }

@@ -813,26 +813,40 @@ struct GpuSideEffectIsolationArchitectureTests {
         let repoRoot = try Self.repoRoot()
         let dependencyComposition = try String(
             contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/PaintDocumentDependencies.swift",
+                "App/Features/Document/DocumentDependencyKeys.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let applicationEnvironment = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentApplicationEnvironment.swift",
                 isDirectory: false
             ),
             encoding: .utf8
         )
         let capabilityAccess = try String(
             contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/PaintDocumentClient.swift",
+                "App/Features/Document/DocumentRuntimeCapabilities.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let adapters = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentRuntimeAdapters.swift",
                 isDirectory: false
             ),
             encoding: .utf8
         )
         let validation = try String(
             contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/PaintDocumentValidation.swift",
+                "App/Features/Document/DocumentWorkflowValidation.swift",
                 isDirectory: false
             ),
             encoding: .utf8
         )
-        let body = [dependencyComposition, capabilityAccess, validation].joined(separator: "\n")
+        let body = [dependencyComposition, applicationEnvironment, capabilityAccess, adapters, validation].joined(separator: "\n")
         let paintDocumentClient = repoRoot.appendingPathComponent(
             "App/Features/Document/PaintDocumentClient.swift",
             isDirectory: false
@@ -1101,6 +1115,40 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func appWorkflowValidationReturnsEditableLayerCapability() throws {
+        let repoRoot = try Self.repoRoot()
+        let mutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let validation = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentWorkflowValidation.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let adapters = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentRuntimeAdapters.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        #expect(mutationContracts.contains("public struct EditableLayerIndex"))
+        #expect(mutationContracts.contains("public init?(\n        validating rawValue: Int"))
+        #expect(mutationContracts.contains("package init(_ rawValue: Int)"))
+        #expect(validation.contains("let layerIndex: EditableLayerIndex"))
+        #expect(!validation.contains("let layerIndex: Int"))
+        #expect(adapters.contains("command.layer.layerIndex.rawValue"))
+        #expect(adapters.contains("command.layerIndex.rawValue"))
+    }
+
+    @Test
     func runtimeLayerMutationGatewayKeepsTypedFolderBoundaries() throws {
         let repoRoot = try Self.repoRoot()
         let engineLive = try String(
@@ -1213,6 +1261,13 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(rawRenderingBodies[6].contains("package let transformedLayerPixelData"))
         #expect(rawRenderingBodies[7].contains("package let processedLayerPixelData"))
         #expect(rawMutationBodies[0].contains("package let beginStroke"))
+
+        let gpuGatewayBody = rawRenderingBodies[3]
+        let surfaceReleaserBody = try #require(Self.typeBody(named: "DocumentSurfaceHandleReleaser", in: renderingContracts))
+        #expect(!gpuGatewayBody.contains("public init("), "DocumentGpuOperationGateway should not publicly accept raw GPU function tables")
+        #expect(!surfaceReleaserBody.contains("public init(releaseSurfaceHandle"), "Raw surface-handle release authority should be constructed inside the package")
+        #expect(surfaceReleaserBody.contains("public func releaseSurfaceLease(_ lease: StrokePreviewLease)"))
+        #expect(renderingContracts.contains("public protocol SurfaceHandleReleasing"))
         #expect(rawMutationBodies[1].contains("package let undo"))
         #expect(rawMutationBodies[2].contains("package let setTextLayer"))
         #expect(rawMutationBodies[3].contains("package let mergeLayerDown"))
@@ -1232,7 +1287,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         for typeName in [
             "HueSaturationBrightnessSettings",
             "BrightnessContrastSettings",
-            "LevelsAdjustmentSettings"
+            "LevelsAdjustmentSettings",
+            "PosterizeSettings"
         ] {
             let body = try #require(Self.typeBody(named: typeName, in: mutationContracts))
             #expect(!body.contains("public var") || body.contains(".rawValue"), "\(typeName) should expose raw scalars as read-only projections")
@@ -1246,7 +1302,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public var inputWhite: Double =",
             "public var gamma: Double =",
             "public var outputBlack: Double =",
-            "public var outputWhite: Double ="
+            "public var outputWhite: Double =",
+            "public var levels: Double ="
         ] {
             #expect(!mutationContracts.contains(token), "Adjustment settings should not store \(token)")
         }
@@ -1254,6 +1311,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(mutationContracts.contains("public struct AdjustmentScale"))
         #expect(mutationContracts.contains("public struct AdjustmentOffset"))
         #expect(mutationContracts.contains("public let gammaValue: PositiveFiniteDouble"))
+        #expect(mutationContracts.contains("public struct PosterizeLevelCount"))
+        #expect(mutationContracts.contains("public let levelsValue: PosterizeLevelCount"))
     }
 
     @Test

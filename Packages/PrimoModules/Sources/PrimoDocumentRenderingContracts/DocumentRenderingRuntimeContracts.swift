@@ -228,7 +228,7 @@ public struct DocumentGpuOperationGateway: Sendable {
     package let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
     package let releaseSurfaceHandle: @Sendable (MetalBufferHandle?) -> Void
 
-    public init(
+    package init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
         compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
         compositedPreviewIncrementalUpdate: @escaping @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> DocumentRenderingResult<IncrementalLayerUpdate>,
@@ -292,7 +292,7 @@ public struct DocumentCanvasPreviewRenderingOperations: Sendable {
     package let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
     package let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
 
-    public init(
+    package init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
         compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
         selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>,
@@ -325,7 +325,7 @@ public struct DocumentSelectionMaskOperations: Sendable {
     package let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
     package let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
 
-    public init(
+    package init(
         alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
         croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
         combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>,
@@ -357,7 +357,7 @@ public struct DocumentSelectionMaskOperations: Sendable {
 public struct DocumentLayerTransformOperations: Sendable {
     package let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
 
-    public init(
+    package init(
         transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
     ) {
         self.transformedLayerPixelData = transformedLayerPixelData
@@ -373,7 +373,7 @@ public struct DocumentRenderingOperations: Sendable {
     package let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
     package let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
 
-    public init(
+    package init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
         compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
         processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>,
@@ -413,7 +413,7 @@ public protocol SurfaceHandleReleasing: Sendable {
 public struct DocumentSurfaceHandleReleaser: SurfaceHandleReleasing {
     private let releaseSurfaceHandleHandler: @Sendable (MetalBufferHandle?) -> Void
 
-    public init(releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void) {
+    package init(releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void) {
         self.releaseSurfaceHandleHandler = releaseSurfaceHandle
     }
 

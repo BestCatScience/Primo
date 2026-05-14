@@ -8,6 +8,25 @@ import PrimoDocumentPresentationContracts
 public typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
 public typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
 
+public struct EditableLayerIndex: Equatable, Sendable {
+    public let rawValue: Int
+
+    public init?(
+        validating rawValue: Int,
+        layerCount: Int,
+        isLayerLocked: (Int) -> Bool
+    ) {
+        guard (0..<layerCount).contains(rawValue), !isLayerLocked(rawValue) else {
+            return nil
+        }
+        self.rawValue = rawValue
+    }
+
+    package init(_ rawValue: Int) {
+        self.rawValue = rawValue
+    }
+}
+
 public enum DocumentGpuMutationFailure: Error, Equatable, Sendable {
     case gpuUnavailable
     case staleSnapshot(operation: String)
@@ -228,11 +247,43 @@ public struct ThresholdSettings: Equatable, Sendable {
     }
 }
 
-public struct PosterizeSettings: Equatable, Sendable {
-    public var levels: Double = 6
-    public init(levels: Double = 6) {
-        self.levels = levels
+public struct PosterizeLevelCount: Equatable, Sendable {
+    public static let allowedRange = 2...256
+
+    public let rawValue: Int
+
+    public init?(_ rawValue: Int) {
+        guard Self.allowedRange.contains(rawValue) else { return nil }
+        self.rawValue = rawValue
     }
+
+    public init?(rounding rawValue: Double) {
+        guard rawValue.isFinite else { return nil }
+        self.init(Int(rawValue.rounded()))
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 6
+            return
+        }
+        let roundedValue = Int(rawValue.rounded())
+        self.rawValue = min(max(roundedValue, Self.allowedRange.lowerBound), Self.allowedRange.upperBound)
+    }
+}
+
+public struct PosterizeSettings: Equatable, Sendable {
+    public let levelsValue: PosterizeLevelCount
+
+    public init(levels: Double = 6) {
+        self.init(levels: PosterizeLevelCount(clamping: levels))
+    }
+
+    public init(levels: PosterizeLevelCount) {
+        self.levelsValue = levels
+    }
+
+    public var levels: Double { Double(levelsValue.rawValue) }
 }
 
 public enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
