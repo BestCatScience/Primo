@@ -7,11 +7,13 @@ struct PrimoApp: App {
     let store: StoreOf<PrimoRootFeature>
 
     init() {
-        let documentRuntime = DocumentRuntimeFactory.live()
+        let documentApplicationEnvironment = DocumentApplicationEnvironment(
+            runtime: DocumentApplicationRuntimeFactory.live()
+        )
         self.store = Store(initialState: PrimoRootFeature.State()) {
             PrimoRootFeature()
         } withDependencies: {
-            $0.documentRuntime = documentRuntime
+            $0.documentApplicationEnvironment = documentApplicationEnvironment
         }
     }
 

@@ -6,6 +6,7 @@ import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
+import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import UIKit
 
@@ -18,9 +19,8 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeSessionCoordinator {
-        let layerCommands: DocumentLayerCommandService
-        let strokeInteraction: CanvasStrokeInteractionService
-        let commitWorkflow: DocumentStrokeCommitWorkflowService
+        let layerCommands: LayerEditingRuntime
+        let strokeInteraction: CanvasStrokeRuntime
 
         func resolveAppendedStrokePreview(
             state: DocumentEditingState,
@@ -77,36 +77,64 @@ extension DocumentFeature {
                 brush: context.brush,
                 previewBrush: context.previewBrush
             )
-            let result: Result<StrokeCommitWorkflowResult<CanvasSelection, ApplicationFeature.Feedback>, DocumentMutationFailure> = commitWorkflow.resolveCommit(
-                StrokeCommitWorkflowRequest(
-                    baseSnapshot: state.canvas.strokeSession.baseSnapshot,
-                    renderSnapshot: state.canvas.renderSnapshot,
-                    renderState: state.canvas.strokeSession.renderState,
-                    samples: samples,
-                    context: documentContext,
-                    selectionClearPolicy: keepsSelectionCleared ? .clearSelection : .none,
-                    refreshViaDirtyPresentation: refreshViaDirtyPresentation
-                ),
-                usesResponsivePreviewCommit: usesResponsivePreview(state: state, brush: context.previewBrush)
+            if keepsSelectionCleared {
+                switch layerCommands.ensureLayerVisible(context.activeLayerIndex) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    return .failed(failure)
+                }
+            }
+
+            let outcome = strokeInteraction.finish(
+                renderState: state.canvas.strokeSession.renderState,
+                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+                renderSnapshot: state.canvas.renderSnapshot,
+                samples: samples,
+                context: documentContext,
+                allowsApproximatePreviewCommit: usesResponsivePreview(state: state, brush: context.previewBrush),
+                refreshViaDirtyPresentation: refreshViaDirtyPresentation
             )
 
-            switch result {
-            case let .success(commit):
+            switch outcome {
+            case let .commit(mutation):
+                guard let payload = GpuLayerMutationPayload(
+                    validatingCanvasWidth: mutation.surface.width,
+                    canvasHeight: mutation.surface.height,
+                    dirtyRect: mutation.dirtyRegion.layerPixelRect,
+                    gpuBufferHandle: mutation.surface.handle.buffer,
+                    fallbackPixelData: mutation.surface.pixelData
+                ) else {
+                    return .failed(.bridgeMutationFailed("GPU stroke commit invalid payload"))
+                }
+                switch layerCommands.applyLayerSurfaceMutation(mutation.surface.layerIndex, payload) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    return .failed(failure)
+                }
                 if keepsSelectionCleared {
                     state.canvas.clearSelection()
                 }
-                if let pending = commit.pendingCommittedSnapshot {
+                let commitBaseSnapshot = state.canvas.strokeSession.baseSnapshot ?? state.canvas.renderSnapshot
+                if let commitBaseSnapshot {
                     state.canvas.stagePendingCommittedStrokeSnapshot(
-                        baseSnapshot: pending.baseSnapshot,
-                        surface: pending.surface
+                        baseSnapshot: commitBaseSnapshot,
+                        surface: mutation.surface
                     )
                 }
                 return .committed(
-                    commit.contract,
-                    transferredPreviewLease: commit.transferredPreviewLease
+                    DocumentMutationWorkflowOutcome<CanvasSelection, ApplicationFeature.Feedback>(
+                        canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
+                        refresh: mutation.refreshViaDirtyPresentation ? .dirty : .current,
+                        updatesWorkspaceArtifacts: false
+                    ),
+                    transferredPreviewLease: strokeInteraction.previewLease(for: mutation)
                 )
             case let .failure(failure):
                 return .failed(failure)
+            case .preview, .reset:
+                return .failed(.bridgeMutationFailed("GPU stroke commit failed: unexpected session outcome"))
             }
         }
 
@@ -119,8 +147,8 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeStateCoordinator {
-        let layerCommands: DocumentLayerCommandService
-        let strokeCommands: DocumentStrokeCommandService
+        let layerCommands: LayerEditingRuntime
+        let strokeCommands: CanvasStrokeRuntime
 
         func resetPreview(state: inout DocumentEditingState) {
             state.canvas.resetStrokePreview()

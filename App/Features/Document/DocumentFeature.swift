@@ -6,6 +6,7 @@ import PrimoBrushRuntimeContracts
 import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
 
 struct DocumentCanvasDimensions: Equatable, Sendable {
@@ -81,7 +82,7 @@ struct DocumentFeature {
     typealias DocumentPresentationRefresh = DocumentPresentationRefreshIntent
     typealias LayerMutationFinalization = DocumentLayerMutationFinalization
     typealias DocumentMutationContract = DocumentMutationWorkflowOutcome<CanvasSelection, ApplicationFeature.Feedback>
-    typealias LayerWorkflowService = DocumentMutationWorkflowService
+    typealias LayerWorkflowService = LayerEditingRuntime
     typealias CanvasDimensions = DocumentCanvasDimensions
     typealias FreshDocumentReplacementContract = DocumentFreshDocumentReplacementContract
     typealias WorkspaceDocumentSnapshot = DocumentWorkspaceDocumentSnapshot

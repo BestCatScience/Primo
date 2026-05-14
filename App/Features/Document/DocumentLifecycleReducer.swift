@@ -16,7 +16,7 @@ struct DocumentLifecycleReducer: Reducer {
     @Dependency(\.documentCanvasMutationCapability) var documentCanvasMutationCapability
     @Dependency(\.documentExportCapability) var documentExportCapability
 
-    var documentCanvasCommandService: DocumentCanvasCommandService {
+    var documentCanvasCommandService: CanvasMutationRuntime {
         documentCanvasMutationCapability.canvasCommandService
     }
 
@@ -28,7 +28,7 @@ struct DocumentLifecycleReducer: Reducer {
         documentCanvasMutationCapability.renderingWorkflow
     }
 
-    var documentHistoryCommandService: DocumentHistoryCommandService {
+    var documentHistoryCommandService: CanvasMutationRuntime {
         documentCanvasMutationCapability.historyCommandService
     }
 

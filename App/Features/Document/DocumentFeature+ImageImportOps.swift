@@ -28,7 +28,7 @@ extension DocumentFeature {
         canvasHeight: Int,
         selection: CanvasSelection,
         padding: Int = 64,
-        selectionWorkflow: SelectionWorkflowService
+        selectionWorkflow: LayerEditingRuntime
     ) -> InpaintCrop? {
         guard let expandedMask = selectionWorkflow.expandedMask(
             from: selection,

@@ -14,7 +14,7 @@ struct AdjustmentWorkflowReducer: Reducer {
         layerWorkflowEnvironment.renderingWorkflow
     }
 
-    var documentMutationWorkflowService: DocumentMutationWorkflowService {
+    var documentMutationWorkflowService: LayerEditingRuntime {
         layerWorkflowEnvironment.mutationWorkflowService
     }
 

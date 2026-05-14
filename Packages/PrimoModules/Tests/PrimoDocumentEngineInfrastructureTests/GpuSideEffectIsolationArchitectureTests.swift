@@ -573,6 +573,18 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!body.contains("public let gpuOperationGateway:"))
         #expect(!body.contains("public let textLayerGateway:"))
         #expect(!body.contains("public let mutationGateway:"))
+        #expect(!body.contains("public let canvasCommands:"))
+        #expect(!body.contains("public let layerCommands:"))
+        #expect(!body.contains("public let strokeCommands:"))
+        #expect(!body.contains("public let historyCommands:"))
+        #expect(!body.contains("public let mutationWorkflow:"))
+        #expect(!body.contains("public let contentService:"))
+        #expect(!body.contains("public let canvasEditingWorkflow:"))
+        #expect(!body.contains("public let selectionWorkflow:"))
+        #expect(!body.contains("public let renderingWorkflow:"))
+        #expect(!body.contains("public let textLayerService:"))
+        #expect(!body.contains("public let exportClient:"))
+        #expect(!body.contains("public let persistenceClient:"))
         #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
         #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
 
@@ -580,6 +592,15 @@ struct GpuSideEffectIsolationArchitectureTests {
         let expectedSymbols: Set<String> = [
             "DocumentRuntime",
             "DocumentRuntimeFactory",
+            "DocumentApplicationRuntime",
+            "DocumentApplicationRuntimeFactory",
+            "DocumentPresentationRuntime",
+            "CanvasMutationRuntime",
+            "CanvasStrokeRuntime",
+            "LayerEditingRuntime",
+            "DocumentPersistenceRuntime",
+            "DocumentExportRuntime",
+            "CanvasPreviewRuntime",
             "DocumentCommand",
             "DocumentCommandOutcome",
             "DocumentCanvasCommand",

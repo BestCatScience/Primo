@@ -479,71 +479,614 @@ public struct DocumentRenderingWorkflow: Sendable {
 
 }
 
+private struct DocumentRuntimeServices: Sendable {
+    let canvasCommands: DocumentCanvasCommandService
+    let layerCommands: DocumentLayerCommandService
+    let strokeCommands: DocumentStrokeCommandService
+    let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    let historyCommands: DocumentHistoryCommandService
+    let mutationWorkflow: DocumentMutationWorkflowService
+    let contentService: DocumentContentService
+    let canvasEditingWorkflow: CanvasEditingWorkflowService
+    let selectionWorkflow: SelectionWorkflowService
+    let canvasPreviewRenderer: any CanvasPreviewRendering
+    let layerTransformProcessor: any LayerTransformProcessing
+    let selectionMaskProcessor: any SelectionMaskProcessing
+    let canvasPresentationEnvironment: CanvasPresentationEnvironment
+    let presentationReader: DocumentPresentationReader
+    let renderingWorkflow: DocumentRenderingWorkflow
+    let textLayerService: DocumentTextLayerService
+    let exportClient: DocumentExportClient
+    let persistenceClient: DocumentPersistenceClient
+
+    init(composition: DocumentRuntimeComposition) {
+        self.canvasCommands = DocumentCanvasCommandService(
+            queryGateway: composition.queryGateway,
+            renderGateway: composition.renderGateway,
+            mutationGateway: composition.mutationGateway,
+            persistenceGateway: composition.persistenceGateway
+        )
+        self.layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
+        self.strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
+        self.canvasStrokeInteractionService = CanvasStrokeInteractionService(
+            sessionUseCase: composition.strokeSessionUseCase,
+            releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
+        )
+        self.historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+        self.mutationWorkflow = DocumentMutationWorkflowService(
+            documentEditingGateway: composition.editingGateway,
+            documentLayerEffectsGateway: composition.layerEffectsGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        self.contentService = DocumentContentService(
+            documentQueryGateway: composition.queryGateway,
+            documentRenderGateway: composition.renderGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        self.canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
+        self.layerTransformProcessor = GpuLayerTransformProcessor(
+            layerTransformOperations: composition.layerTransformOperations,
+            selectionOperations: composition.selectionMaskOperations
+        )
+        self.selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
+        self.canvasEditingWorkflow = CanvasEditingWorkflowService(
+            documentContentService: contentService,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        self.selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
+        self.canvasPresentationEnvironment = CanvasPresentationEnvironment(
+            previewRenderer: canvasPreviewRenderer,
+            eyedropperSampler: GpuCanvasEyedropperSampler(),
+            selectionProcessor: selectionMaskProcessor
+        )
+        self.presentationReader = DocumentPresentationReader(
+            lightweightPresentation: composition.queryGateway.lightweightPresentation,
+            presentation: composition.queryGateway.presentation
+        )
+        self.renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
+        self.textLayerService = DocumentTextLayerService(
+            textLayerData: composition.textLayerGateway.textLayerData,
+            setTextLayer: composition.textLayerGateway.setTextLayer,
+            clearTextLayerData: composition.textLayerGateway.clearTextLayerData
+        )
+        self.persistenceClient = DocumentPersistenceClient(
+            saveProject: composition.persistenceGateway.saveProject,
+            loadProject: composition.persistenceGateway.loadProject,
+            setPaperStyle: composition.persistenceGateway.setPaperStyle,
+            newCanvas: composition.persistenceGateway.newCanvas,
+            prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources
+        )
+        self.exportClient = DocumentExportClient(
+            compositeSurface: composition.exportGateway.compositeSurface,
+            compositePNGData: composition.exportGateway.compositePNGData,
+            timelapseCapture: composition.exportGateway.timelapseCapture
+        )
+    }
+}
+
+public struct DocumentPresentationRuntime: Sendable {
+    private let presentationReader: DocumentPresentationReader
+    private let renderingWorkflow: DocumentRenderingWorkflow
+
+    public init(
+        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
+        presentation: @escaping @Sendable () -> PaintDocumentPresentation,
+        renderingWorkflow: DocumentRenderingWorkflow
+    ) {
+        self.presentationReader = DocumentPresentationReader(
+            lightweightPresentation: lightweightPresentation,
+            presentation: presentation
+        )
+        self.renderingWorkflow = renderingWorkflow
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.presentationReader = services.presentationReader
+        self.renderingWorkflow = services.renderingWorkflow
+    }
+
+    public func lightweightPresentation() -> PaintDocumentPresentation {
+        presentationReader.lightweightPresentation()
+    }
+
+    public func presentation() -> PaintDocumentPresentation {
+        presentationReader.presentation()
+    }
+
+    public func compositedPaperPreviewRGBA(
+        _ pixelData: Data,
+        _ width: Int,
+        _ height: Int,
+        _ paperStyle: CanvasPaperStyle
+    ) -> DocumentRenderingResult<Data> {
+        renderingWorkflow.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle)
+    }
+
+    public func compositedPreviewPixelData(
+        _ snapshot: MetalDocumentSnapshot,
+        _ activeLayerIndex: Int,
+        _ adjustedActiveLayerPixels: Data
+    ) -> DocumentRenderingResult<Data> {
+        renderingWorkflow.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
+    }
+
+    public func processedLayerPixelData(
+        _ source: Data,
+        _ width: Int,
+        _ height: Int,
+        _ request: LayerProcessingRequest
+    ) -> DocumentRenderingResult<Data> {
+        renderingWorkflow.processedLayerPixelData(source, width, height, request)
+    }
+
+    public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
+        renderingWorkflow.alphaMask(pixelData, width, height)
+    }
+
+    public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
+        renderingWorkflow.croppedSelectionMask(mask, width, height)
+    }
+
+    public func scaledPixelData(
+        _ source: Data,
+        _ width: Int,
+        _ height: Int,
+        _ targetWidth: Int,
+        _ targetHeight: Int
+    ) -> DocumentRenderingResult<Data> {
+        renderingWorkflow.scaledPixelData(source, width, height, targetWidth, targetHeight)
+    }
+
+    public func translatedPixelData(
+        _ source: Data,
+        _ width: Int,
+        _ height: Int,
+        _ targetWidth: Int,
+        _ targetHeight: Int,
+        _ offsetX: Int,
+        _ offsetY: Int
+    ) -> DocumentRenderingResult<Data> {
+        renderingWorkflow.translatedPixelData(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
+    }
+}
+
+public struct CanvasMutationRuntime: Sendable {
+    private let canvasCommands: DocumentCanvasCommandService
+    private let historyCommands: DocumentHistoryCommandService
+
+    public init(
+        canvasCommands: DocumentCanvasCommandService,
+        historyCommands: DocumentHistoryCommandService
+    ) {
+        self.canvasCommands = canvasCommands
+        self.historyCommands = historyCommands
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.canvasCommands = services.canvasCommands
+        self.historyCommands = services.historyCommands
+    }
+
+    public func createCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        canvasCommands.createCanvas(width, height)
+    }
+
+    public func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        canvasCommands.resizeCanvas(width, height)
+    }
+
+    public func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        canvasCommands.resizeCanvasExtent(width, height)
+    }
+
+    public func initializeImportedCanvas(_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult {
+        canvasCommands.initializeImportedCanvas(request, layerName)
+    }
+
+    public func compositeSurface() -> DocumentCompositeSurface {
+        canvasCommands.compositeSurface()
+    }
+
+    public func undo() -> DocumentMutationResult {
+        historyCommands.undo()
+    }
+
+    public func redo() -> DocumentMutationResult {
+        historyCommands.redo()
+    }
+
+    public func trimHistoryForMemoryPressure() {
+        historyCommands.trimForMemoryPressure()
+    }
+
+    public func trimForMemoryPressure() {
+        historyCommands.trimForMemoryPressure()
+    }
+}
+
+public struct LayerEditingRuntime: Sendable {
+    private let layerCommands: DocumentLayerCommandService
+    private let mutationWorkflow: DocumentMutationWorkflowService
+    private let contentService: DocumentContentService
+    private let textLayerService: DocumentTextLayerService
+    private let selectionWorkflow: SelectionWorkflowService
+    private let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    private let layerTransformProcessor: any LayerTransformProcessing
+    private let canvasEditingWorkflow: CanvasEditingWorkflowService
+
+    public init(
+        layerCommands: DocumentLayerCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        textLayerService: DocumentTextLayerService,
+        selectionWorkflow: SelectionWorkflowService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService,
+        layerTransformProcessor: any LayerTransformProcessing,
+        canvasEditingWorkflow: CanvasEditingWorkflowService
+    ) {
+        self.layerCommands = layerCommands
+        self.mutationWorkflow = mutationWorkflow
+        self.contentService = contentService
+        self.textLayerService = textLayerService
+        self.selectionWorkflow = selectionWorkflow
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+        self.layerTransformProcessor = layerTransformProcessor
+        self.canvasEditingWorkflow = canvasEditingWorkflow
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.layerCommands = services.layerCommands
+        self.mutationWorkflow = services.mutationWorkflow
+        self.contentService = services.contentService
+        self.textLayerService = services.textLayerService
+        self.selectionWorkflow = services.selectionWorkflow
+        self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
+        self.layerTransformProcessor = services.layerTransformProcessor
+        self.canvasEditingWorkflow = services.canvasEditingWorkflow
+    }
+
+    public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
+    public func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
+    public func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
+    public func deleteLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
+    public func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
+    public func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
+    public func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
+    public func mergeLayerDown(_ index: Int) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
+    public func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
+    public func setActiveLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index) }
+    public func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index, opacity: opacity) }
+    public func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index, isLocked: isLocked) }
+    public func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
+    public func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index, isClipped: isClipped) }
+    public func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID, isExpanded: isExpanded) }
+    public func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID, visible: visible) }
+    public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
+    public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
+    public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
+    public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
+    public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
+    public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
+    public func clearLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
+    public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, maskData: maskData) }
+    public func clearLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
+    public func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
+
+    public func pixelDataForLayer(_ index: Int) -> Data { contentService.pixelDataForLayer(index) }
+    public func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
+    public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
+    public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
+    public func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
+    public func textLayerData(_ index: Int) -> TextLayerData? { textLayerService.textLayerData(index) }
+    public func clearTextLayerData(_ index: Int) { textLayerService.clearTextLayerData(index) }
+    public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
+    public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
+    public func revealLayerForEditing(_ index: Int) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index) }
+    public func ensureLayerVisible(_ index: Int) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index) }
+    public func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index, payload) }
+    public func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index, payload) }
+    public func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index, textLayer, payload) }
+
+    public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
+    public func transformedLayerPixels(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        layerTransformProcessor.transformedLayerPixels(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            selection: selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets
+        )
+    }
+
+    public func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        layerTransformProcessor.transformedSelection(
+            selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets,
+            canvasSize: canvasSize
+        )
+    }
+
+    public func transformationBounds(selection: CanvasSelection?, pixelData: Data, canvasWidth: Int, canvasHeight: Int) -> CGRect? {
+        layerTransformProcessor.transformationBounds(
+            selection: selection,
+            pixelData: pixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+
+    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
+    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
+    public func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? { selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) }
+    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
+    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
+    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
+    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
+    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: Int, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
+    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
+    public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] { selectionWorkflow.expandedSelectionMask(source, width: width, height: height, expansion: expansion) }
+    public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] { selectionWorkflow.contractedSelectionMask(source, width: width, height: height, contraction: contraction) }
+    public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] { selectionWorkflow.featheredSelectionMask(source, width: width, height: height, radius: radius) }
+    public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] { selectionWorkflow.invertedSelectionMask(source) }
+    public func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, width: width, height: height, mode: mode) }
+    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
+}
+
+public struct CanvasStrokeRuntime: Sendable {
+    private let strokeCommands: DocumentStrokeCommandService
+    private let canvasStrokeInteractionService: CanvasStrokeInteractionService
+
+    public init(
+        strokeCommands: DocumentStrokeCommandService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService
+    ) {
+        self.strokeCommands = strokeCommands
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.strokeCommands = services.strokeCommands
+        self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
+    }
+
+    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) { strokeCommands.beginStroke(sample, brush) }
+    public func appendStroke(_ sample: StylusSample) { strokeCommands.appendStroke(sample) }
+    public func endStroke() -> DocumentMutationResult { strokeCommands.endStroke() }
+    public func cancelStroke() { strokeCommands.cancelStroke() }
+    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex) }
+    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) }
+    public func endBlurStroke() -> DocumentMutationResult { strokeCommands.endBlurStroke() }
+    public func cancelBlurStroke() { strokeCommands.cancelBlurStroke() }
+    public func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult { strokeCommands.fill(sample, brush) }
+    public func cancel() -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.cancel() }
+    public func cancelPreview() -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.cancel() }
+    public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
+    public func beginPreview(sample: StylusSample, baseSnapshot: MetalDocumentSnapshot?, context: DocumentStrokeContext, usesResponsivePreview: Bool) -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.beginPreview(sample: sample, baseSnapshot: baseSnapshot, context: context, usesResponsivePreview: usesResponsivePreview) }
+    public func appendPreview(baseSnapshot: MetalDocumentSnapshot?, renderSnapshot: MetalDocumentSnapshot?, renderState: StrokeSessionRenderState?, samples: [StylusSample], fullSamples: [StylusSample], context: DocumentStrokeContext, usesResponsivePreview: Bool) -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.appendPreview(baseSnapshot: baseSnapshot, renderSnapshot: renderSnapshot, renderState: renderState, samples: samples, fullSamples: fullSamples, context: context, usesResponsivePreview: usesResponsivePreview) }
+    public func finish(renderState: StrokeSessionRenderState?, baseSnapshot: MetalDocumentSnapshot?, renderSnapshot: MetalDocumentSnapshot?, samples: [StylusSample], context: DocumentStrokeContext, allowsApproximatePreviewCommit: Bool, refreshViaDirtyPresentation: Bool) -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.finish(renderState: renderState, baseSnapshot: baseSnapshot, renderSnapshot: renderSnapshot, samples: samples, context: context, allowsApproximatePreviewCommit: allowsApproximatePreviewCommit, refreshViaDirtyPresentation: refreshViaDirtyPresentation) }
+    public func finishPreview(renderState: StrokeSessionRenderState?, baseSnapshot: MetalDocumentSnapshot?, renderSnapshot: MetalDocumentSnapshot?, samples: [StylusSample], context: DocumentStrokeContext, allowsApproximatePreviewCommit: Bool, refreshViaDirtyPresentation: Bool) -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.finish(renderState: renderState, baseSnapshot: baseSnapshot, renderSnapshot: renderSnapshot, samples: samples, context: context, allowsApproximatePreviewCommit: allowsApproximatePreviewCommit, refreshViaDirtyPresentation: refreshViaDirtyPresentation) }
+    public func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease {
+        StrokePreviewLease(surfaceHandle: mutation.surface.handle.buffer)
+    }
+}
+
+public struct DocumentPersistenceRuntime: Sendable {
+    private let persistenceClient: DocumentPersistenceClient
+
+    public init(persistenceClient: DocumentPersistenceClient) {
+        self.persistenceClient = persistenceClient
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.persistenceClient = services.persistenceClient
+    }
+
+    public func saveProject(_ url: URL, _ paperStyle: CanvasPaperStyle) throws { try persistenceClient.saveProject(url, paperStyle) }
+    public func loadProject(_ url: URL) throws -> LoadedPaintProject { try persistenceClient.loadProject(url) }
+    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) { persistenceClient.setPaperStyle(paperStyle) }
+    public func newCanvas(_ width: Int, _ height: Int) { persistenceClient.newCanvas(width, height) }
+    public func prewarmDrawingResources() { persistenceClient.prewarmDrawingResources() }
+}
+
+public struct DocumentExportRuntime: Sendable {
+    private let exportClient: DocumentExportClient
+
+    public init(exportClient: DocumentExportClient) {
+        self.exportClient = exportClient
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.exportClient = services.exportClient
+    }
+
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? { exportClient.compositeSurface(paperStyle) }
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Data? { exportClient.compositePNGData(paperStyle) }
+    public func timelapseCapture() -> TimelapseCapture? { exportClient.timelapseCapture() }
+}
+
+public struct CanvasPreviewRuntime: Sendable {
+    private let canvasPreviewRenderer: any CanvasPreviewRendering
+    private let canvasEyedropperSampler: any CanvasEyedropperSampling
+    private let selectionMaskProcessor: any SelectionMaskProcessing
+    private let canvasPresentationEnvironment: CanvasPresentationEnvironment
+
+    public init(
+        canvasPreviewRenderer: any CanvasPreviewRendering,
+        canvasEyedropperSampler: any CanvasEyedropperSampling,
+        selectionMaskProcessor: any SelectionMaskProcessing,
+        canvasPresentationEnvironment: CanvasPresentationEnvironment
+    ) {
+        self.canvasPreviewRenderer = canvasPreviewRenderer
+        self.canvasEyedropperSampler = canvasEyedropperSampler
+        self.selectionMaskProcessor = selectionMaskProcessor
+        self.canvasPresentationEnvironment = canvasPresentationEnvironment
+    }
+
+    fileprivate init(services: DocumentRuntimeServices) {
+        self.canvasPreviewRenderer = services.canvasPreviewRenderer
+        self.canvasEyedropperSampler = GpuCanvasEyedropperSampler()
+        self.selectionMaskProcessor = services.selectionMaskProcessor
+        self.canvasPresentationEnvironment = services.canvasPresentationEnvironment
+    }
+
+    public func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data) -> Data? {
+        canvasPreviewRenderer.compositePreviewImageData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels
+        )
+    }
+
+    public func eyedropperLoupeSurface(
+        sourcePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.eyedropperLoupeSurface(
+            sourcePixelData: sourcePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            centerX: centerX,
+            centerY: centerY,
+            gridSize: gridSize,
+            paperStyle: paperStyle,
+            blendWithPaper: blendWithPaper
+        )
+    }
+
+    public func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.paperCompositeSurface(pixelData: pixelData, width: width, height: height, paperStyle: paperStyle)
+    }
+
+    public func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.shapePreviewSurface(stroke: stroke, style: style, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    }
+
+    public func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.transformedTextPreviewSurface(textLayer: textLayer, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    }
+
+    public func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
+        canvasPreviewRenderer.transformedTextLayoutRect(textLayer: textLayer, canvasSize: canvasSize)
+    }
+
+    public func sampledColor(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        source: EyedropperSamplingSource,
+        point: CGPoint,
+        paperStyle: CanvasPaperStyle
+    ) -> SampledColor? {
+        canvasEyedropperSampler.sampledColor(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            source: source,
+            point: point,
+            paperStyle: paperStyle
+        )
+    }
+
+    public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
+        selectionMaskProcessor.selectionOverlaySurface(maskData: maskData, width: width, height: height)
+    }
+
+    public func presentationEnvironment() -> CanvasPresentationEnvironment {
+        canvasPresentationEnvironment
+    }
+}
+
+public struct DocumentApplicationRuntime: Sendable {
+    public let presentation: DocumentPresentationRuntime
+    public let canvasMutation: CanvasMutationRuntime
+    public let stroke: CanvasStrokeRuntime
+    public let layerEditing: LayerEditingRuntime
+    public let persistence: DocumentPersistenceRuntime
+    public let export: DocumentExportRuntime
+    public let preview: CanvasPreviewRuntime
+
+    public init(
+        presentation: DocumentPresentationRuntime,
+        canvasMutation: CanvasMutationRuntime,
+        stroke: CanvasStrokeRuntime,
+        layerEditing: LayerEditingRuntime,
+        persistence: DocumentPersistenceRuntime,
+        export: DocumentExportRuntime,
+        preview: CanvasPreviewRuntime
+    ) {
+        self.presentation = presentation
+        self.canvasMutation = canvasMutation
+        self.stroke = stroke
+        self.layerEditing = layerEditing
+        self.persistence = persistence
+        self.export = export
+        self.preview = preview
+    }
+
+    package init(composition: DocumentRuntimeComposition) {
+        let services = DocumentRuntimeServices(composition: composition)
+        self.init(
+            presentation: DocumentPresentationRuntime(services: services),
+            canvasMutation: CanvasMutationRuntime(services: services),
+            stroke: CanvasStrokeRuntime(services: services),
+            layerEditing: LayerEditingRuntime(services: services),
+            persistence: DocumentPersistenceRuntime(services: services),
+            export: DocumentExportRuntime(services: services),
+            preview: CanvasPreviewRuntime(services: services)
+        )
+    }
+}
+
 public struct DocumentRuntime: Sendable {
     private let executeHandler: @Sendable (DocumentCommand) async -> DocumentCommandOutcome
     private let observePresentationHandler: @Sendable () -> AsyncStream<PaintDocumentPresentation>
 
-    public let canvasCommands: DocumentCanvasCommandService
-    public let layerCommands: DocumentLayerCommandService
-    public let strokeCommands: DocumentStrokeCommandService
-    public let canvasStrokeInteractionService: CanvasStrokeInteractionService
-    public let historyCommands: DocumentHistoryCommandService
-    public let mutationWorkflow: DocumentMutationWorkflowService
-    public let contentService: DocumentContentService
-    public let canvasEditingWorkflow: CanvasEditingWorkflowService
-    public let selectionWorkflow: SelectionWorkflowService
-    public let canvasPreviewRenderer: any CanvasPreviewRendering
-    public let layerTransformProcessor: any LayerTransformProcessing
-    public let selectionMaskProcessor: any SelectionMaskProcessing
-    public let canvasPresentationEnvironment: CanvasPresentationEnvironment
-    public let presentationReader: DocumentPresentationReader
-    public let renderingWorkflow: DocumentRenderingWorkflow
-    public let textLayerService: DocumentTextLayerService
-    public let exportClient: DocumentExportClient
-    public let persistenceClient: DocumentPersistenceClient
-
     public init(
         execute: @escaping @Sendable (DocumentCommand) async -> DocumentCommandOutcome,
-        observePresentation: @escaping @Sendable () -> AsyncStream<PaintDocumentPresentation>,
-        canvasCommands: DocumentCanvasCommandService,
-        layerCommands: DocumentLayerCommandService,
-        strokeCommands: DocumentStrokeCommandService,
-        canvasStrokeInteractionService: CanvasStrokeInteractionService,
-        historyCommands: DocumentHistoryCommandService,
-        mutationWorkflow: DocumentMutationWorkflowService,
-        contentService: DocumentContentService,
-        canvasEditingWorkflow: CanvasEditingWorkflowService,
-        selectionWorkflow: SelectionWorkflowService,
-        canvasPreviewRenderer: any CanvasPreviewRendering,
-        layerTransformProcessor: any LayerTransformProcessing,
-        selectionMaskProcessor: any SelectionMaskProcessing,
-        canvasPresentationEnvironment: CanvasPresentationEnvironment,
-        presentationReader: DocumentPresentationReader,
-        renderingWorkflow: DocumentRenderingWorkflow,
-        textLayerService: DocumentTextLayerService,
-        exportClient: DocumentExportClient,
-        persistenceClient: DocumentPersistenceClient
+        observePresentation: @escaping @Sendable () -> AsyncStream<PaintDocumentPresentation>
     ) {
         self.executeHandler = execute
         self.observePresentationHandler = observePresentation
-        self.canvasCommands = canvasCommands
-        self.layerCommands = layerCommands
-        self.strokeCommands = strokeCommands
-        self.canvasStrokeInteractionService = canvasStrokeInteractionService
-        self.historyCommands = historyCommands
-        self.mutationWorkflow = mutationWorkflow
-        self.contentService = contentService
-        self.canvasEditingWorkflow = canvasEditingWorkflow
-        self.selectionWorkflow = selectionWorkflow
-        self.canvasPreviewRenderer = canvasPreviewRenderer
-        self.layerTransformProcessor = layerTransformProcessor
-        self.selectionMaskProcessor = selectionMaskProcessor
-        self.canvasPresentationEnvironment = canvasPresentationEnvironment
-        self.presentationReader = presentationReader
-        self.renderingWorkflow = renderingWorkflow
-        self.textLayerService = textLayerService
-        self.exportClient = exportClient
-        self.persistenceClient = persistenceClient
     }
 
     public func execute(_ command: DocumentCommand) async -> DocumentCommandOutcome {
@@ -555,69 +1098,7 @@ public struct DocumentRuntime: Sendable {
     }
 
     package init(composition: DocumentRuntimeComposition) {
-        let canvasCommands = DocumentCanvasCommandService(
-            queryGateway: composition.queryGateway,
-            renderGateway: composition.renderGateway,
-            mutationGateway: composition.mutationGateway,
-            persistenceGateway: composition.persistenceGateway
-        )
-        let layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
-        let strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
-        let canvasStrokeInteractionService = CanvasStrokeInteractionService(
-            sessionUseCase: composition.strokeSessionUseCase,
-            releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
-        )
-        let historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
-        let mutationWorkflow = DocumentMutationWorkflowService(
-            documentEditingGateway: composition.editingGateway,
-            documentLayerEffectsGateway: composition.layerEffectsGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
-        let contentService = DocumentContentService(
-            documentQueryGateway: composition.queryGateway,
-            documentRenderGateway: composition.renderGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
-        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
-        let layerTransformProcessor = GpuLayerTransformProcessor(
-            layerTransformOperations: composition.layerTransformOperations,
-            selectionOperations: composition.selectionMaskOperations
-        )
-        let selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
-        let canvasEditingWorkflow = CanvasEditingWorkflowService(
-            documentContentService: contentService,
-            layerTransformProcessor: layerTransformProcessor
-        )
-        let selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
-        let canvasPresentationEnvironment = CanvasPresentationEnvironment(
-            previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: GpuCanvasEyedropperSampler(),
-            selectionProcessor: selectionMaskProcessor
-        )
-        let presentationReader = DocumentPresentationReader(
-            lightweightPresentation: composition.queryGateway.lightweightPresentation,
-            presentation: composition.queryGateway.presentation
-        )
-        let renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
-        let textLayerService = DocumentTextLayerService(
-            textLayerData: composition.textLayerGateway.textLayerData,
-            setTextLayer: composition.textLayerGateway.setTextLayer,
-            clearTextLayerData: composition.textLayerGateway.clearTextLayerData
-        )
-        let persistenceClient = DocumentPersistenceClient(
-            saveProject: composition.persistenceGateway.saveProject,
-            loadProject: composition.persistenceGateway.loadProject,
-            setPaperStyle: composition.persistenceGateway.setPaperStyle,
-            newCanvas: composition.persistenceGateway.newCanvas,
-            prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources
-        )
-        let exportClient = DocumentExportClient(
-            compositeSurface: composition.exportGateway.compositeSurface,
-            compositePNGData: composition.exportGateway.compositePNGData,
-            timelapseCapture: composition.exportGateway.timelapseCapture
-        )
+        let services = DocumentRuntimeServices(composition: composition)
         let presentationBroadcaster = DocumentRuntimePresentationBroadcaster {
             composition.queryGateway.lightweightPresentation()
         }
@@ -642,15 +1123,15 @@ public struct DocumentRuntime: Sendable {
             case let .canvas(command):
                 switch command {
                 case let .create(width, height):
-                    return mutationOutcome(canvasCommands.createCanvas(width, height).map { .completed })
+                    return mutationOutcome(services.canvasCommands.createCanvas(width, height).map { .completed })
                 case let .resize(width, height):
-                    return mutationOutcome(canvasCommands.resizeCanvas(width, height).map { .completed })
+                    return mutationOutcome(services.canvasCommands.resizeCanvas(width, height).map { .completed })
                 case let .resizeExtent(width, height):
-                    return mutationOutcome(canvasCommands.resizeCanvasExtent(width, height).map { .completed })
+                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(width, height).map { .completed })
                 case let .initializeImported(request, layerName):
-                    return mutationOutcome(canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
+                    return mutationOutcome(services.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
                 case .compositeSurface:
-                    return .compositeSurface(canvasCommands.compositeSurface())
+                    return .compositeSurface(services.canvasCommands.compositeSurface())
                 case let .setPaperStyle(style):
                     composition.persistenceGateway.setPaperStyle(style)
                     presentationBroadcaster.publishLatest()
@@ -707,25 +1188,23 @@ public struct DocumentRuntime: Sendable {
             execute: executeClosure,
             observePresentation: {
                 presentationBroadcaster.stream()
-            },
-            canvasCommands: canvasCommands,
-            layerCommands: layerCommands,
-            strokeCommands: strokeCommands,
-            canvasStrokeInteractionService: canvasStrokeInteractionService,
-            historyCommands: historyCommands,
-            mutationWorkflow: mutationWorkflow,
-            contentService: contentService,
-            canvasEditingWorkflow: canvasEditingWorkflow,
-            selectionWorkflow: selectionWorkflow,
-            canvasPreviewRenderer: canvasPreviewRenderer,
-            layerTransformProcessor: layerTransformProcessor,
-            selectionMaskProcessor: selectionMaskProcessor,
-            canvasPresentationEnvironment: canvasPresentationEnvironment,
-            presentationReader: presentationReader,
-            renderingWorkflow: renderingWorkflow,
-            textLayerService: textLayerService,
-            exportClient: exportClient,
-            persistenceClient: persistenceClient
+            }
+        )
+    }
+}
+
+public enum DocumentApplicationRuntimeFactory {
+    public static func live(
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) -> DocumentApplicationRuntime {
+        DocumentApplicationRuntime(
+            composition: DocumentRuntimeCompositionFactory.live(
+                fileClient: fileClient,
+                dateClient: dateClient,
+                uuidClient: uuidClient
+            )
         )
     }
 }

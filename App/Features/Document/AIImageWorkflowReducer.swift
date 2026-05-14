@@ -14,7 +14,7 @@ struct AIImageWorkflowReducer: Reducer {
     typealias DocumentMutationFeedbackMapper = DocumentFeature.DocumentMutationFeedbackMapper
     typealias DocumentNamingPolicy = DocumentFeature.DocumentNamingPolicy
     typealias LayerContentMutationTarget = PrimoDocumentApplication.LayerContentMutationTarget
-    typealias LayerContentWorkflowService = PrimoDocumentApplication.DocumentContentService
+    typealias LayerContentWorkflowService = LayerEditingRuntime
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
     @Dependency(\.aiImageEditUseCase) var aiImageEditUseCase
@@ -22,7 +22,7 @@ struct AIImageWorkflowReducer: Reducer {
     @Dependency(\.dateClient) var dateClient
     @Dependency(\.layerWorkflowEnvironment) var layerWorkflowEnvironment
 
-    var documentContentService: DocumentContentService {
+    var documentContentService: LayerEditingRuntime {
         layerWorkflowEnvironment.contentService
     }
 
@@ -34,11 +34,11 @@ struct AIImageWorkflowReducer: Reducer {
         layerWorkflowEnvironment.presentationReader
     }
 
-    var documentTextLayerService: DocumentTextLayerService {
+    var documentTextLayerService: LayerEditingRuntime {
         layerWorkflowEnvironment.textLayerService
     }
 
-    var selectionWorkflowService: SelectionWorkflowService {
+    var selectionWorkflowService: LayerEditingRuntime {
         layerWorkflowEnvironment.selectionWorkflowService
     }
     @Dependency(\.uuidClient) var uuidClient

@@ -20,7 +20,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
 
     @Dependency(\.canvasStrokeEnvironment) var canvasStrokeEnvironment
 
-    var canvasStrokeInteractionService: CanvasStrokeInteractionService {
+    var canvasStrokeInteractionService: CanvasStrokeRuntime {
         canvasStrokeEnvironment.canvasStrokeInteractionService
     }
 
@@ -28,7 +28,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
         canvasStrokeEnvironment.renderingWorkflow
     }
 
-    var documentLayerCommandService: DocumentLayerCommandService {
+    var documentLayerCommandService: LayerEditingRuntime {
         canvasStrokeEnvironment.layerCommandService
     }
 
@@ -40,19 +40,19 @@ struct CanvasEditingWorkflowReducer: Reducer {
         canvasStrokeEnvironment.presentationReader
     }
 
-    var documentStrokeCommandService: DocumentStrokeCommandService {
+    var documentStrokeCommandService: CanvasStrokeRuntime {
         canvasStrokeEnvironment.strokeCommandService
     }
 
-    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
+    var canvasEditingWorkflowService: LayerEditingRuntime {
         canvasStrokeEnvironment.canvasEditingWorkflowService
     }
 
-    var documentContentService: DocumentContentService {
+    var documentContentService: LayerEditingRuntime {
         canvasStrokeEnvironment.contentService
     }
 
-    var layerTransformProcessor: any LayerTransformProcessing {
+    var layerTransformProcessor: LayerEditingRuntime {
         canvasStrokeEnvironment.layerTransformProcessor
     }
 

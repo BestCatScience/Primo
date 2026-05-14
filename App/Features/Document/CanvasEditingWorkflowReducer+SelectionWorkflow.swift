@@ -4,9 +4,10 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRuntime
 
 extension CanvasEditingWorkflowReducer {
-    var selectionWorkflowService: SelectionWorkflowService {
+    var selectionWorkflowService: LayerEditingRuntime {
         selectionWorkflowEnvironment.workflow
     }
 

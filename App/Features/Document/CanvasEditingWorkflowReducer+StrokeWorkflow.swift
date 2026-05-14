@@ -262,11 +262,7 @@ extension CanvasEditingWorkflowReducer {
         let strokeInteraction = canvasStrokeInteractionService
         return DocumentFeature.CanvasStrokeSessionCoordinator(
             layerCommands: documentLayerCommandService,
-            strokeInteraction: strokeInteraction,
-            commitWorkflow: DocumentStrokeCommitWorkflowService(
-                layerCommands: documentLayerCommandService,
-                strokeInteraction: strokeInteraction
-            )
+            strokeInteraction: strokeInteraction
         )
     }
 
