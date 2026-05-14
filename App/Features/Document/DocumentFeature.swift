@@ -82,7 +82,7 @@ struct DocumentFeature {
     typealias DocumentPresentationRefresh = DocumentPresentationRefreshIntent
     typealias LayerMutationFinalization = DocumentLayerMutationFinalization
     typealias DocumentMutationContract = DocumentMutationWorkflowOutcome<CanvasSelection, ApplicationFeature.Feedback>
-    typealias LayerWorkflowService = LayerEditingRuntime
+    typealias LayerWorkflowService = any LayerMutationWorkflowSubmitting
     typealias CanvasDimensions = DocumentCanvasDimensions
     typealias FreshDocumentReplacementContract = DocumentFreshDocumentReplacementContract
     typealias WorkspaceDocumentSnapshot = DocumentWorkspaceDocumentSnapshot

@@ -6,7 +6,7 @@ import PrimoDocumentRuntime
 
 extension AdjustmentWorkflowReducer {
     struct AdjustmentWorkflowService {
-        let documentMutationWorkflowService: LayerEditingRuntime
+        let documentMutationWorkflowService: any LayerMutationWorkflowSubmitting
 
         func applyLayerProcessing(
             _ layerIndex: Int,

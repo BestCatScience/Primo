@@ -8,7 +8,7 @@ extension DocumentFeature {
     static func layerMaskData(
         from selection: CanvasSelection?,
         canvasSize: CGSize,
-        selectionWorkflow: LayerEditingRuntime
+        selectionWorkflow: any SelectionWorkflowRequesting
     ) -> Data? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)

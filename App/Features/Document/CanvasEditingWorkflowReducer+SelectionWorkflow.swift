@@ -211,7 +211,26 @@ extension CanvasEditingWorkflowReducer {
             return .none
         }
 
-        switch documentContentService.replaceLayerPixels(session.layerIndex, movedLayerPixels) {
+        let command: ValidatedLayerContentReplacementCommand
+        switch documentWorkflowCommandValidator.editableLayerCommand(
+            index: session.layerIndex,
+            in: state
+        ) {
+        case let .success(layer):
+            command = ValidatedLayerContentReplacementCommand(
+                layer: layer,
+                pixelData: movedLayerPixels
+            )
+
+        case let .failure(failure):
+            state.canvas.cancelSelectionMove()
+            state.canvas.resetStrokePreview()
+            return documentMutationFeedbackEffect(
+                for: DocumentMutationFeedbackMapper().feedback(for: failure)
+            )
+        }
+
+        switch documentContentService.replaceLayerPixels(command) {
         case .success:
             let retainedSession = session.committed(by: committedOffset)
             state.canvas.replaceSelection(translatedSelection)

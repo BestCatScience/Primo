@@ -79,12 +79,16 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
     var locked: Bool
     var alphaLocked: Bool
     var clipped: Bool
-    var opacity: Double
+    private var opacityStorage: DocumentLayerOpacity
     var blendMode: LayerBlendMode
     var folderID: Int?
     var textLayer: TextLayerData?
-    var pixelData: Data
-    var maskData: Data?
+    private(set) var pixelData: Data
+    private(set) var maskData: Data?
+
+    var opacity: Double {
+        opacityStorage.rawValue
+    }
 
     init?(
         name: String,
@@ -146,12 +150,43 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
         self.locked = locked
         self.alphaLocked = alphaLocked
         self.clipped = clipped
-        self.opacity = opacity.rawValue
+        self.opacityStorage = opacity
         self.blendMode = blendMode
         self.folderID = folderID
         self.textLayer = textLayer
         self.pixelData = pixelBuffer.data
         self.maskData = maskBuffer?.data
+    }
+
+    @discardableResult
+    mutating func setOpacity(_ rawValue: Double) -> Bool {
+        guard let opacity = DocumentLayerOpacity(rawValue) else {
+            return false
+        }
+        opacityStorage = opacity
+        return true
+    }
+
+    @discardableResult
+    mutating func replacePixelData(_ data: Data, geometry: PixelGeometry) -> Bool {
+        guard let pixelBuffer = LayerPixelBuffer(geometry: geometry, data: data) else {
+            return false
+        }
+        pixelData = pixelBuffer.data
+        return true
+    }
+
+    @discardableResult
+    mutating func replaceMaskData(_ data: Data?, geometry: PixelGeometry) -> Bool {
+        guard let data else {
+            maskData = nil
+            return true
+        }
+        guard let maskBuffer = LayerMaskBuffer(geometry: geometry, data: data) else {
+            return false
+        }
+        maskData = maskBuffer.data
+        return true
     }
 }
 

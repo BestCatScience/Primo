@@ -42,6 +42,23 @@ struct SwiftDocumentStoreInvariantTests {
     }
 
     @Test
+    func layerValidatedMutatorsPreserveExistingValuesOnFailure() throws {
+        let geometry = try #require(PixelGeometry(width: 2, height: 2))
+        var layer = try #require(makeLayer(geometry: geometry))
+        let originalPixelData = layer.pixelData
+
+        let rejectedOpacity = layer.setOpacity(.nan)
+        #expect(!rejectedOpacity)
+        #expect(layer.opacity == 1)
+        let rejectedPixelData = layer.replacePixelData(Data(count: geometry.rgbaByteCount - 1), geometry: geometry)
+        #expect(!rejectedPixelData)
+        #expect(layer.pixelData == originalPixelData)
+        let rejectedMaskData = layer.replaceMaskData(Data(count: geometry.maskByteCount - 1), geometry: geometry)
+        #expect(!rejectedMaskData)
+        #expect(layer.maskData == nil)
+    }
+
+    @Test
     func restoreRejectsInvalidMutatedSnapshot() throws {
         let store = SwiftDocumentStore(width: 2, height: 2)
         var invalid = store.snapshot

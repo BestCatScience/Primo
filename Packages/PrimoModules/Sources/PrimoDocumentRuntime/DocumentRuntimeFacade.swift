@@ -906,6 +906,140 @@ public struct CanvasStrokeRuntime: Sendable {
     }
 }
 
+public struct StrokeEditingRuntime: Sendable {
+    private let strokeRuntime: CanvasStrokeRuntime
+
+    public init(strokeRuntime: CanvasStrokeRuntime) {
+        self.strokeRuntime = strokeRuntime
+    }
+
+    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) {
+        strokeRuntime.beginStroke(sample, brush)
+    }
+
+    public func appendStroke(_ sample: StylusSample) {
+        strokeRuntime.appendStroke(sample)
+    }
+
+    public func endStroke() -> DocumentMutationResult {
+        strokeRuntime.endStroke()
+    }
+
+    public func cancelStroke() {
+        strokeRuntime.cancelStroke()
+    }
+
+    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult {
+        strokeRuntime.applyGpuStrokeSurface(samples, brush, layerIndex)
+    }
+
+    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
+        strokeRuntime.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+    }
+
+    public func endBlurStroke() -> DocumentMutationResult {
+        strokeRuntime.endBlurStroke()
+    }
+
+    public func cancelBlurStroke() {
+        strokeRuntime.cancelBlurStroke()
+    }
+
+    public func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
+        strokeRuntime.fill(sample, brush)
+    }
+
+    public func cancel() -> GpuStrokeSessionOutcome {
+        strokeRuntime.cancel()
+    }
+
+    public func cancelPreview() -> GpuStrokeSessionOutcome {
+        strokeRuntime.cancelPreview()
+    }
+
+    public func discardPreviewLease(_ lease: StrokePreviewLease) {
+        strokeRuntime.discardPreviewLease(lease)
+    }
+
+    public func beginPreview(
+        sample: StylusSample,
+        baseSnapshot: MetalDocumentSnapshot?,
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.beginPreview(
+            sample: sample,
+            baseSnapshot: baseSnapshot,
+            context: context,
+            usesResponsivePreview: usesResponsivePreview
+        )
+    }
+
+    public func appendPreview(
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext,
+        usesResponsivePreview: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.appendPreview(
+            baseSnapshot: baseSnapshot,
+            renderSnapshot: renderSnapshot,
+            renderState: renderState,
+            samples: samples,
+            fullSamples: fullSamples,
+            context: context,
+            usesResponsivePreview: usesResponsivePreview
+        )
+    }
+
+    public func finish(
+        renderState: StrokeSessionRenderState?,
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        allowsApproximatePreviewCommit: Bool,
+        refreshViaDirtyPresentation: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.finish(
+            renderState: renderState,
+            baseSnapshot: baseSnapshot,
+            renderSnapshot: renderSnapshot,
+            samples: samples,
+            context: context,
+            allowsApproximatePreviewCommit: allowsApproximatePreviewCommit,
+            refreshViaDirtyPresentation: refreshViaDirtyPresentation
+        )
+    }
+
+    public func finishPreview(
+        renderState: StrokeSessionRenderState?,
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        allowsApproximatePreviewCommit: Bool,
+        refreshViaDirtyPresentation: Bool
+    ) -> GpuStrokeSessionOutcome {
+        strokeRuntime.finishPreview(
+            renderState: renderState,
+            baseSnapshot: baseSnapshot,
+            renderSnapshot: renderSnapshot,
+            samples: samples,
+            context: context,
+            allowsApproximatePreviewCommit: allowsApproximatePreviewCommit,
+            refreshViaDirtyPresentation: refreshViaDirtyPresentation
+        )
+    }
+
+    public func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease {
+        strokeRuntime.previewLease(for: mutation)
+    }
+}
+
 public struct DocumentPersistenceRuntime: Sendable {
     private let persistenceClient: DocumentPersistenceClient
 
@@ -1044,6 +1178,10 @@ public struct DocumentApplicationRuntime: Sendable {
     public let persistence: DocumentPersistenceRuntime
     public let export: DocumentExportRuntime
     public let preview: CanvasPreviewRuntime
+
+    public var strokeEditing: StrokeEditingRuntime {
+        StrokeEditingRuntime(strokeRuntime: stroke)
+    }
 
     public init(
         presentation: DocumentPresentationRuntime,

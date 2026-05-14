@@ -24,7 +24,7 @@ extension AIImageWorkflowReducer {
         func validate(
             command: SubmitAIImageEditCommand,
             state: DocumentEditingState,
-            selectionWorkflow: LayerEditingRuntime
+            selectionWorkflow: any SelectionWorkflowRequesting
         ) -> Result<AIImageValidatedEdit, AIImageValidationFailure> {
             guard
                 let snapshot = state.canvas.renderSnapshot,
@@ -122,7 +122,7 @@ extension AIImageWorkflowReducer {
             let targetLayerIndex: Int
         }
 
-        let contentService: LayerEditingRuntime
+        let contentService: any LayerContentWorkflowSubmitting
 
         func apply(_ plan: AIImagePreviewApplicationPlan) -> Result<AppliedPreview, DocumentMutationFailure> {
             contentService.applyPixels(
@@ -145,7 +145,7 @@ extension AIImageWorkflowReducer {
         AIImagePreviewPreparationService(editUseCase: aiImageEditUseCase)
     }
 
-    private var aiImageLayerContentService: LayerEditingRuntime {
+    private var aiImageLayerContentService: any LayerContentWorkflowSubmitting {
         documentContentService
     }
 

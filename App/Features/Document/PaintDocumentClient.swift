@@ -15,6 +15,122 @@ import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
 
+struct ValidatedDocumentLayerMutationCommand: Equatable, Sendable {
+    let command: DocumentMutationCommand
+    let layerIndex: Int
+
+    init(command: DocumentMutationCommand, layerIndex: Int) {
+        self.command = command
+        self.layerIndex = layerIndex
+    }
+}
+
+struct ValidatedLayerContentReplacementCommand: Equatable, Sendable {
+    let layer: ValidatedDocumentLayerMutationCommand
+    let pixelData: Data
+}
+
+struct ValidatedBlurStrokeMutationCommand: Equatable, Sendable {
+    let layer: ValidatedDocumentLayerMutationCommand
+    let samples: [StylusSample]
+    let brush: BrushRuntimeSettings
+    let clearSelectionAfterBlur: Bool
+}
+
+struct ValidatedFillMutationCommand: Equatable, Sendable {
+    let layer: ValidatedDocumentLayerMutationCommand
+    let sample: StylusSample
+    let brush: BrushRuntimeSettings
+}
+
+struct DocumentWorkflowCommandValidator: Sendable {
+    private let validator = DocumentMutationValidator()
+
+    func editableLayerCommand(
+        index: Int,
+        in state: DocumentEditingState
+    ) -> Result<ValidatedDocumentLayerMutationCommand, DocumentMutationFailure> {
+        let command = DocumentMutationCommand.layer(index: index, requiresUnlocked: true)
+        if let issue = validator.validate(command, in: validationContext(for: state)) {
+            return .failure(issue.documentMutationFailure)
+        }
+        return .success(
+            ValidatedDocumentLayerMutationCommand(
+                command: command,
+                layerIndex: index
+            )
+        )
+    }
+
+    func blurStrokeCommand(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        clearSelectionAfterBlur: Bool,
+        in state: DocumentEditingState
+    ) -> Result<ValidatedBlurStrokeMutationCommand, DocumentMutationFailure> {
+        guard !samples.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        return editableLayerCommand(index: state.canvas.activeLayerIndex, in: state).map { layer in
+            ValidatedBlurStrokeMutationCommand(
+                layer: layer,
+                samples: samples,
+                brush: brush,
+                clearSelectionAfterBlur: clearSelectionAfterBlur
+            )
+        }
+    }
+
+    func fillCommand(
+        sample: StylusSample,
+        brush: BrushRuntimeSettings,
+        in state: DocumentEditingState
+    ) -> Result<ValidatedFillMutationCommand, DocumentMutationFailure> {
+        editableLayerCommand(index: state.canvas.activeLayerIndex, in: state).map { layer in
+            ValidatedFillMutationCommand(
+                layer: layer,
+                sample: sample,
+                brush: brush
+            )
+        }
+    }
+
+    private func validationContext(for state: DocumentEditingState) -> DocumentMutationValidationContext {
+        let lockedLayerIndexes = Set(
+            state.layerSidebar.layers
+                .filter(\.isLocked)
+                .map(\.index)
+        )
+        return DocumentMutationValidationContext(
+            layerCount: state.layerSidebar.layers.count,
+            folderIDs: Set(
+                state.layerSidebar.rows.compactMap { row in
+                    if case let .folder(folder) = row {
+                        return folder.id
+                    }
+                    return nil
+                }
+            ),
+            isLayerLocked: { index in
+                lockedLayerIndexes.contains(index)
+            }
+        )
+    }
+}
+
+private extension DocumentMutationValidationIssue {
+    var documentMutationFailure: DocumentMutationFailure {
+        switch self {
+        case let .invalidLayerIndex(index):
+            return .invalidLayerIndex(index)
+        case let .invalidFolderID(folderID):
+            return .invalidFolderID(folderID)
+        case let .layerLocked(index):
+            return .layerLocked(index)
+        }
+    }
+}
+
 private enum DocumentApplicationEnvironmentKey: DependencyKey {
     static var liveValue: DocumentApplicationEnvironment {
         @Dependency(\.fileClient) var fileClient
@@ -102,7 +218,7 @@ struct DocumentLayerMutationCapability: Sendable {
 struct LayerWorkflowEnvironment: Sendable {
     let layerEditingRuntime: LayerEditingRuntime
     let presentationRuntime: DocumentPresentationRuntime
-    let strokeRuntime: CanvasStrokeRuntime
+    let strokeRuntime: StrokeEditingRuntime
 }
 
 protocol StrokePreviewLeasing: Sendable {
@@ -142,6 +258,7 @@ protocol StrokePreviewResolving: Sendable {
 
 protocol StrokeMutationSubmitting: Sendable {
     func cancelStroke()
+    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult
     func blurStroke(
         _ samples: [StylusSample],
         _ brush: BrushRuntimeSettings,
@@ -150,17 +267,53 @@ protocol StrokeMutationSubmitting: Sendable {
     ) -> DocumentMutationResult
     func endBlurStroke() -> DocumentMutationResult
     func cancelBlurStroke()
+    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult
     func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
 }
 
+protocol LayerMutationWorkflowSubmitting: Sendable {
+    func addLayer(named name: String) -> DocumentIndexedMutationResult
+    func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult
+    func deleteFolder(_ folderID: Int) -> DocumentMutationResult
+    func deleteLayer(_ index: Int) -> DocumentMutationResult
+    func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult
+    func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult
+    func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult
+    func mergeLayerDown(_ index: Int) -> DocumentMutationResult
+    func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult
+    func setActiveLayer(_ index: Int) -> DocumentMutationResult
+    func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult
+    func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult
+    func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult
+    func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult
+    func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult
+    func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult
+    func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult
+    func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult
+    func setLayerName(_ index: Int, name: String) -> DocumentMutationResult
+    func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult
+    func clearLayer(_ index: Int) -> DocumentMutationResult
+    func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult
+    func clearLayerMask(_ index: Int) -> DocumentMutationResult
+    func applyLayerMask(_ index: Int) -> DocumentMutationResult
+}
+
 protocol LayerMutationSubmitting: Sendable {
+    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
     func revealLayerForEditing(_ index: Int) -> DocumentMutationResult
+    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
     func ensureLayerVisible(_ index: Int) -> DocumentMutationResult
     func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
 }
 
+protocol LayerContentWorkflowSubmitting: Sendable {
+    func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure>
+    func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure>
+}
+
 protocol LayerContentSubmitting: Sendable {
     func pixelDataForLayer(_ index: Int) -> Data
+    func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult
     func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult
 }
 
@@ -202,12 +355,12 @@ typealias CanvasStrokeWorkflowAccess =
     & LayerTransformProcessing
 
 struct DocumentCanvasStrokeWorkflowAccess: CanvasStrokeWorkflowAccess {
-    private let strokeRuntime: CanvasStrokeRuntime
+    private let strokeRuntime: StrokeEditingRuntime
     private let layerEditingRuntime: LayerEditingRuntime
     private let presentationAccess: DocumentPresentationWorkflowAccess
 
     init(
-        strokeRuntime: CanvasStrokeRuntime,
+        strokeRuntime: StrokeEditingRuntime,
         layerEditingRuntime: LayerEditingRuntime,
         presentationAccess: DocumentPresentationWorkflowAccess
     ) {
@@ -217,9 +370,42 @@ struct DocumentCanvasStrokeWorkflowAccess: CanvasStrokeWorkflowAccess {
     }
 }
 
-extension CanvasStrokeRuntime: StrokePreviewLeasing, StrokePreviewResolving, StrokeMutationSubmitting {}
+extension StrokeMutationSubmitting {
+    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
+        blurStroke(
+            command.samples,
+            command.brush,
+            command.layer.layerIndex,
+            command.clearSelectionAfterBlur
+        )
+    }
+
+    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult {
+        fill(command.sample, command.brush)
+    }
+}
+
+extension LayerMutationSubmitting {
+    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        revealLayerForEditing(command.layerIndex)
+    }
+
+    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        ensureLayerVisible(command.layerIndex)
+    }
+}
+
+extension LayerContentSubmitting {
+    func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult {
+        replaceLayerPixels(command.layer.layerIndex, command.pixelData)
+    }
+}
+
+extension StrokeEditingRuntime: StrokePreviewLeasing, StrokePreviewResolving, StrokeMutationSubmitting {}
 
 extension LayerEditingRuntime:
+    LayerMutationWorkflowSubmitting,
+    LayerContentWorkflowSubmitting,
     LayerMutationSubmitting,
     LayerContentSubmitting,
     CanvasEditingExecuting,
@@ -327,7 +513,7 @@ extension DocumentLayerMutationCapability {
         presentationRuntime.renderingWorkflow
     }
 
-    var mutationWorkflowService: LayerEditingRuntime {
+    var mutationWorkflowService: any LayerMutationWorkflowSubmitting {
         layerEditingRuntime
     }
 
@@ -342,13 +528,13 @@ extension DocumentLayerMutationCapability {
         layerEditingRuntime
     }
 
-    var selectionWorkflowService: LayerEditingRuntime {
+    var selectionWorkflowService: any SelectionWorkflowRequesting {
         layerEditingRuntime
     }
 }
 
 extension LayerWorkflowEnvironment {
-    var contentService: LayerEditingRuntime {
+    var contentService: any LayerContentWorkflowSubmitting {
         layerEditingRuntime
     }
 
@@ -356,7 +542,7 @@ extension LayerWorkflowEnvironment {
         presentationRuntime.renderingWorkflow
     }
 
-    var mutationWorkflowService: LayerEditingRuntime {
+    var mutationWorkflowService: any LayerMutationWorkflowSubmitting {
         layerEditingRuntime
     }
 
@@ -371,11 +557,11 @@ extension LayerWorkflowEnvironment {
         layerEditingRuntime
     }
 
-    var selectionWorkflowService: LayerEditingRuntime {
+    var selectionWorkflowService: any SelectionWorkflowRequesting {
         layerEditingRuntime
     }
 
-    var canvasStrokeInteractionService: CanvasStrokeRuntime {
+    var canvasStrokeInteractionService: any StrokePreviewLeasing {
         strokeRuntime
     }
 }
@@ -816,10 +1002,10 @@ struct DocumentApplicationEnvironment: Sendable {
         self.layerWorkflowEnvironment = LayerWorkflowEnvironment(
             layerEditingRuntime: runtime.layerEditing,
             presentationRuntime: runtime.presentation,
-            strokeRuntime: runtime.stroke
+            strokeRuntime: runtime.strokeEditing
         )
         self.canvasStrokeWorkflowAccess = DocumentCanvasStrokeWorkflowAccess(
-            strokeRuntime: runtime.stroke,
+            strokeRuntime: runtime.strokeEditing,
             layerEditingRuntime: runtime.layerEditing,
             presentationAccess: presentationWorkflowAccess
         )

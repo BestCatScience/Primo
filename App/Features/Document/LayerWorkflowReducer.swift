@@ -11,14 +11,14 @@ struct LayerWorkflowReducer: Reducer {
     typealias DocumentMutationFeedbackMapper = DocumentFeature.DocumentMutationFeedbackMapper
     typealias DocumentNamingPolicy = DocumentFeature.DocumentNamingPolicy
     typealias LayerContentMutationTarget = PrimoDocumentApplication.LayerContentMutationTarget
-    typealias LayerContentWorkflowService = LayerEditingRuntime
+    typealias LayerContentWorkflowService = any LayerContentWorkflowSubmitting
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
-    typealias LayerWorkflowService = LayerEditingRuntime
+    typealias LayerWorkflowService = any LayerMutationWorkflowSubmitting
 
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.layerWorkflowEnvironment) var layerWorkflowEnvironment
 
-    var documentContentService: LayerEditingRuntime {
+    var documentContentService: any LayerContentWorkflowSubmitting {
         layerWorkflowEnvironment.contentService
     }
 
@@ -26,7 +26,7 @@ struct LayerWorkflowReducer: Reducer {
         layerWorkflowEnvironment.renderingWorkflow
     }
 
-    var documentMutationWorkflowService: LayerEditingRuntime {
+    var documentMutationWorkflowService: any LayerMutationWorkflowSubmitting {
         layerWorkflowEnvironment.mutationWorkflowService
     }
 
@@ -34,7 +34,7 @@ struct LayerWorkflowReducer: Reducer {
         layerWorkflowEnvironment.presentationReader
     }
 
-    var canvasStrokeInteractionService: CanvasStrokeRuntime {
+    var canvasStrokeInteractionService: any StrokePreviewLeasing {
         layerWorkflowEnvironment.canvasStrokeInteractionService
     }
 
@@ -42,7 +42,7 @@ struct LayerWorkflowReducer: Reducer {
         layerWorkflowEnvironment.textLayerService
     }
 
-    var selectionWorkflowService: LayerEditingRuntime {
+    var selectionWorkflowService: any SelectionWorkflowRequesting {
         layerWorkflowEnvironment.selectionWorkflowService
     }
 

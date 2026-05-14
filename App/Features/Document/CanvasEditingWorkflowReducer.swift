@@ -56,6 +56,10 @@ struct CanvasEditingWorkflowReducer: Reducer {
         canvasStrokeWorkflowAccess
     }
 
+    var documentWorkflowCommandValidator: DocumentWorkflowCommandValidator {
+        DocumentWorkflowCommandValidator()
+    }
+
     enum EditingAction: Equatable {
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)

@@ -634,20 +634,26 @@ extension CanvasEditingWorkflowReducer {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        let activeLayerIndex = state.canvas.activeLayerIndex
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+        let command: ValidatedBlurStrokeMutationCommand
+        switch documentWorkflowCommandValidator.blurStrokeCommand(
+            samples: samples,
+            brush: brush,
+            clearSelectionAfterBlur: false,
+            in: state
+        ) {
+        case let .success(validatedCommand):
+            command = validatedCommand
+        case let .failure(failure):
+            return applyCanvasStrokeFailure(failure, state: &state)
+        }
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
             mutation: {
-                switch documentLayerCommandService.revealLayerForEditing(activeLayerIndex) {
+                switch documentLayerCommandService.revealLayerForEditing(command.layer) {
                 case .success:
-                    return documentStrokeCommandService.blurStroke(
-                        samples,
-                        brush,
-                        activeLayerIndex,
-                        false
-                    )
+                    return documentStrokeCommandService.blurStroke(command)
                 case let .failure(failure):
                     return .failure(failure)
                 }
@@ -675,18 +681,25 @@ extension CanvasEditingWorkflowReducer {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        let activeLayerIndex = state.canvas.activeLayerIndex
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+        let command: ValidatedFillMutationCommand
+        switch documentWorkflowCommandValidator.fillCommand(
+            sample: sample,
+            brush: brush,
+            in: state
+        ) {
+        case let .success(validatedCommand):
+            command = validatedCommand
+        case let .failure(failure):
+            return applyCanvasStrokeFailure(failure, state: &state)
+        }
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
             mutation: {
-                switch documentLayerCommandService.ensureLayerVisible(activeLayerIndex) {
+                switch documentLayerCommandService.ensureLayerVisible(command.layer) {
                 case .success:
-                    return documentStrokeCommandService.fill(
-                        sample,
-                        brush
-                    )
+                    return documentStrokeCommandService.fill(command)
                 case let .failure(failure):
                     return .failure(failure)
                 }

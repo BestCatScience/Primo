@@ -597,6 +597,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentPresentationRuntime",
             "CanvasMutationRuntime",
             "CanvasStrokeRuntime",
+            "StrokeEditingRuntime",
             "LayerEditingRuntime",
             "DocumentPersistenceRuntime",
             "DocumentExportRuntime",
@@ -733,6 +734,38 @@ struct GpuSideEffectIsolationArchitectureTests {
             #expect(!body.contains("releaseSurfaceHandle"), "\(file) should release preview resources through lease abstractions")
             #expect(!body.contains("SurfaceHandleReleasing"), "\(file) should not depend on rendering-resource release capability")
             #expect(body.contains("StrokePreviewLease"), "\(file) should use the App-facing preview lease abstraction")
+        }
+    }
+
+    @Test
+    func appWorkflowsDependOnCapabilitySplitRuntimeFacades() throws {
+        let repoRoot = try Self.repoRoot()
+        let strokeWorkflowFiles = [
+            "App/Features/Document/CanvasEditingWorkflowReducer.swift",
+            "App/Features/Document/LayerWorkflowReducer.swift",
+            "App/Features/Document/PaintDocumentClient.swift"
+        ]
+
+        for file in strokeWorkflowFiles {
+            let url = repoRoot.appendingPathComponent(file, isDirectory: false)
+            let body = try String(contentsOf: url, encoding: .utf8)
+
+            #expect(!body.contains("CanvasStrokeRuntime"), "\(file) should depend on StrokeEditingRuntime or narrow stroke protocols")
+        }
+
+        let layerWorkflowFiles = [
+            "App/Features/Document/LayerWorkflowReducer.swift",
+            "App/Features/Document/AIImageWorkflowReducer.swift",
+            "App/Features/Document/AdjustmentWorkflowReducer.swift"
+        ]
+
+        for file in layerWorkflowFiles {
+            let url = repoRoot.appendingPathComponent(file, isDirectory: false)
+            let body = try String(contentsOf: url, encoding: .utf8)
+
+            #expect(!body.contains("documentMutationWorkflowService: LayerEditingRuntime"), "\(file) should expose narrow layer mutation workflow access")
+            #expect(!body.contains("documentContentService: LayerEditingRuntime"), "\(file) should expose narrow layer content workflow access")
+            #expect(!body.contains("selectionWorkflowService: LayerEditingRuntime"), "\(file) should expose narrow selection workflow access")
         }
     }
 

@@ -38,6 +38,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
     }
 
     private func scaledLayers() -> [SwiftDocumentLayerRecord]? {
+        guard let targetGeometry = PixelGeometry(width: targetWidth, height: targetHeight) else {
+            return nil
+        }
         let widthScale = Double(targetWidth) / Double(sourceWidth)
         let heightScale = Double(targetHeight) / Double(sourceHeight)
         let textScale = min(widthScale, heightScale)
@@ -53,7 +56,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
             ) else {
                 return nil
             }
-            layer.pixelData = scaled
+            guard layer.replacePixelData(scaled, geometry: targetGeometry) else {
+                return nil
+            }
             if let mask = layer.maskData {
                 guard let scaledMask = gpuServices.scaledMaskData(
                     mask,
@@ -64,7 +69,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
                 ) else {
                     return nil
                 }
-                layer.maskData = scaledMask
+                guard layer.replaceMaskData(scaledMask, geometry: targetGeometry) else {
+                    return nil
+                }
             }
             if let textLayer = layer.textLayer {
                 layer.textLayer = TextLayerData(
@@ -88,6 +95,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
     }
 
     private func extentAdjustedLayers() -> [SwiftDocumentLayerRecord]? {
+        guard let targetGeometry = PixelGeometry(width: targetWidth, height: targetHeight) else {
+            return nil
+        }
         let offsetX = (targetWidth - sourceWidth) / 2
         let offsetY = (targetHeight - sourceHeight) / 2
         var output: [SwiftDocumentLayerRecord] = []
@@ -104,7 +114,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
             ) else {
                 return nil
             }
-            layer.pixelData = translated
+            guard layer.replacePixelData(translated, geometry: targetGeometry) else {
+                return nil
+            }
             if let mask = layer.maskData {
                 guard let translatedMask = gpuServices.translatedMaskData(
                     mask,
@@ -117,7 +129,9 @@ struct RuntimeResizeCanvasPlan: Sendable {
                 ) else {
                     return nil
                 }
-                layer.maskData = translatedMask
+                guard layer.replaceMaskData(translatedMask, geometry: targetGeometry) else {
+                    return nil
+                }
             }
             if let textLayer = layer.textLayer {
                 layer.textLayer = TextLayerData(
@@ -223,13 +237,16 @@ private struct GpuLayerStoragePolicy: Sendable {
         services: DocumentRuntimeGpuServices
     ) -> SwiftDocumentStoreSnapshot {
         var snapshot = snapshot
+        guard let geometry = snapshot.pixelGeometry else {
+            return snapshot
+        }
         for index in handles.keys where snapshot.layers.indices.contains(index) {
-            snapshot.layers[index].pixelData = currentPixelData(
+            snapshot.layers[index].replacePixelData(currentPixelData(
                 for: index,
                 in: snapshot,
                 rgbaByteCount: rgbaByteCount,
                 services: services
-            )
+            ), geometry: geometry)
         }
         return snapshot
     }
@@ -254,13 +271,16 @@ private struct GpuLayerStoragePolicy: Sendable {
         rgbaByteCount: Int,
         services: DocumentRuntimeGpuServices
     ) {
+        guard let geometry = store.snapshot.pixelGeometry else {
+            return
+        }
         for index in handles.keys where store.snapshot.layers.indices.contains(index) {
-            store.snapshot.layers[index].pixelData = currentPixelData(
+            store.snapshot.layers[index].replacePixelData(currentPixelData(
                 for: index,
                 in: store.snapshot,
                 rgbaByteCount: rgbaByteCount,
                 services: services
-            )
+            ), geometry: geometry)
         }
     }
 
@@ -271,8 +291,12 @@ private struct GpuLayerStoragePolicy: Sendable {
         in store: SwiftDocumentStore,
         services: DocumentRuntimeGpuServices
     ) {
+        guard let geometry = store.snapshot.pixelGeometry,
+              store.snapshot.layers[index].replacePixelData(pixelData, geometry: geometry) else {
+            services.release(gpuBufferHandle)
+            return
+        }
         let previousHandle = handles[index]
-        store.snapshot.layers[index].pixelData = pixelData
         if let gpuBufferHandle {
             handles[index] = gpuBufferHandle
         } else {
@@ -615,7 +639,10 @@ private struct LayerRectDeltaUndoEntry: Sendable {
         }
         var snapshot = current
         metadata.apply(to: &snapshot.layers[layerIndex])
-        snapshot.layers[layerIndex].pixelData = patchedPixels
+        guard let geometry = snapshot.pixelGeometry,
+              snapshot.layers[layerIndex].replacePixelData(patchedPixels, geometry: geometry) else {
+            return nil
+        }
         return snapshot
     }
 }
@@ -626,7 +653,7 @@ private struct LayerUndoMetadata: Sendable {
     var locked: Bool
     var alphaLocked: Bool
     var clipped: Bool
-    var opacity: Double
+    var opacity: DocumentLayerOpacity
     var blendMode: LayerBlendMode
     var folderID: Int?
     var textLayer: TextLayerData?
@@ -637,7 +664,10 @@ private struct LayerUndoMetadata: Sendable {
         locked = layer.locked
         alphaLocked = layer.alphaLocked
         clipped = layer.clipped
-        opacity = layer.opacity
+        guard let layerOpacity = layer.validatedOpacity() else {
+            preconditionFailure("LayerUndoMetadata cannot capture invalid layer opacity")
+        }
+        opacity = layerOpacity
         blendMode = layer.blendMode
         folderID = layer.folderID
         textLayer = layer.textLayer
@@ -653,7 +683,7 @@ private struct LayerUndoMetadata: Sendable {
         layer.locked = locked
         layer.alphaLocked = alphaLocked
         layer.clipped = clipped
-        layer.opacity = opacity
+        layer.setOpacity(opacity.rawValue)
         layer.blendMode = blendMode
         layer.folderID = folderID
         layer.textLayer = textLayer
@@ -891,8 +921,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func materializedSnapshot() -> SwiftDocumentStoreSnapshot {
         var snapshot = store.snapshot
+        guard let geometry = snapshot.pixelGeometry else {
+            return snapshot
+        }
         for index in snapshot.layers.indices {
-            snapshot.layers[index].pixelData = currentPixelData(for: index)
+            snapshot.layers[index].replacePixelData(currentPixelData(for: index), geometry: geometry)
         }
         return snapshot
     }
@@ -1040,9 +1073,23 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
               layers.count == plan.before.layers.count else {
             return .failure(.gpu(.staleSnapshot(operation: "resizeCanvas")))
         }
-        store.snapshot.layers = layers
-        store.snapshot.canvasWidth = plan.targetWidth
-        store.snapshot.canvasHeight = plan.targetHeight
+        guard let resizedSnapshot = SwiftDocumentStoreSnapshot(
+            canvasWidth: plan.targetWidth,
+            canvasHeight: plan.targetHeight,
+            activeLayerIndex: store.snapshot.activeLayerIndex,
+            paperStyle: store.snapshot.paperStyle,
+            revision: store.snapshot.revision,
+            nextFolderID: store.snapshot.nextFolderID,
+            layers: layers,
+            folders: store.snapshot.folders,
+            thumbnailCache: store.snapshot.thumbnailCache,
+            timelapseFrames: store.snapshot.timelapseFrames,
+            timelapseEvents: store.snapshot.timelapseEvents,
+            timelapseUsesOperationPersistence: store.snapshot.timelapseUsesOperationPersistence
+        ) else {
+            return .failure(.bridgeMutationFailed("resizeCanvasInvalidSnapshot"))
+        }
+        store.snapshot = resizedSnapshot
         store.snapshot.thumbnailCache.removeAll()
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
@@ -1239,8 +1286,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard data.count == store.snapshot.canvasWidth * store.snapshot.canvasHeight else {
             return .failure(.bridgeMutationFailed("replaceLayerMask"))
         }
+        guard let geometry = store.snapshot.pixelGeometry,
+              LayerMaskBuffer(geometry: geometry, data: data) != nil else {
+            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+        }
         let before = undoSnapshot()
-        store.snapshot.layers[index].maskData = data
+        store.snapshot.layers[index].replaceMaskData(data, geometry: geometry)
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .replaceLayerMask(index: .unchecked(index), data: data))
         return .success(())
@@ -1250,7 +1301,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers[index].maskData != nil else { return .success(()) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].maskData = nil
+        guard let geometry = store.snapshot.pixelGeometry,
+              store.snapshot.layers[index].replaceMaskData(nil, geometry: geometry) else {
+            return .failure(.bridgeMutationFailed("clearLayerMask"))
+        }
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .clearLayerMask(index: .unchecked(index)))
         return .success(())
@@ -1269,7 +1323,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             let before = undoSnapshot()
             setLayerPixelState(index: index, pixelData: maskedPixels, gpuBufferHandle: nil)
-            store.snapshot.layers[index].maskData = nil
+            guard let geometry = store.snapshot.pixelGeometry,
+                  store.snapshot.layers[index].replaceMaskData(nil, geometry: geometry) else {
+                return .failure(.bridgeMutationFailed("applyLayerMask"))
+            }
             invalidateThumbnail(for: index)
             recordMutation(
                 before: before,
@@ -1652,9 +1709,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
+        guard let geometry = store.snapshot.pixelGeometry else {
+            return .failure(.bridgeMutationFailed("duplicateLayerInvalidStoreGeometry"))
+        }
         let before = undoSnapshot()
         var layer = store.snapshot.layers[index]
-        layer.pixelData = currentPixelData(for: index)
+        guard layer.replacePixelData(currentPixelData(for: index), geometry: geometry) else {
+            return .failure(.bridgeMutationFailed("duplicateLayerInvalidPixelData"))
+        }
         layer.name = name
         let duplicatedIndex = index + 1
         store.snapshot.layers.insert(layer, at: duplicatedIndex)
@@ -1814,9 +1876,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        guard (0...1).contains(opacity) else { return .failure(.invalidOpacity(opacity)) }
+        guard DocumentLayerOpacity(opacity) != nil else { return .failure(.invalidOpacity(opacity)) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].opacity = opacity
+        store.snapshot.layers[index].setOpacity(opacity)
         recordMutation(before: before, timelapseEvent: .setLayerOpacity(index: .unchecked(index), opacity: opacity))
         return .success(())
     }
@@ -1833,10 +1895,17 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard index > 0 else { return .failure(.invalidLayerIndex(index)) }
         if let failure = validateEditableLayer(index) { return .failure(failure) }
         if let failure = validateEditableLayer(index - 1) { return .failure(failure) }
+        guard let geometry = store.snapshot.pixelGeometry else {
+            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidStoreGeometry"))
+        }
         var upper = store.snapshot.layers[index]
-        upper.pixelData = currentPixelData(for: index)
+        guard upper.replacePixelData(currentPixelData(for: index), geometry: geometry) else {
+            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidUpperPixels"))
+        }
         var lower = store.snapshot.layers[index - 1]
-        lower.pixelData = currentPixelData(for: index - 1)
+        guard lower.replacePixelData(currentPixelData(for: index - 1), geometry: geometry) else {
+            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidLowerPixels"))
+        }
         guard let merged = gpuServices.mergeLayers(
             lowerPixelData: lower.pixelData,
             upperPixelData: upper.pixelData,
