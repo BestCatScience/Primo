@@ -60,7 +60,7 @@ extension LayerRowModel {
             index: index,
             name: "Layer \(index + 1)",
             visible: true,
-            opacity: 1.0,
+            opacity: UnitInterval(1.0)!,
             isLocked: isLocked,
             isAlphaLocked: isAlphaLocked,
             isClipped: false,
@@ -82,12 +82,12 @@ extension PaintDocumentPresentation {
     ) -> Self {
         let resolvedLayerRows = layerRows ?? [LayerRowModel.testValue(index: activeLayerIndex)]
         return Self(
-            canvasSize: canvasSize,
+            validatingCanvasSize: canvasSize,
             activeLayerIndex: activeLayerIndex,
             layerRows: resolvedLayerRows,
             layerSidebarRows: resolvedLayerRows.map { .layer($0, depth: 0) },
             renderSnapshot: renderSnapshot
-        )
+        )!
     }
 
     static func renderedTestValue(

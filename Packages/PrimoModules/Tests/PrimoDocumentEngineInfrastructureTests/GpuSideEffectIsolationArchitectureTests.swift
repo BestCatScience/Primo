@@ -538,6 +538,59 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentDTOsExposeInvariantValueObjects() throws {
+        let repoRoot = try Self.repoRoot()
+        let valueObjects = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentDomain/DocumentValueObjects.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let paperStyle = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentDomain/WorkspaceDocumentTypes.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let textLayer = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentDomain/TextLayerTypes.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let presentation = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let persistence = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentPersistenceInfrastructure/PaintDocumentPersistenceService.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        for symbol in ["UnitInterval", "PositiveFiniteDouble", "FiniteDouble", "CanvasColor"] {
+            #expect(valueObjects.contains("public struct \(symbol)"), "Document DTO value object \(symbol) should exist")
+        }
+        #expect(paperStyle.contains("public init?(color: CanvasColor, isTransparent: Bool)"))
+        #expect(paperStyle.contains("public var validatedColor: CanvasColor?"))
+        #expect(textLayer.contains("public var validatedFontSize: PositiveFiniteDouble?"))
+        #expect(textLayer.contains("public var validatedColor: CanvasColor?"))
+        #expect(presentation.contains("public var validatedOpacity: UnitInterval?"))
+        #expect(presentation.contains("validatingCanvasSize canvasSize: CGSize"))
+        #expect(!persistence.contains("isUnitInterval("), "Persistence validation should use DTO value objects instead of ad hoc unit interval checks")
+        #expect(persistence.contains("textLayer.validatedColor"))
+        #expect(persistence.contains("UnitInterval(layer.opacity)"))
+    }
+
+    @Test
     func runtimeCompositionStoresNarrowGpuCapabilities() throws {
         let repoRoot = try Self.repoRoot()
         let compositionFiles = [

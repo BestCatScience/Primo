@@ -69,6 +69,42 @@ public struct TextLayerData: Equatable, Sendable, Codable {
         self.alpha = alpha
     }
 
+    public init?(
+        text: String,
+        positionX: FiniteDouble,
+        positionY: FiniteDouble,
+        fontPostScriptName: String,
+        fontDisplayName: String,
+        fontSize: PositiveFiniteDouble,
+        scale: PositiveFiniteDouble = PositiveFiniteDouble(1.0)!,
+        rotationDegrees: FiniteDouble = FiniteDouble(0)!,
+        color: CanvasColor
+    ) {
+        self.init(
+            text: text,
+            positionX: positionX.rawValue,
+            positionY: positionY.rawValue,
+            fontPostScriptName: fontPostScriptName,
+            fontDisplayName: fontDisplayName,
+            fontSize: fontSize.rawValue,
+            scale: scale.rawValue,
+            rotationDegrees: rotationDegrees.rawValue,
+            red: color.red.rawValue,
+            green: color.green.rawValue,
+            blue: color.blue.rawValue,
+            alpha: color.alpha.rawValue
+        )
+    }
+
+    public var validatedPositionX: FiniteDouble? { FiniteDouble(positionX) }
+    public var validatedPositionY: FiniteDouble? { FiniteDouble(positionY) }
+    public var validatedFontSize: PositiveFiniteDouble? { PositiveFiniteDouble(fontSize) }
+    public var validatedScale: PositiveFiniteDouble? { PositiveFiniteDouble(scale) }
+    public var validatedRotationDegrees: FiniteDouble? { FiniteDouble(rotationDegrees) }
+    public var validatedColor: CanvasColor? {
+        CanvasColor(red: red, green: green, blue: blue, alpha: alpha)
+    }
+
     enum CodingKeys: String, CodingKey {
         case text
         case positionX

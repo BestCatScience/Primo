@@ -144,7 +144,7 @@ public struct PaintDocumentPersistenceService {
             guard layer.index.rawValue == expectedIndex else {
                 throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid layer index ordering")
             }
-            guard isUnitInterval(layer.opacity),
+            guard UnitInterval(layer.opacity) != nil,
                   LayerBlendMode(rawValue: layer.blendMode) != nil else {
                 throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid layer attributes")
             }
@@ -186,26 +186,23 @@ public struct PaintDocumentPersistenceService {
     }
 
     private func validateTextLayer(_ textLayer: TextLayerData) throws {
-        guard textLayer.positionX.isFinite,
-              textLayer.positionY.isFinite,
-              textLayer.fontSize.isFinite,
-              textLayer.fontSize > 0,
-              textLayer.scale.isFinite,
-              textLayer.scale > 0,
-              textLayer.rotationDegrees.isFinite,
-              isUnitInterval(textLayer.red),
-              isUnitInterval(textLayer.green),
-              isUnitInterval(textLayer.blue),
-              isUnitInterval(textLayer.alpha) else {
+        guard textLayer.validatedPositionX != nil,
+              textLayer.validatedPositionY != nil,
+              textLayer.validatedFontSize != nil,
+              textLayer.validatedScale != nil,
+              textLayer.validatedRotationDegrees != nil,
+              textLayer.validatedColor != nil else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid text layer attributes")
         }
     }
 
     private func validatePaperStyle(_ paperStyle: StoredPrimoDocument.PaperStyle) throws {
-        guard isUnitInterval(paperStyle.red),
-              isUnitInterval(paperStyle.green),
-              isUnitInterval(paperStyle.blue),
-              isUnitInterval(paperStyle.alpha) else {
+        guard CanvasColor(
+            red: paperStyle.red,
+            green: paperStyle.green,
+            blue: paperStyle.blue,
+            alpha: paperStyle.alpha
+        ) != nil else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid paper style")
         }
     }
@@ -293,7 +290,7 @@ public struct PaintDocumentPersistenceService {
         case .setLayerOpacity:
             guard operation.layerIndex != nil,
                   let opacity = operation.opacity,
-                  isUnitInterval(opacity) else {
+                  UnitInterval(opacity) != nil else {
                 throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
             }
         case .setLayerBlendMode:
@@ -320,10 +317,6 @@ public struct PaintDocumentPersistenceService {
               name.count <= CanvasSizePolicy.maxLayerNameLength else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
         }
-    }
-
-    private func isUnitInterval(_ value: Double) -> Bool {
-        value.isFinite && (0...1).contains(value)
     }
 
     public func publishStagedProjectDirectory(_ stagedProjectURL: URL, to destinationURL: URL) throws {

@@ -2812,7 +2812,7 @@ extension SwiftDocumentRuntime {
                 index: index,
                 name: layer.name,
                 visible: layer.visible,
-                opacity: layer.opacity,
+                opacity: UnitInterval(layer.opacity)!,
                 isLocked: layer.locked,
                 isAlphaLocked: layer.alphaLocked,
                 isClipped: layer.clipped,

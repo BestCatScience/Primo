@@ -44,6 +44,40 @@ public struct LayerRowModel: Identifiable, Equatable, Sendable {
         self.isTextLayer = isTextLayer
         self.textLayer = textLayer
     }
+
+    public init(
+        index: Int,
+        name: String,
+        visible: Bool,
+        opacity: UnitInterval,
+        isLocked: Bool,
+        isAlphaLocked: Bool,
+        isClipped: Bool,
+        blendMode: LayerBlendMode,
+        folderID: Int?,
+        hasMask: Bool,
+        isTextLayer: Bool,
+        textLayer: TextLayerData?
+    ) {
+        self.init(
+            index: index,
+            name: name,
+            visible: visible,
+            opacity: opacity.rawValue,
+            isLocked: isLocked,
+            isAlphaLocked: isAlphaLocked,
+            isClipped: isClipped,
+            blendMode: blendMode,
+            folderID: folderID,
+            hasMask: hasMask,
+            isTextLayer: isTextLayer,
+            textLayer: textLayer
+        )
+    }
+
+    public var validatedOpacity: UnitInterval? {
+        UnitInterval(opacity)
+    }
 }
 
 public struct LayerFolderModel: Identifiable, Equatable, Sendable {
@@ -444,6 +478,44 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
         self.layerSidebarRows = layerSidebarRows
         self.renderSnapshot = renderSnapshot
         self.revision = revision
+    }
+
+    public init?(
+        validatingCanvasSize canvasSize: CGSize,
+        activeLayerIndex: Int,
+        layerRows: [LayerRowModel],
+        layerSidebarRows: [LayerSidebarRowModel],
+        renderSnapshot: MetalDocumentSnapshot?,
+        revision: DocumentRevision = .initial
+    ) {
+        guard let canvasWidth = Self.validatingDimension(canvasSize.width),
+              let canvasHeight = Self.validatingDimension(canvasSize.height),
+              layerRows.contains(where: { $0.index == activeLayerIndex }),
+              layerRows.allSatisfy({ $0.validatedOpacity != nil }) else {
+            return nil
+        }
+        if let renderSnapshot {
+            guard renderSnapshot.width == canvasWidth,
+                  renderSnapshot.height == canvasHeight else {
+                return nil
+            }
+        }
+        self.init(
+            canvasSize: canvasSize,
+            activeLayerIndex: activeLayerIndex,
+            layerRows: layerRows,
+            layerSidebarRows: layerSidebarRows,
+            renderSnapshot: renderSnapshot,
+            revision: revision
+        )
+    }
+
+    private static func validatingDimension(_ value: CGFloat) -> Int? {
+        let doubleValue = Double(value)
+        guard doubleValue.isFinite, doubleValue > 0 else { return nil }
+        let rounded = doubleValue.rounded()
+        guard rounded == doubleValue else { return nil }
+        return Int(rounded)
     }
 }
 

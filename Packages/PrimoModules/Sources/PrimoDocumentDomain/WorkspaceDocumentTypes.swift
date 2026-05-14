@@ -50,13 +50,29 @@ public struct CanvasPaperStyle: Equatable, Sendable {
         self.isTransparent = isTransparent
     }
 
+    public init?(color: CanvasColor, isTransparent: Bool) {
+        self.init(
+            red: Float(color.red.rawValue),
+            green: Float(color.green.rawValue),
+            blue: Float(color.blue.rawValue),
+            alpha: Float(color.alpha.rawValue),
+            isTransparent: isTransparent
+        )
+    }
+
+    public var validatedColor: CanvasColor? {
+        CanvasColor(
+            red: Double(red),
+            green: Double(green),
+            blue: Double(blue),
+            alpha: Double(alpha)
+        )
+    }
+
     public static let `default` = CanvasPaperStyle(
-        red: 1.0,
-        green: 1.0,
-        blue: 1.0,
-        alpha: 1.0,
+        color: CanvasColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)!,
         isTransparent: false
-    )
+    )!
 }
 
 public struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
