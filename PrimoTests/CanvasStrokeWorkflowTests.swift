@@ -47,9 +47,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             Data([9]),
             Data(repeating: 9, count: 4),
             Data([9]),
-            Data([9]),
             Data(repeating: 9, count: 4),
-            Data([9]),
         ])
     }
 
@@ -304,7 +302,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 isApproximatePreview: true
             ),
             state: &state,
-            releaseSurfaceHandle: { _ in }
+            discardPreviewLease: { _ in }
         )
 
         XCTAssertEqual(state.canvas.strokeSession.baseSnapshot?.revision, 12)
@@ -328,15 +326,17 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
         var state = DocumentEditingState()
         let previewBrush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
-        state.canvas.strokeSession.renderState = StrokeSessionRenderState(
-            baseRevision: 12,
-            layerIndex: 0,
-            surfaceHandle: expectedHandle,
-            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2),
-            isApproximatePreview: true,
-            previewBrush: previewBrush,
-            sampleCount: 32,
-            supportsIncrementalContinuation: true
+        state.canvas.strokeSession.replaceRenderState(
+            StrokeSessionRenderState(
+                baseRevision: 12,
+                layerIndex: 0,
+                surfaceHandle: expectedHandle,
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2),
+                isApproximatePreview: true,
+                previewBrush: previewBrush,
+                sampleCount: 32,
+                supportsIncrementalContinuation: true
+            )
         )
         let result = coordinator.resolveAppendedStrokePreview(
             state: state,
@@ -379,15 +379,17 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         ]
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
         var state = DocumentEditingState()
-        state.canvas.strokeSession.renderState = StrokeSessionRenderState(
-            baseRevision: 12,
-            layerIndex: 0,
-            surfaceHandle: expectedHandle,
-            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
-            isApproximatePreview: false,
-            previewBrush: brush,
-            sampleCount: 1,
-            supportsIncrementalContinuation: true
+        state.canvas.strokeSession.replaceRenderState(
+            StrokeSessionRenderState(
+                baseRevision: 12,
+                layerIndex: 0,
+                surfaceHandle: expectedHandle,
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
+                isApproximatePreview: false,
+                previewBrush: brush,
+                sampleCount: 1,
+                supportsIncrementalContinuation: true
+            )
         )
 
         let result = coordinator.resolveShapeStrokePreview(
@@ -447,7 +449,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         await store.send(.strokeEnded(stroke)) {
             $0.isStrokeActive = false
             $0.isAwaitingCommittedRender = true
-            $0.strokeSession.committedPointCount = 0
+            $0.strokeSession.resetCommittedPointCount()
             $0.shapePreviewIsLive = false
         }
         await store.receive(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
@@ -477,7 +479,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         await store.send(.strokeEnded(stroke)) {
             $0.isStrokeActive = false
             $0.activeStroke = nil
-            $0.strokeSession.committedPointCount = 0
+            $0.strokeSession.resetCommittedPointCount()
             $0.shapePreviewIsLive = false
         }
     }
@@ -496,7 +498,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         await store.send(.strokeEnded(stroke)) {
             $0.isStrokeActive = false
-            $0.strokeSession.committedPointCount = 0
+            $0.strokeSession.resetCommittedPointCount()
             $0.shapePreviewIsLive = false
         }
     }
@@ -561,7 +563,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             $0.isStrokeActive = false
             $0.isAwaitingCommittedRender = false
             $0.activeStroke = nil
-            $0.strokeSession.committedPointCount = 0
+            $0.strokeSession.resetCommittedPointCount()
         }
         await store.receive(.delegate(.cancelBlurStroke))
     }
@@ -598,7 +600,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             state.currentTool = .brush
             state.activeStroke = previousStroke
             state.isStrokeActive = true
-            state.strokeSession.committedPointCount = previousStroke.points.count
+            state.strokeSession.markCommittedPointCount(previousStroke.points.count)
             return state
         }()) {
             CanvasFeature()
@@ -608,7 +610,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             $0.isStrokeActive = false
             $0.isAwaitingCommittedRender = true
             $0.activeStroke = endedStroke
-            $0.strokeSession.committedPointCount = 0
+            $0.strokeSession.resetCommittedPointCount()
         }
         await store.receive(.delegate(.appendSamples([third.stylusSample])))
         await store.receive(.delegate(.endStroke(endedStroke.points.map(\.stylusSample))))
@@ -660,9 +662,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
 
         switch result {
-        case let .committed(contract, transferredSurfaceHandle):
+        case let .committed(contract, transferredPreviewLease):
             XCTAssertEqual(contract, DocumentFeature.DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false))
-            XCTAssertEqual(transferredSurfaceHandle, handle)
+            XCTAssertTrue(transferredPreviewLease.isPresent)
         case let .failed(failure):
             XCTFail("Expected committed GPU surface mutation, got \(failure)")
         }
@@ -906,7 +908,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 supportsIncrementalContinuation: true
             ),
             state: &state,
-            releaseSurfaceHandle: { _ in }
+            discardPreviewLease: { _ in }
         )
         stateCoordinator.applyPreviewMutation(
             GpuPreviewMutation(
@@ -932,7 +934,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 supportsIncrementalContinuation: true
             ),
             state: &state,
-            releaseSurfaceHandle: { _ in }
+            discardPreviewLease: { _ in }
         )
 
         XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4))
@@ -1233,10 +1235,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testPreviewReplacementReleasesPreviousSurfaceHandle() {
         let oldHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let newHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
-        let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        let gpuOperations = DocumentGpuOperationGateway.stub(
-            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
-        )
+        let releasedLeases = TestRecorder<StrokePreviewLease>()
 
         do {
             let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
@@ -1252,13 +1251,14 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 compositePixelData: Data(repeating: 0, count: 64),
                 layers: []
             )
-            state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+            let oldRenderState = StrokeSessionRenderState(
                 baseRevision: 11,
                 layerIndex: 0,
                 surfaceHandle: oldHandle,
                 dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
                 isApproximatePreview: false
             )
+            state.canvas.strokeSession.replaceRenderState(oldRenderState)
 
             coordinator.applyPreviewMutation(
                 GpuPreviewMutation(
@@ -1277,9 +1277,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     supportsIncrementalContinuation: true
                 ),
                 state: &state,
-                releaseSurfaceHandle: { handle in
-                    gpuOperations.releaseSurfaceHandle(handle)
-                }
+                discardPreviewLease: { lease in releasedLeases.record(lease) }
             )
 
             XCTAssertEqual(state.canvas.strokeSession.renderState?.surfaceHandle, newHandle)
@@ -1288,61 +1286,54 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             XCTAssertEqual(state.canvas.strokeSession.renderState?.supportsIncrementalContinuation, true)
         }
 
-        XCTAssertEqual(releasedHandles.values, [oldHandle])
+        XCTAssertEqual(releasedLeases.values.count, 1)
+        XCTAssertTrue(releasedLeases.values[0].isPresent)
     }
 
     func testResetStrokePreviewReleasesCurrentSurfaceHandle() {
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
-        let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        let gpuOperations = DocumentGpuOperationGateway.stub(
-            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
-        )
+        let releasedLeases = TestRecorder<StrokePreviewLease>()
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
-        state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+        state.canvas.strokeSession.replaceRenderState(StrokeSessionRenderState(
             baseRevision: 11,
             layerIndex: 0,
             surfaceHandle: handle,
             dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
             isApproximatePreview: false
-        )
+        ))
 
-        coordinator.resetPreviewState(state: &state) { handle in
-            gpuOperations.releaseSurfaceHandle(handle)
-        }
+        coordinator.resetPreviewState(state: &state) { lease in releasedLeases.record(lease) }
 
-        XCTAssertEqual(releasedHandles.values, [handle])
+        XCTAssertEqual(releasedLeases.values.count, 1)
+        XCTAssertTrue(releasedLeases.values[0].isPresent)
     }
 
     func testCompletedCommitDoesNotReleaseTransferredPreviewSurfaceHandle() {
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
-        let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        let gpuOperations = DocumentGpuOperationGateway.stub(
-            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
-        )
+        let releasedLeases = TestRecorder<StrokePreviewLease>()
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
-        state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+        let renderState = StrokeSessionRenderState(
             baseRevision: 11,
             layerIndex: 0,
             surfaceHandle: handle,
             dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
             isApproximatePreview: false
         )
+        state.canvas.strokeSession.replaceRenderState(renderState)
 
-        coordinator.resetPreviewState(state: &state, preserving: handle) { handle in
-            gpuOperations.releaseSurfaceHandle(handle)
-        }
+        coordinator.resetPreviewState(state: &state, preserving: renderState.previewLease) { lease in releasedLeases.record(lease) }
 
-        XCTAssertTrue(releasedHandles.values.isEmpty)
+        XCTAssertTrue(releasedLeases.values.isEmpty)
     }
 
     func testFillFailureRemainsTyped() {
@@ -1371,9 +1362,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         let service = DocumentContentService(
-            documentPresentationReader: .stub(
-                presentation: .testValue(activeLayerIndex: 3)
+            documentQueryGateway: .stub(
+                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 3)
             ),
+            documentRenderGateway: .stub(),
             documentMutationGateway: .stub(
                 addLayer: { name in
                     addLayerCalls.record(name)
@@ -1391,7 +1383,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("replace failed"))
                 }
             ),
-            documentTextLayerService: .stub()
+            textLayerGateway: .stub()
         )
         let result = service.applyPixels(
             Data([0x00]),
@@ -1406,9 +1398,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testLayerContentTransactionSurfacesRollbackFailure() {
         let service = DocumentContentService(
-            documentPresentationReader: .stub(
-                presentation: .testValue(activeLayerIndex: 3)
+            documentQueryGateway: .stub(
+                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 3)
             ),
+            documentRenderGateway: .stub(),
             documentMutationGateway: .stub(
                 addLayer: { _ in .success(7) },
                 deleteLayer: { _ in
@@ -1421,7 +1414,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("replace failed"))
                 }
             ),
-            documentTextLayerService: .stub()
+            textLayerGateway: .stub()
         )
         let result = service.applyPixels(
             Data([0x00]),
@@ -1448,9 +1441,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         let service = DocumentContentService(
-            documentPresentationReader: .stub(
-                presentation: .testValue(activeLayerIndex: 2)
+            documentQueryGateway: .stub(
+                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 2)
             ),
+            documentRenderGateway: .stub(),
             documentMutationGateway: .stub(
                 addLayer: { name in
                     addLayerCalls.record(name)
@@ -1468,7 +1462,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("apply failed"))
                 }
             ),
-            documentTextLayerService: .stub()
+            textLayerGateway: .stub()
         )
         _ = service.applyPixels(
             Data([0x00, 0x00, 0x00, 0x00]),

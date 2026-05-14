@@ -498,31 +498,33 @@ struct GpuSideEffectIsolationArchitectureTests {
         }
     }
 
-    @Test
-    func publicRuntimeFacadeSymbolGraphsMatchSnapshots() throws {
-        let repoRoot = try Self.repoRoot()
-        let moduleNames = [
-            "PrimoDocumentRuntime",
-            "PrimoWorkspaceRuntime"
-        ]
-        let generatedSnapshots = try Self.generatedPublicSymbolSnapshots(
-            for: moduleNames,
-            repoRoot: repoRoot
-        )
+    #if os(macOS)
+        @Test
+        func publicRuntimeFacadeSymbolGraphsMatchSnapshots() throws {
+            let repoRoot = try Self.repoRoot()
+            let moduleNames = [
+                "PrimoDocumentRuntime",
+                "PrimoWorkspaceRuntime"
+            ]
+            let generatedSnapshots = try Self.generatedPublicSymbolSnapshots(
+                for: moduleNames,
+                repoRoot: repoRoot
+            )
 
-        for moduleName in moduleNames {
-            let expectedURL = repoRoot.appendingPathComponent(
-                "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/__Snapshots__/SymbolGraphs/\(moduleName).symbols.tsv",
-                isDirectory: false
-            )
-            let expected = try String(contentsOf: expectedURL, encoding: .utf8)
-            let actual = try #require(generatedSnapshots[moduleName])
-            #expect(
-                actual == expected,
-                "\(moduleName) public symbol graph drifted. Run scripts/update-symbol-snapshots.sh if the API change is intentional."
-            )
+            for moduleName in moduleNames {
+                let expectedURL = repoRoot.appendingPathComponent(
+                    "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/__Snapshots__/SymbolGraphs/\(moduleName).symbols.tsv",
+                    isDirectory: false
+                )
+                let expected = try String(contentsOf: expectedURL, encoding: .utf8)
+                let actual = try #require(generatedSnapshots[moduleName])
+                #expect(
+                    actual == expected,
+                    "\(moduleName) public symbol graph drifted. Run scripts/update-symbol-snapshots.sh if the API change is intentional."
+                )
+            }
         }
-    }
+    #endif
 
     @Test
     func documentMutationGatewayDoesNotExposePublicRawMutationClosuresToApp() throws {
@@ -1341,59 +1343,61 @@ struct GpuSideEffectIsolationArchitectureTests {
         return PackageManifestTargetParser.parseTargetDependencies(from: body)
     }
 
-    private static func generatedPublicSymbolSnapshots(
-        for moduleNames: [String],
-        repoRoot: URL
-    ) throws -> [String: String] {
-        let packageRoot = repoRoot.appendingPathComponent("Packages/PrimoModules", isDirectory: true)
-        let scratchRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "primo-symbolgraph-\(UUID().uuidString)",
-            isDirectory: true
-        )
-        try FileManager.default.createDirectory(at: scratchRoot, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: scratchRoot) }
+    #if os(macOS)
+        private static func generatedPublicSymbolSnapshots(
+            for moduleNames: [String],
+            repoRoot: URL
+        ) throws -> [String: String] {
+            let packageRoot = repoRoot.appendingPathComponent("Packages/PrimoModules", isDirectory: true)
+            let scratchRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "primo-symbolgraph-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: scratchRoot, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: scratchRoot) }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
-        process.arguments = [
-            "package",
-            "--package-path",
-            packageRoot.path,
-            "--scratch-path",
-            scratchRoot.path,
-            "dump-symbol-graph",
-            "--minimum-access-level",
-            "public",
-            "--skip-synthesized-members"
-        ]
-        var environment = ProcessInfo.processInfo.environment
-        environment["DEVELOPER_DIR"] = environment["DEVELOPER_DIR"] ?? "/Applications/Xcode.app/Contents/Developer"
-        process.environment = environment
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+            process.arguments = [
+                "package",
+                "--package-path",
+                packageRoot.path,
+                "--scratch-path",
+                scratchRoot.path,
+                "dump-symbol-graph",
+                "--minimum-access-level",
+                "public",
+                "--skip-synthesized-members"
+            ]
+            var environment = ProcessInfo.processInfo.environment
+            environment["DEVELOPER_DIR"] = environment["DEVELOPER_DIR"] ?? "/Applications/Xcode.app/Contents/Developer"
+            process.environment = environment
 
-        let outputURL = scratchRoot.appendingPathComponent("symbolgraph-extract.log", isDirectory: false)
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: outputURL)
-        defer { try? outputHandle.close() }
-        process.standardOutput = outputHandle
-        process.standardError = outputHandle
-        try process.run()
-        process.waitUntilExit()
+            let outputURL = scratchRoot.appendingPathComponent("symbolgraph-extract.log", isDirectory: false)
+            FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+            let outputHandle = try FileHandle(forWritingTo: outputURL)
+            defer { try? outputHandle.close() }
+            process.standardOutput = outputHandle
+            process.standardError = outputHandle
+            try process.run()
+            process.waitUntilExit()
 
-        let requestedSymbolGraphs = try moduleNames.map { moduleName in
-            try #require(Self.symbolGraphURL(for: moduleName, under: scratchRoot))
+            let requestedSymbolGraphs = try moduleNames.map { moduleName in
+                try #require(Self.symbolGraphURL(for: moduleName, under: scratchRoot))
+            }
+
+            if process.terminationStatus != 0, requestedSymbolGraphs.count != moduleNames.count {
+                let message = try String(contentsOf: outputURL, encoding: .utf8)
+                throw SymbolSnapshotError.symbolGraphExtractionFailed(message)
+            }
+
+            var snapshots: [String: String] = [:]
+            for (moduleName, symbolGraph) in zip(moduleNames, requestedSymbolGraphs) {
+                snapshots[moduleName] = try Self.normalizedPublicSymbolSnapshot(at: symbolGraph)
+            }
+            return snapshots
         }
-
-        if process.terminationStatus != 0, requestedSymbolGraphs.count != moduleNames.count {
-            let message = try String(contentsOf: outputURL, encoding: .utf8)
-            throw SymbolSnapshotError.symbolGraphExtractionFailed(message)
-        }
-
-        var snapshots: [String: String] = [:]
-        for (moduleName, symbolGraph) in zip(moduleNames, requestedSymbolGraphs) {
-            snapshots[moduleName] = try Self.normalizedPublicSymbolSnapshot(at: symbolGraph)
-        }
-        return snapshots
-    }
+    #endif
 
     private static func symbolGraphURL(for moduleName: String, under root: URL) -> URL? {
         guard let enumerator = FileManager.default.enumerator(

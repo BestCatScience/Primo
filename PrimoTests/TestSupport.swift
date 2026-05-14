@@ -884,6 +884,44 @@ extension DocumentGpuOperationGateway {
     }
 }
 
+extension DocumentRenderingWorkflow {
+    static func stub(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data? = { _, _, _, _ in nil },
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data? = { _, _, _ in nil },
+        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data? = { _, _, _, _ in nil },
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]? = { _, _, _ in nil },
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask? = { _, _, _ in nil },
+        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data? = { _, _, _, _, _ in nil },
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data? = { _, _, _, _, _, _, _ in nil }
+    ) -> Self {
+        Self(
+            compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
+                stubRenderingResult(compositedPaperPreviewRGBA(pixelData, width, height, paperStyle))
+            },
+            compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in
+                stubRenderingResult(compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels))
+            },
+            processedLayerPixelData: { pixelData, width, height, request in
+                stubRenderingResult(processedLayerPixelData(pixelData, width, height, request))
+            },
+            alphaMask: { pixelData, width, height in
+                stubRenderingResult(alphaMask(pixelData, width, height))
+            },
+            croppedSelectionMask: croppedSelectionMask,
+            scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in
+                stubRenderingResult(scaledPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight))
+            },
+            translatedPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
+                stubRenderingResult(translatedPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY))
+            }
+        )
+    }
+
+    private static func stubRenderingResult<Value>(_ value: Value?) -> DocumentRenderingResult<Value> {
+        value.map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
+    }
+}
+
 extension DocumentStrokeSessionUseCase {
     static func stub(
         execute: @escaping @Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome = { _ in .reset }

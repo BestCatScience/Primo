@@ -57,6 +57,10 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             })
             $0.fileClient = .stub()
             configureDependencies(&$0)
+            $0.workspaceApplicationCapability = .stub(
+                documentWorkspaceClient: $0.documentWorkspaceClient,
+                uuidClient: $0.uuidClient
+            )
         }
     }
 
@@ -113,6 +117,10 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 UUID(uuidString: "00000000-0000-0000-0000-00000000BEEF")!
             })
             $0.fileClient = .stub()
+            $0.workspaceApplicationCapability = .stub(
+                documentWorkspaceClient: $0.documentWorkspaceClient,
+                uuidClient: $0.uuidClient
+            )
         }
 
         await store.send(.tabSelectionLoaded(targetTab.id, loaded)) {
