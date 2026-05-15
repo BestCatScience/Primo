@@ -27,14 +27,14 @@ public struct DocumentCanvasCommandService: Sendable {
     public let resizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
     public let resizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
     public let initializeImportedCanvas: @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult
-    public let compositeSurface: @Sendable () -> DocumentCompositeSurface
+    public let compositeSurface: @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
 
     public init(
         createCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
         resizeCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
         resizeCanvasExtent: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
         initializeImportedCanvas: @escaping @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult,
-        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface
+        compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
     ) {
         self.createCanvas = createCanvas
         self.resizeCanvas = resizeCanvas
@@ -54,9 +54,11 @@ public struct DocumentCanvasCommandService: Sendable {
                 guard let size = ValidCanvasSize(width, height) else {
                     return .failure(.invalidCanvasSize(width: width, height: height))
                 }
-                persistenceGateway.newCanvas(size.width, size.height)
-                persistenceGateway.prewarmDrawingResources()
-                return .success(())
+                switch persistenceGateway.newCanvas(size.width, size.height) {
+                case let .failure(failure): return .failure(failure)
+                case .success: break
+                }
+                return persistenceGateway.prewarmDrawingResources()
             },
             resizeCanvas: { width, height in
                 guard let size = ValidCanvasSize(width, height) else {
@@ -77,8 +79,14 @@ public struct DocumentCanvasCommandService: Sendable {
                 guard let layerName = NonEmptyLayerName(layerName) else {
                     return .failure(.emptyInput)
                 }
-                persistenceGateway.newCanvas(size.width, size.height)
-                persistenceGateway.prewarmDrawingResources()
+                switch persistenceGateway.newCanvas(size.width, size.height) {
+                case let .failure(failure): return .failure(failure)
+                case .success: break
+                }
+                switch persistenceGateway.prewarmDrawingResources() {
+                case let .failure(failure): return .failure(failure)
+                case .success: break
+                }
                 switch mutationGateway.replaceLayerPixels(0, request.pixelData) {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
@@ -135,25 +143,25 @@ public struct DocumentLayerCommandService: Sendable {
 }
 
 public struct DocumentStrokeCommandService: Sendable {
-    public let beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void
-    public let appendStroke: @Sendable (StylusSample) -> Void
+    public let beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
+    public let appendStroke: @Sendable (StylusSample) -> DocumentMutationResult
     public let endStroke: @Sendable () -> DocumentMutationResult
-    public let cancelStroke: @Sendable () -> Void
+    public let cancelStroke: @Sendable () -> DocumentMutationResult
     public let applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
     public let blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
     public let endBlurStroke: @Sendable () -> DocumentMutationResult
-    public let cancelBlurStroke: @Sendable () -> Void
+    public let cancelBlurStroke: @Sendable () -> DocumentMutationResult
     public let fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
 
     public init(
-        beginStroke: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void,
-        appendStroke: @escaping @Sendable (StylusSample) -> Void,
+        beginStroke: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult,
+        appendStroke: @escaping @Sendable (StylusSample) -> DocumentMutationResult,
         endStroke: @escaping @Sendable () -> DocumentMutationResult,
-        cancelStroke: @escaping @Sendable () -> Void,
+        cancelStroke: @escaping @Sendable () -> DocumentMutationResult,
         applyGpuStrokeSurface: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
         blurStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
-        cancelBlurStroke: @escaping @Sendable () -> Void,
+        cancelBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
         fill: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
     ) {
         self.beginStroke = beginStroke

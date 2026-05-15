@@ -149,7 +149,13 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
-        let geometry = documentQueryGateway.lightweightPresentation().geometry
+        let geometry: PixelGeometry
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            geometry = presentation.geometry
+        }
         guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
             return .failure(
                 .gpu(
@@ -177,7 +183,13 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult {
-        let geometry = documentQueryGateway.lightweightPresentation().geometry
+        let geometry: PixelGeometry
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            geometry = presentation.geometry
+        }
         guard let payload = LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData) else {
             return .failure(
                 .gpu(

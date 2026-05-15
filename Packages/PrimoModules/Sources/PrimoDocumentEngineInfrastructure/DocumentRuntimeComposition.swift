@@ -3,6 +3,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentRenderingInfrastructure
@@ -150,7 +151,13 @@ extension DocumentEngineLive {
         let useCase = DocumentEditorUseCase()
 
         return DocumentEditingGateway { request in
-            let presentation = self.queryGateway.lightweightPresentation()
+            let presentation: PaintDocumentPresentation
+            switch self.queryGateway.lightweightPresentation() {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(currentPresentation):
+                presentation = currentPresentation
+            }
             let context = DocumentLayerMutationContext(
                 revision: presentation.revision,
                 layerCount: presentation.layerRows.count,
@@ -343,7 +350,13 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     // Authoritative stale validation happens immediately before raw runtime
     // mutation so UI preflight results cannot grant stale access.
     private func validateFreshLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
-        let currentRevision = runtime.queryGateway.lightweightPresentation().revision
+        let currentRevision: DocumentRevision
+        switch runtime.queryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return mapRuntimeFailure(failure)
+        case let .success(presentation):
+            currentRevision = presentation.revision
+        }
         guard index.revision == currentRevision else {
             return .staleLayerIndex(
                 index: index.rawValue,
@@ -355,7 +368,13 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentLayerMutationFailure? {
-        let currentRevision = runtime.queryGateway.lightweightPresentation().revision
+        let currentRevision: DocumentRevision
+        switch runtime.queryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return mapRuntimeFailure(failure)
+        case let .success(presentation):
+            currentRevision = presentation.revision
+        }
         guard index.revision == currentRevision else {
             return .staleLayerIndex(
                 index: index.rawValue,

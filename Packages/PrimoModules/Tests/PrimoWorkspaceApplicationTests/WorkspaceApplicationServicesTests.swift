@@ -43,9 +43,9 @@ struct WorkspaceApplicationServicesTests {
                         paperStyle: .default
                     )
                 },
-                setPaperStyle: { _ in },
-                newCanvas: { _, _ in },
-                prewarmDrawingResources: {}
+                setPaperStyle: { _ in .success(()) },
+                newCanvas: { _, _ in .success(()) },
+                prewarmDrawingResources: { .success(()) }
             ),
             documentWorkspaceClient: DocumentWorkspaceClient(
                 createTabBackingStoreURL: { id in

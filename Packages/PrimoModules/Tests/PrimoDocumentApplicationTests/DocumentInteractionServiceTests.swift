@@ -23,15 +23,20 @@ struct DocumentCommandServiceTests {
                 presentation: { queryGateway().presentation() }
             ),
             renderGateway: DocumentRenderGateway(
-                compositePixelData: { expected },
-                compositeSurface: { expectedSurface },
+                compositePixelData: { .success(expected) },
+                compositeSurface: { .success(expectedSurface) },
                 pixelDataForLayer: { _ in .success(Data()) }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
         )
 
-        #expect(service.compositeSurface() == expectedSurface)
+        switch service.compositeSurface() {
+        case let .success(surface):
+            #expect(surface == expectedSurface)
+        case let .failure(failure):
+            Issue.record("Expected composite surface to succeed: \(failure)")
+        }
     }
 
     @Test
@@ -44,15 +49,20 @@ struct DocumentCommandServiceTests {
                 presentation: { queryGateway().presentation() }
             ),
             renderGateway: DocumentRenderGateway(
-                compositePixelData: { Data() },
-                compositeSurface: { expectedSurface },
+                compositePixelData: { .success(Data()) },
+                compositeSurface: { .success(expectedSurface) },
                 pixelDataForLayer: { _ in .success(Data()) }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
         )
 
-        #expect(service.compositeSurface().pixelData == expected)
+        switch service.compositeSurface() {
+        case let .success(surface):
+            #expect(surface.pixelData == expected)
+        case let .failure(failure):
+            Issue.record("Expected composite surface to succeed: \(failure)")
+        }
     }
 
     @Test
@@ -134,8 +144,8 @@ private func queryGateway() -> DocumentQueryGateway {
         renderSnapshot: nil
     )!
     return DocumentQueryGateway(
-        lightweightPresentation: { presentation },
-        presentation: { presentation }
+        lightweightPresentation: { .success(presentation) },
+        presentation: { .success(presentation) }
     )
 }
 
@@ -158,8 +168,8 @@ private func layerRow(index: Int) -> LayerRowModel {
 
 private func renderGateway() -> DocumentRenderGateway {
     DocumentRenderGateway(
-        compositePixelData: { Data() },
-        compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
+        compositePixelData: { .success(Data()) },
+        compositeSurface: { .success(DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data())) },
         pixelDataForLayer: { _ in .success(Data()) }
     )
 }
@@ -198,13 +208,13 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
 
 private func strokeGateway(
     endBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) },
-    cancelBlurStroke: @escaping @Sendable () -> Void = {}
+    cancelBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) }
 ) -> StrokeInputGateway {
     StrokeInputGateway(
-        beginStroke: { _, _ in },
-        appendStroke: { _ in },
+        beginStroke: { _, _ in .success(()) },
+        appendStroke: { _ in .success(()) },
         endStroke: { .success(()) },
-        cancelStroke: {},
+        cancelStroke: { .success(()) },
         blurStroke: { _, _, _, _ in .success(()) },
         endBlurStroke: endBlurStroke,
         cancelBlurStroke: cancelBlurStroke,
@@ -215,8 +225,8 @@ private func strokeGateway(
 
 private func historyGateway(recorder: CallRecorder) -> DocumentHistoryGateway {
     DocumentHistoryGateway(
-        canUndo: { true },
-        canRedo: { true },
+        canUndo: { .success(true) },
+        canRedo: { .success(true) },
         undo: {
             recorder.record("undo")
             return .success(())
@@ -232,17 +242,20 @@ private func persistenceGateway(recorder: CallRecorder) -> DocumentPersistenceGa
     DocumentPersistenceGateway(
         saveProject: { _, _ in },
         loadProject: { _ in
-            LoadedPaintProject(
-                presentation: queryGateway().presentation(),
+            let presentation = try queryGateway().presentation().get()
+            return LoadedPaintProject(
+                presentation: presentation,
                 paperStyle: .default
             )
         },
-        setPaperStyle: { _ in },
+        setPaperStyle: { _ in .success(()) },
         newCanvas: { width, height in
             recorder.record("newCanvas:\(width)x\(height)")
+            return .success(())
         },
         prewarmDrawingResources: {
             recorder.record("prewarmDrawingResources")
+            return .success(())
         }
     )
 }

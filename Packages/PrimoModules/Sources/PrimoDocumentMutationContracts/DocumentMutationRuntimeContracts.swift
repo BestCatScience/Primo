@@ -593,24 +593,24 @@ public struct DocumentMutationGateway: Sendable {
 }
 
 public struct StrokeInputGateway: Sendable {
-    package let beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
-    package let appendStroke: @Sendable (StylusSample) -> Void
+    package let beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
+    package let appendStroke: @Sendable (StylusSample) -> DocumentMutationResult
     package let endStroke: @Sendable () -> DocumentMutationResult
-    package let cancelStroke: @Sendable () -> Void
+    package let cancelStroke: @Sendable () -> DocumentMutationResult
     package let blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
     package let endBlurStroke: @Sendable () -> DocumentMutationResult
-    package let cancelBlurStroke: @Sendable () -> Void
+    package let cancelBlurStroke: @Sendable () -> DocumentMutationResult
     package let fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
     package let applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
     public init(
-        beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> Void,
-        appendStroke: @escaping @Sendable (StylusSample) -> Void,
+        beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult,
+        appendStroke: @escaping @Sendable (StylusSample) -> DocumentMutationResult,
         endStroke: @escaping @Sendable () -> DocumentMutationResult,
-        cancelStroke: @escaping @Sendable () -> Void,
+        cancelStroke: @escaping @Sendable () -> DocumentMutationResult,
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
-        cancelBlurStroke: @escaping @Sendable () -> Void,
+        cancelBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult,
         applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     ) {
@@ -627,15 +627,15 @@ public struct StrokeInputGateway: Sendable {
 }
 
 public struct DocumentHistoryGateway: Sendable {
-    package let canUndo: @Sendable () -> Bool
-    package let canRedo: @Sendable () -> Bool
+    package let canUndo: @Sendable () -> Result<Bool, DocumentMutationFailure>
+    package let canRedo: @Sendable () -> Result<Bool, DocumentMutationFailure>
     package let undo: @Sendable () -> DocumentMutationResult
     package let redo: @Sendable () -> DocumentMutationResult
     package let trimForMemoryPressure: @Sendable () -> Void
 
     public init(
-        canUndo: @escaping @Sendable () -> Bool,
-        canRedo: @escaping @Sendable () -> Bool,
+        canUndo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>,
+        canRedo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>,
         undo: @escaping @Sendable () -> DocumentMutationResult,
         redo: @escaping @Sendable () -> DocumentMutationResult,
         trimForMemoryPressure: @escaping @Sendable () -> Void = {}
@@ -649,14 +649,14 @@ public struct DocumentHistoryGateway: Sendable {
 }
 
 public struct TextLayerGateway: Sendable {
-    package let textLayerData: @Sendable (Int) -> TextLayerData?
+    package let textLayerData: @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>
     package let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    package let clearTextLayerData: @Sendable (Int) -> Void
+    package let clearTextLayerData: @Sendable (Int) -> DocumentMutationResult
 
     public init(
-        textLayerData: @escaping @Sendable (Int) -> TextLayerData?,
+        textLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>,
         setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
-        clearTextLayerData: @escaping @Sendable (Int) -> Void
+        clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
     ) {
         self.textLayerData = textLayerData
         self.setTextLayer = setTextLayer

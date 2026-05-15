@@ -473,7 +473,7 @@ struct SwiftDocumentRuntimeUndoTests {
         let sample = sample()
         let brush = brush()
 
-        runtime.persistenceGateway.newCanvas(2, 2)
+        _ = runtime.persistenceGateway.newCanvas(2, 2)
         _ = try runtime.mutationGateway.replaceLayerPixels(0, Data(repeating: 0x11, count: 16)).get()
         gpu.setBlockingEnabled(true)
 
@@ -620,8 +620,9 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale resize GPU result to be rejected")
             return
         }
-        #expect(runtime.queryGateway.lightweightPresentation().canvasSize.width == 2)
-        #expect(runtime.queryGateway.lightweightPresentation().canvasSize.height == 2)
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
+        #expect(presentation.canvasSize.width == 2)
+        #expect(presentation.canvasSize.height == 2)
         #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
     }
 

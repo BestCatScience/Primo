@@ -6,12 +6,12 @@ import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
 public struct DocumentReadGateway: Sendable {
-    package let lightweightPresentation: @Sendable () -> PaintDocumentPresentation
-    package let presentation: @Sendable () -> PaintDocumentPresentation
+    package let lightweightPresentation: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
+    package let presentation: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
 
     public init(
-        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
-        presentation: @escaping @Sendable () -> PaintDocumentPresentation
+        lightweightPresentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>,
+        presentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
     ) {
         self.lightweightPresentation = lightweightPresentation
         self.presentation = presentation
@@ -24,13 +24,13 @@ public typealias DocumentQueryGateway = DocumentReadGateway
 public struct DocumentRenderGateway: Sendable {
     /// Legacy convenience retained for callers that still expect raw bytes.
     /// Live query paths should prefer `compositeSurface`.
-    package let compositePixelData: @Sendable () -> Data
-    package let compositeSurface: @Sendable () -> DocumentCompositeSurface
+    package let compositePixelData: @Sendable () -> Result<Data, DocumentMutationFailure>
+    package let compositeSurface: @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
     package let pixelDataForLayer: @Sendable (Int) -> Result<Data, DocumentMutationFailure>
 
     public init(
-        compositePixelData: @escaping @Sendable () -> Data,
-        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface,
+        compositePixelData: @escaping @Sendable () -> Result<Data, DocumentMutationFailure>,
+        compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>,
         pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure>
     ) {
         self.compositePixelData = compositePixelData
@@ -40,10 +40,10 @@ public struct DocumentRenderGateway: Sendable {
 }
 
 public struct DocumentDirtyUpdateQueue: Sendable {
-    package let consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
+    package let consumeDirtyUpdate: @Sendable () -> Result<IncrementalLayerUpdate?, DocumentMutationFailure>
 
     public init(
-        consumeDirtyUpdate: @escaping @Sendable () -> IncrementalLayerUpdate?
+        consumeDirtyUpdate: @escaping @Sendable () -> Result<IncrementalLayerUpdate?, DocumentMutationFailure>
     ) {
         self.consumeDirtyUpdate = consumeDirtyUpdate
     }

@@ -415,8 +415,8 @@ private func queryGateway(
         revision: revision
     )!
     return DocumentQueryGateway(
-        lightweightPresentation: { presentation },
-        presentation: { presentation }
+        lightweightPresentation: { .success(presentation) },
+        presentation: { .success(presentation) }
     )
 }
 
@@ -424,8 +424,8 @@ private func renderGateway(
     pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure> = { _ in .success(Data()) }
 ) -> DocumentRenderGateway {
     DocumentRenderGateway(
-        compositePixelData: { Data() },
-        compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
+        compositePixelData: { .success(Data()) },
+        compositeSurface: { .success(DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data())) },
         pixelDataForLayer: pixelDataForLayer
     )
 }

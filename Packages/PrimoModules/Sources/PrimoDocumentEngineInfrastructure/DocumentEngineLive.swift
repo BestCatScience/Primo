@@ -70,28 +70,50 @@ package enum DocumentEngineFactory {
         )
 
         let queryGateway = DocumentQueryGateway(
-            lightweightPresentation: { runtimeExecutor.perform { $0.lightweightPresentation() } },
-            presentation: { runtimeExecutor.perform { $0.presentation() } }
+            lightweightPresentation: {
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("lightweightPresentation")) {
+                    $0.lightweightPresentation()
+                }
+            },
+            presentation: {
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("presentation")) {
+                    $0.presentation()
+                }
+            }
         )
         let renderGateway = DocumentRenderGateway(
             compositePixelData: {
-                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
-                return SwiftDocumentRuntime.compositeSurface(
-                    forMaterializedSnapshot: snapshot,
-                    gpuServices: gpuServices
-                ).pixelData
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("compositePixelData")) {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositeSurface(
+                        forMaterializedSnapshot: $0,
+                        gpuServices: gpuServices
+                    ).pixelData
+                }
             },
             compositeSurface: {
-                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
-                return SwiftDocumentRuntime.compositeSurface(
-                    forMaterializedSnapshot: snapshot,
-                    gpuServices: gpuServices
-                )
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("compositeSurface")) {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositeSurface(
+                        forMaterializedSnapshot: $0,
+                        gpuServices: gpuServices
+                    )
+                }
             },
-            pixelDataForLayer: { index in runtimeExecutor.perform { $0.pixelDataForLayer(index: index) } }
+            pixelDataForLayer: { index in
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("pixelDataForLayer")) {
+                    $0.pixelDataForLayer(index: index)
+                }
+            }
         )
         let dirtyUpdateQueue = DocumentDirtyUpdateQueue(
-            consumeDirtyUpdate: { runtimeExecutor.perform { $0.consumeDirtyUpdate() } }
+            consumeDirtyUpdate: {
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("consumeDirtyUpdate")) {
+                    $0.consumeDirtyUpdate()
+                }
+            }
         )
 
         let mutationGateway = DocumentMutationGateway(
@@ -142,17 +164,33 @@ package enum DocumentEngineFactory {
         )
 
         let strokeGateway = StrokeInputGateway(
-            beginStroke: { sample, brush in runtimeExecutor.perform { $0.beginStroke(sample: sample, brush: brush) } },
-            appendStroke: { sample in runtimeExecutor.perform { $0.appendStroke(sample: sample) } },
+            beginStroke: { sample, brush in
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("beginStroke")) {
+                    $0.beginStroke(sample: sample, brush: brush)
+                }
+            },
+            appendStroke: { sample in
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("appendStroke")) {
+                    $0.appendStroke(sample: sample)
+                }
+            },
             endStroke: {
                 performCurrentStrokeCommit(runtimeExecutor: runtimeExecutor)
             },
-            cancelStroke: { runtimeExecutor.perform { $0.cancelStroke() } },
+            cancelStroke: {
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("cancelStroke")) {
+                    $0.cancelStroke()
+                }
+            },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
                 performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeExecutor: runtimeExecutor)
             },
             endBlurStroke: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("endBlurStroke")) { $0.endBlurStroke() } },
-            cancelBlurStroke: { runtimeExecutor.perform { $0.cancelBlurStroke() } },
+            cancelBlurStroke: {
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("cancelBlurStroke")) {
+                    $0.cancelBlurStroke()
+                }
+            },
             fill: { sample, brush in
                 performFill(sample: sample, brush: brush, runtimeExecutor: runtimeExecutor)
             },
@@ -162,16 +200,24 @@ package enum DocumentEngineFactory {
         )
 
         let historyGateway = DocumentHistoryGateway(
-            canUndo: { runtimeExecutor.perform { $0.canUndo() } },
-            canRedo: { runtimeExecutor.perform { $0.canRedo() } },
+            canUndo: { runtimeExecutor.performValue(failure: reentrantRuntimeFailure("canUndo")) { $0.canUndo() } },
+            canRedo: { runtimeExecutor.performValue(failure: reentrantRuntimeFailure("canRedo")) { $0.canRedo() } },
             undo: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("undo")) { $0.undo() } },
             redo: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("redo")) { $0.redo() } },
-            trimForMemoryPressure: { runtimeExecutor.perform { $0.trimUndoHistoryForMemoryPressure() } }
+            trimForMemoryPressure: {
+                _ = runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("trimForMemoryPressure")) {
+                    $0.trimUndoHistoryForMemoryPressure()
+                }
+            }
         )
 
         let persistenceGateway = DocumentPersistenceGateway(
             saveProject: { url, paperStyle in
-                let snapshot = runtimeExecutor.perform { $0.projectSaveSnapshot(paperStyle: paperStyle) }
+                let snapshot = try runtimeExecutor.performThrowing(
+                    reentrantError: reentrantRuntimeFailure("saveProject")
+                ) {
+                    $0.projectSaveSnapshot(paperStyle: paperStyle)
+                }
                 try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
             },
             loadProject: { url in
@@ -186,12 +232,19 @@ package enum DocumentEngineFactory {
                     presentation: runtime.presentation(),
                     paperStyle: runtime.currentPaperStyle
                 )
-                runtimeExecutor.replaceRuntime(with: runtime)
+                try runtimeExecutor.replaceRuntimeResult(
+                    with: runtime,
+                    failure: reentrantRuntimeFailure("loadProject")
+                ).get()
                 return loadedProject
             },
-            setPaperStyle: { style in runtimeExecutor.perform { $0.setPaperStyle(style) } },
+            setPaperStyle: { style in
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("setPaperStyle")) {
+                    $0.setPaperStyle(style)
+                }
+            },
             newCanvas: { width, height in
-                runtimeExecutor.replaceRuntime(
+                runtimeExecutor.replaceRuntimeResult(
                     with: SwiftDocumentRuntime(
                         width: width,
                         height: height,
@@ -199,46 +252,68 @@ package enum DocumentEngineFactory {
                         dateClient: dateClient,
                         uuidClient: uuidClient,
                         gpuServices: gpuServices
-                    )
+                    ),
+                    failure: reentrantRuntimeFailure("newCanvas")
                 )
             },
             prewarmDrawingResources: {
-                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
-                _ = SwiftDocumentRuntime.compositeSurface(
-                    forMaterializedSnapshot: snapshot,
-                    gpuServices: gpuServices
-                )
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("prewarmDrawingResources")) {
+                    $0.materializedSnapshot()
+                }.map {
+                    _ = SwiftDocumentRuntime.compositeSurface(
+                        forMaterializedSnapshot: $0,
+                        gpuServices: gpuServices
+                    )
+                }
             }
         )
 
         let exportGateway = DocumentExportGateway(
             compositeSurface: { style in
-                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
-                return SwiftDocumentRuntime.compositeExportSurface(
-                    forMaterializedSnapshot: snapshot,
-                    paperStyle: style,
-                    gpuServices: gpuServices
-                )
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("exportCompositeSurface")) {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositeExportSurface(
+                        forMaterializedSnapshot: $0,
+                        paperStyle: style,
+                        gpuServices: gpuServices
+                    )
+                }
             },
             compositePNGData: { style in
-                let snapshot = runtimeExecutor.perform { $0.materializedSnapshot() }
-                return SwiftDocumentRuntime.compositePNGData(
-                    forMaterializedSnapshot: snapshot,
-                    paperStyle: style,
-                    gpuServices: gpuServices
-                )
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("compositePNGData")) {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositePNGData(
+                        forMaterializedSnapshot: $0,
+                        paperStyle: style,
+                        gpuServices: gpuServices
+                    )
+                }
             },
-            timelapseCapture: { runtimeExecutor.perform { $0.timelapseCapture() } }
+            timelapseCapture: {
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("timelapseCapture")) {
+                    $0.timelapseCapture()
+                }
+            }
         )
 
         let textLayerGateway = TextLayerGateway(
-            textLayerData: { index in runtimeExecutor.perform { $0.textLayerData(index: index) } },
+            textLayerData: { index in
+                runtimeExecutor.performValue(failure: reentrantRuntimeFailure("textLayerData")) {
+                    $0.textLayerData(index: index)
+                }
+            },
             setTextLayer: { index, textLayer in
                 runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setTextLayer")) {
                     $0.setTextLayer(index: index, textLayer: textLayer)
                 }
             },
-            clearTextLayerData: { index in runtimeExecutor.perform { $0.clearTextLayerData(index: index) } }
+            clearTextLayerData: { index in
+                runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("clearTextLayerData")) {
+                    $0.clearTextLayerData(index: index)
+                }
+            }
         )
 
         return DocumentEngineLive(
@@ -465,7 +540,9 @@ package enum DocumentEngineFactory {
             }
             switch mutationResult {
             case .success:
-                runtimeExecutor.perform { $0.clearCurrentStroke() }
+                _ = runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("clearCurrentStroke")) {
+                    $0.clearCurrentStroke()
+                }
             case let .failure(failure):
                 Self.logger.error("Current stroke apply failed: \(String(describing: failure), privacy: .public)")
             }

@@ -266,9 +266,9 @@ private extension DocumentLayerEffectsGateway {
 
 private extension TextLayerGateway {
     static let unused = TextLayerGateway(
-        textLayerData: { _ in nil },
+        textLayerData: { _ in .success(nil) },
         setTextLayer: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-        clearTextLayerData: { _ in }
+        clearTextLayerData: { _ in .success(()) }
     )
 }
 
@@ -313,10 +313,10 @@ private func queryGateway(
 ) -> DocumentQueryGateway {
     DocumentQueryGateway(
         lightweightPresentation: {
-            presentation(layerCount: layerCount, lockedLayerIndexes: lockedLayerIndexes, revision: revision())
+            .success(presentation(layerCount: layerCount, lockedLayerIndexes: lockedLayerIndexes, revision: revision()))
         },
         presentation: {
-            presentation(layerCount: layerCount, lockedLayerIndexes: lockedLayerIndexes, revision: revision())
+            .success(presentation(layerCount: layerCount, lockedLayerIndexes: lockedLayerIndexes, revision: revision()))
         }
     )
 }

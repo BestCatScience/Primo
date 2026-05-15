@@ -182,46 +182,47 @@ public enum DocumentCommandOutcome: Sendable {
     case presentation(PaintDocumentPresentation)
     case compositeSurface(DocumentCompositeSurface)
     case history(DocumentHistoryState)
+    case failure(DocumentMutationFailure)
     case none
 }
 
 public struct DocumentPresentationReader: Sendable {
-    private let lightweightPresentationHandler: @Sendable () -> PaintDocumentPresentation
-    private let presentationHandler: @Sendable () -> PaintDocumentPresentation
+    private let lightweightPresentationHandler: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
+    private let presentationHandler: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
 
     public init(
-        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
-        presentation: @escaping @Sendable () -> PaintDocumentPresentation
+        lightweightPresentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>,
+        presentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
     ) {
         self.lightweightPresentationHandler = lightweightPresentation
         self.presentationHandler = presentation
     }
 
-    public func lightweightPresentation() -> PaintDocumentPresentation {
+    public func lightweightPresentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         lightweightPresentationHandler()
     }
 
-    public func presentation() -> PaintDocumentPresentation {
+    public func presentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         presentationHandler()
     }
 }
 
 public struct DocumentTextLayerService: Sendable {
-    private let textLayerDataHandler: @Sendable (Int) -> TextLayerData?
+    private let textLayerDataHandler: @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>
     private let setTextLayerHandler: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    private let clearTextLayerDataHandler: @Sendable (Int) -> Void
+    private let clearTextLayerDataHandler: @Sendable (Int) -> DocumentMutationResult
 
     public init(
-        textLayerData: @escaping @Sendable (Int) -> TextLayerData?,
+        textLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>,
         setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
-        clearTextLayerData: @escaping @Sendable (Int) -> Void
+        clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
     ) {
         self.textLayerDataHandler = textLayerData
         self.setTextLayerHandler = setTextLayer
         self.clearTextLayerDataHandler = clearTextLayerData
     }
 
-    public func textLayerData(_ index: Int) -> TextLayerData? {
+    public func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> {
         textLayerDataHandler(index)
     }
 
@@ -229,7 +230,7 @@ public struct DocumentTextLayerService: Sendable {
         setTextLayerHandler(index, textLayer)
     }
 
-    public func clearTextLayerData(_ index: Int) {
+    public func clearTextLayerData(_ index: Int) -> DocumentMutationResult {
         clearTextLayerDataHandler(index)
     }
 }
@@ -237,16 +238,16 @@ public struct DocumentTextLayerService: Sendable {
 public struct DocumentPersistenceClient: Sendable {
     private let saveProjectHandler: @Sendable (URL, CanvasPaperStyle) throws -> Void
     private let loadProjectHandler: @Sendable (URL) throws -> LoadedPaintProject
-    private let setPaperStyleHandler: @Sendable (CanvasPaperStyle) -> Void
-    private let newCanvasHandler: @Sendable (Int, Int) -> Void
-    private let prewarmDrawingResourcesHandler: @Sendable () -> Void
+    private let setPaperStyleHandler: @Sendable (CanvasPaperStyle) -> DocumentMutationResult
+    private let newCanvasHandler: @Sendable (Int, Int) -> DocumentMutationResult
+    private let prewarmDrawingResourcesHandler: @Sendable () -> DocumentMutationResult
 
     public init(
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
         loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject,
-        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> Void,
-        newCanvas: @escaping @Sendable (Int, Int) -> Void,
-        prewarmDrawingResources: @escaping @Sendable () -> Void
+        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
+        newCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
+        prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
     ) {
         self.saveProjectHandler = saveProject
         self.loadProjectHandler = loadProject
@@ -263,43 +264,43 @@ public struct DocumentPersistenceClient: Sendable {
         try loadProjectHandler(url)
     }
 
-    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) -> DocumentMutationResult {
         setPaperStyleHandler(paperStyle)
     }
 
-    public func newCanvas(_ width: Int, _ height: Int) {
+    public func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         newCanvasHandler(width, height)
     }
 
-    public func prewarmDrawingResources() {
+    public func prewarmDrawingResources() -> DocumentMutationResult {
         prewarmDrawingResourcesHandler()
     }
 }
 
 public struct DocumentExportClient: Sendable {
-    private let compositeSurfaceHandler: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
-    private let compositePNGDataHandler: @Sendable (CanvasPaperStyle) -> Data?
-    private let timelapseCaptureHandler: @Sendable () -> TimelapseCapture?
+    private let compositeSurfaceHandler: @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>
+    private let compositePNGDataHandler: @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>
+    private let timelapseCaptureHandler: @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
 
     public init(
-        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?,
-        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data?,
-        timelapseCapture: @escaping @Sendable () -> TimelapseCapture?
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>,
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>,
+        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
     ) {
         self.compositeSurfaceHandler = compositeSurface
         self.compositePNGDataHandler = compositePNGData
         self.timelapseCaptureHandler = timelapseCapture
     }
 
-    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> {
         compositeSurfaceHandler(paperStyle)
     }
 
-    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Data? {
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure> {
         compositePNGDataHandler(paperStyle)
     }
 
-    public func timelapseCapture() -> TimelapseCapture? {
+    public func timelapseCapture() -> Result<TimelapseCapture?, DocumentMutationFailure> {
         timelapseCaptureHandler()
     }
 }
@@ -514,8 +515,8 @@ public struct DocumentPresentationRuntime: Sendable {
     private let renderingPipeline: DocumentRenderingWorkflow
 
     public init(
-        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
-        presentation: @escaping @Sendable () -> PaintDocumentPresentation,
+        lightweightPresentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>,
+        presentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>,
         renderingWorkflow: DocumentRenderingWorkflow
     ) {
         self.presentationReader = DocumentPresentationReader(
@@ -530,11 +531,11 @@ public struct DocumentPresentationRuntime: Sendable {
         self.renderingPipeline = services.renderingWorkflow
     }
 
-    public func lightweightPresentation() -> PaintDocumentPresentation {
+    public func lightweightPresentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         presentationReader.lightweightPresentation()
     }
 
-    public func presentation() -> PaintDocumentPresentation {
+    public func presentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         presentationReader.presentation()
     }
 
@@ -688,7 +689,7 @@ public struct CanvasMutationRuntime: Sendable {
         canvasCommands.initializeImportedCanvas(request, layerName)
     }
 
-    public func compositeSurface() -> DocumentCompositeSurface {
+    public func compositeSurface() -> Result<DocumentCompositeSurface, DocumentMutationFailure> {
         canvasCommands.compositeSurface()
     }
 
@@ -834,14 +835,14 @@ public struct LayerEditingRuntime: Sendable {
     public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
-    public func textLayerData(_ index: ExistingLayerIndex) -> TextLayerData? { textLayerService.textLayerData(index.rawValue) }
-    public func clearTextLayerData(_ index: EditableLayerIndex) { textLayerService.clearTextLayerData(index.rawValue) }
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index.rawValue) }
+    public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { textLayerService.clearTextLayerData(index.rawValue) }
     @available(*, deprecated, message: "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData.")
     package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
     @available(*, deprecated, message: "Use textLayerData(_:) with ExistingLayerIndex.")
-    package func textLayerData(_ index: Int) -> TextLayerData? { textLayerService.textLayerData(index) }
+    package func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index) }
     @available(*, deprecated, message: "Use clearTextLayerData(_:) with EditableLayerIndex.")
-    package func clearTextLayerData(_ index: Int) { textLayerService.clearTextLayerData(index) }
+    package func clearTextLayerData(_ index: Int) -> DocumentMutationResult { textLayerService.clearTextLayerData(index) }
     public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
     public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
     public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index.rawValue) }
@@ -956,10 +957,10 @@ package struct CanvasStrokeRuntime: Sendable {
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }
 
-    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) { strokeCommands.beginStroke(sample, brush) }
-    public func appendStroke(_ sample: StylusSample) { strokeCommands.appendStroke(sample) }
+    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult { strokeCommands.beginStroke(sample, brush) }
+    public func appendStroke(_ sample: StylusSample) -> DocumentMutationResult { strokeCommands.appendStroke(sample) }
     public func endStroke() -> DocumentMutationResult { strokeCommands.endStroke() }
-    public func cancelStroke() { strokeCommands.cancelStroke() }
+    public func cancelStroke() -> DocumentMutationResult { strokeCommands.cancelStroke() }
     public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex.rawValue) }
     public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex.rawValue, clearSelectionAfterBlur) }
     @available(*, deprecated, message: "Use applyGpuStrokeSurface(_:_:layerIndex:) with EditableLayerIndex.")
@@ -967,7 +968,7 @@ package struct CanvasStrokeRuntime: Sendable {
     @available(*, deprecated, message: "Use blurStroke(_:_:layerIndex:clearSelectionAfterBlur:) with EditableLayerIndex.")
     package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) }
     public func endBlurStroke() -> DocumentMutationResult { strokeCommands.endBlurStroke() }
-    public func cancelBlurStroke() { strokeCommands.cancelBlurStroke() }
+    public func cancelBlurStroke() -> DocumentMutationResult { strokeCommands.cancelBlurStroke() }
     public func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult { strokeCommands.fill(sample, brush) }
     public func cancel() -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.cancel() }
     public func cancelPreview() -> GpuStrokeSessionOutcome { canvasStrokeInteractionService.cancel() }
@@ -998,11 +999,11 @@ public struct StrokeEditingRuntime: Sendable {
         self.strokeRuntime = strokeRuntime
     }
 
-    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) {
+    public func beginStroke(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
         strokeRuntime.beginStroke(sample, brush)
     }
 
-    public func appendStroke(_ sample: StylusSample) {
+    public func appendStroke(_ sample: StylusSample) -> DocumentMutationResult {
         strokeRuntime.appendStroke(sample)
     }
 
@@ -1010,7 +1011,7 @@ public struct StrokeEditingRuntime: Sendable {
         strokeRuntime.endStroke()
     }
 
-    public func cancelStroke() {
+    public func cancelStroke() -> DocumentMutationResult {
         strokeRuntime.cancelStroke()
     }
 
@@ -1036,7 +1037,7 @@ public struct StrokeEditingRuntime: Sendable {
         strokeRuntime.endBlurStroke()
     }
 
-    public func cancelBlurStroke() {
+    public func cancelBlurStroke() -> DocumentMutationResult {
         strokeRuntime.cancelBlurStroke()
     }
 
@@ -1148,9 +1149,9 @@ public struct DocumentPersistenceRuntime: Sendable {
 
     public func saveProject(_ url: URL, _ paperStyle: CanvasPaperStyle) throws { try persistenceClient.saveProject(url, paperStyle) }
     public func loadProject(_ url: URL) throws -> LoadedPaintProject { try persistenceClient.loadProject(url) }
-    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) { persistenceClient.setPaperStyle(paperStyle) }
-    public func newCanvas(_ width: Int, _ height: Int) { persistenceClient.newCanvas(width, height) }
-    public func prewarmDrawingResources() { persistenceClient.prewarmDrawingResources() }
+    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) -> DocumentMutationResult { persistenceClient.setPaperStyle(paperStyle) }
+    public func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult { persistenceClient.newCanvas(width, height) }
+    public func prewarmDrawingResources() -> DocumentMutationResult { persistenceClient.prewarmDrawingResources() }
 }
 
 public struct DocumentExportRuntime: Sendable {
@@ -1164,9 +1165,9 @@ public struct DocumentExportRuntime: Sendable {
         self.exportClient = services.exportClient
     }
 
-    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? { exportClient.compositeSurface(paperStyle) }
-    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Data? { exportClient.compositePNGData(paperStyle) }
-    public func timelapseCapture() -> TimelapseCapture? { exportClient.timelapseCapture() }
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> { exportClient.compositeSurface(paperStyle) }
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure> { exportClient.compositePNGData(paperStyle) }
+    public func timelapseCapture() -> Result<TimelapseCapture?, DocumentMutationFailure> { exportClient.timelapseCapture() }
 }
 
 public struct CanvasPreviewRuntime: Sendable {

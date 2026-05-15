@@ -69,9 +69,9 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func redoRejectsMissingHistory() {
+    func redoRejectsMissingHistory() throws {
         let runtime = DocumentEngineFactory.live()
-        #expect(runtime.historyGateway.canRedo() == false)
+        #expect(try runtime.historyGateway.canRedo().get() == false)
         expectFailure(runtime.historyGateway.redo(), .noRedoState)
     }
 
@@ -80,13 +80,13 @@ struct PaintDocumentMutationContractTests {
         let runtime = DocumentEngineFactory.live()
 
         expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
-        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+        #expect(try runtime.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Ink")
 
         expectSuccess(runtime.historyGateway.undo())
-        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Layer 1")
+        #expect(try runtime.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Layer 1")
 
         expectSuccess(runtime.historyGateway.redo())
-        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+        #expect(try runtime.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Ink")
     }
 
     @Test
@@ -124,7 +124,7 @@ struct PaintDocumentMutationContractTests {
         let loaded = DocumentEngineFactory.live()
         _ = try loaded.persistenceGateway.loadProject(projectURL)
 
-        #expect(loaded.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+        #expect(try loaded.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Ink")
         #expect(folder(in: loaded, id: folderID)?.name == "References")
     }
 
@@ -137,7 +137,7 @@ struct PaintDocumentMutationContractTests {
         expectSuccess(runtime.setFolderName(folderID, "References"))
         expectSuccess(runtime.setFolderExpanded(folderID, false))
 
-        guard case let .operations(operations) = runtime.exportGateway.timelapseCapture()?.source else {
+        guard case let .operations(operations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
@@ -229,7 +229,7 @@ struct PaintDocumentMutationContractTests {
     @Test
     func applyLayerMaskUsesGpuMutationPath() throws {
         let runtime = DocumentEngineFactory.live()
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
         let height = max(Int(presentation.canvasSize.height.rounded()), 1)
         var pixelBytes = [UInt8](repeating: 0, count: width * height * 4)
@@ -262,7 +262,7 @@ struct PaintDocumentMutationContractTests {
     @Test
     func mergeLayerDownUsesGpuMutationPath() throws {
         let runtime = DocumentEngineFactory.live()
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
         let height = max(Int(presentation.canvasSize.height.rounded()), 1)
         var lowerBytes = [UInt8](repeating: 0, count: width * height * 4)
@@ -293,10 +293,10 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func mergeLayerDownRecordsSingleTimelapseOperation() {
+    func mergeLayerDownRecordsSingleTimelapseOperation() throws {
         guard PrimoMetalDocumentProcessingClient.shared.isAvailable else { return }
         let runtime = DocumentEngineFactory.live()
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
         let height = max(Int(presentation.canvasSize.height.rounded()), 1)
         let lower = Data(repeating: 0x20, count: width * height * 4)
@@ -312,30 +312,30 @@ struct PaintDocumentMutationContractTests {
             return
         }
         expectSuccess(runtime.mutationGateway.replaceLayerPixels(upperIndex, upper))
-        guard case let .operations(beforeOperations) = runtime.exportGateway.timelapseCapture()?.source else {
+        guard case let .operations(beforeOperations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
 
         expectSuccess(runtime.mergeLayerDown(upperIndex))
 
-        guard case let .operations(afterOperations) = runtime.exportGateway.timelapseCapture()?.source else {
+        guard case let .operations(afterOperations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
         let mergeOperations = Array(afterOperations.dropFirst(beforeOperations.count))
         #expect(mergeOperations == [.mergeLayerDown(index: .unchecked(upperIndex))])
-        #expect(runtime.queryGateway.lightweightPresentation().layerRows.count == 1)
+        #expect(try runtime.queryGateway.lightweightPresentation().get().layerRows.count == 1)
     }
 
     @Test
-    func compositeSurfaceUsesGpuQueryPath() {
+    func compositeSurfaceUsesGpuQueryPath() throws {
         let runtime = DocumentEngineFactory.live()
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
         let height = max(Int(presentation.canvasSize.height.rounded()), 1)
 
-        let surface = runtime.renderGateway.compositeSurface()
+        let surface = try runtime.renderGateway.compositeSurface().get()
 
         #expect(surface.width == width)
         #expect(surface.height == height)
@@ -343,10 +343,10 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func renderSnapshotUsesSurfaceOnlyLayerThumbnails() {
+    func renderSnapshotUsesSurfaceOnlyLayerThumbnails() throws {
         let runtime = DocumentEngineFactory.live()
 
-        let presentation = runtime.queryGateway.presentation()
+        let presentation = try runtime.queryGateway.presentation().get()
 
         guard let snapshot = presentation.renderSnapshot else {
             Issue.record("Expected render snapshot")
@@ -628,7 +628,10 @@ struct PaintDocumentMutationContractTests {
     }
 
     private func folder(in runtime: DocumentEngineLive, id: Int) -> LayerFolderModel? {
-        runtime.queryGateway.lightweightPresentation().layerSidebarRows.compactMap { row in
+        guard case let .success(presentation) = runtime.queryGateway.lightweightPresentation() else {
+            return nil
+        }
+        return presentation.layerSidebarRows.compactMap { row in
             if case let .folder(folder) = row, folder.id == id {
                 return folder
             }

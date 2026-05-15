@@ -67,7 +67,13 @@ public struct DocumentContentService: Sendable {
         case let .failure(failure):
             return .failure(failure)
         case let .success(index):
-            let geometry = documentQueryGateway.lightweightPresentation().geometry
+            let geometry: PixelGeometry
+            switch documentQueryGateway.lightweightPresentation() {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(presentation):
+                geometry = presentation.geometry
+            }
             guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
                 return .failure(
                     .gpu(
@@ -86,7 +92,13 @@ public struct DocumentContentService: Sendable {
     public func replaceLayerPixels(
         _ command: LayerPixelReplacementCommand
     ) -> DocumentMutationResult {
-        let presentation = documentQueryGateway.lightweightPresentation()
+        let presentation: PaintDocumentPresentation
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(currentPresentation):
+            presentation = currentPresentation
+        }
         let index = command.index
         guard index.revision == presentation.revision else {
             return .failure(
@@ -123,6 +135,14 @@ public struct DocumentContentService: Sendable {
         _ pixelData: Data,
         to target: LayerContentMutationTarget
     ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
+        let geometry: PixelGeometry
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            geometry = presentation.geometry
+        }
+
         let resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
         switch resolve(target) {
         case let .failure(failure):
@@ -131,7 +151,6 @@ public struct DocumentContentService: Sendable {
             resolvedTarget = target
         }
 
-        let geometry = documentQueryGateway.lightweightPresentation().geometry
         guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
             if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
                 return .failure(
@@ -239,7 +258,13 @@ public struct DocumentContentService: Sendable {
     private func resolve(
         _ target: LayerContentMutationTarget
     ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), DocumentMutationFailure> {
-        let originalActiveLayerIndex = documentQueryGateway.lightweightPresentation().activeLayerIndex
+        let originalActiveLayerIndex: Int
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            originalActiveLayerIndex = presentation.activeLayerIndex
+        }
         switch target {
         case let .existingLayer(index):
             switch editableLayerIndex(index) {
@@ -286,7 +311,13 @@ public struct DocumentContentService: Sendable {
     }
 
     private func editableLayerIndex(_ rawValue: Int) -> Result<EditableLayerIndex, DocumentMutationFailure> {
-        let context = layerMutationContext()
+        let context: DocumentLayerMutationContext
+        switch layerMutationContext() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(mutationContext):
+            context = mutationContext
+        }
         guard let index = EditableLayerIndex.validated(
             rawValue,
             revision: context.revision,
@@ -301,9 +332,15 @@ public struct DocumentContentService: Sendable {
         return .success(index)
     }
 
-    private func layerMutationContext() -> DocumentLayerMutationContext {
-        let presentation = documentQueryGateway.lightweightPresentation()
-        return DocumentLayerMutationContext(
+    private func layerMutationContext() -> Result<DocumentLayerMutationContext, DocumentMutationFailure> {
+        let presentation: PaintDocumentPresentation
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(currentPresentation):
+            presentation = currentPresentation
+        }
+        return .success(DocumentLayerMutationContext(
             revision: presentation.revision,
             layerCount: presentation.layerRows.count,
             folderIDs: Set(
@@ -315,6 +352,6 @@ public struct DocumentContentService: Sendable {
             isLayerLocked: { index in
                 presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
             }
-        )
+        ))
     }
 }

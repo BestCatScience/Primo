@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
 public struct TimelapseFrame: Equatable, Sendable {
@@ -80,16 +81,16 @@ public struct TimelapseCapture: Equatable, Sendable {
 public struct DocumentPersistenceGateway: Sendable {
     public let saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
     public let loadProject: @Sendable (URL) throws -> LoadedPaintProject
-    public let setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
-    public let newCanvas: @Sendable (Int, Int) -> Void
-    public let prewarmDrawingResources: @Sendable () -> Void
+    public let setPaperStyle: @Sendable (CanvasPaperStyle) -> DocumentMutationResult
+    public let newCanvas: @Sendable (Int, Int) -> DocumentMutationResult
+    public let prewarmDrawingResources: @Sendable () -> DocumentMutationResult
 
     public init(
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
         loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject,
-        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> Void,
-        newCanvas: @escaping @Sendable (Int, Int) -> Void,
-        prewarmDrawingResources: @escaping @Sendable () -> Void
+        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
+        newCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
+        prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
     ) {
         self.saveProject = saveProject
         self.loadProject = loadProject
@@ -100,14 +101,14 @@ public struct DocumentPersistenceGateway: Sendable {
 }
 
 public struct DocumentExportGateway: Sendable {
-    public let compositeSurface: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
-    public let compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
-    public let timelapseCapture: @Sendable () -> TimelapseCapture?
+    public let compositeSurface: @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>
+    public let compositePNGData: @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>
+    public let timelapseCapture: @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
 
     public init(
-        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface? = { _ in nil },
-        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data?,
-        timelapseCapture: @escaping @Sendable () -> TimelapseCapture?
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> = { _ in .success(nil) },
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>,
+        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
     ) {
         self.compositeSurface = compositeSurface
         self.compositePNGData = compositePNGData

@@ -25,13 +25,13 @@ final class DocumentCommandPerformanceTests: XCTestCase {
         }
         let service = DocumentStrokeCommandService(
             strokeGateway: StrokeInputGateway(
-                beginStroke: { _, _ in },
-                appendStroke: { _ in },
+                beginStroke: { _, _ in .success(()) },
+                appendStroke: { _ in .success(()) },
                 endStroke: { .success(()) },
-                cancelStroke: {},
+                cancelStroke: { .success(()) },
                 blurStroke: { _, _, _, _ in .success(()) },
                 endBlurStroke: { .success(()) },
-                cancelBlurStroke: {},
+                cancelBlurStroke: { .success(()) },
                 fill: { _, _ in .success(()) },
                 applyGpuStrokeSurface: { _, _, _ in .success(()) }
             )

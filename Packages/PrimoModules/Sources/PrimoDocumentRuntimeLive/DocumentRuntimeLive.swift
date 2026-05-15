@@ -21,10 +21,10 @@ import PrimoDocumentStrokeInfrastructure
 
 private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable {
     private let lock = NSLock()
-    private let currentPresentation: @Sendable () -> PaintDocumentPresentation
+    private let currentPresentation: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
     private var continuations: [UUID: AsyncStream<PaintDocumentPresentation>.Continuation] = [:]
 
-    init(currentPresentation: @escaping @Sendable () -> PaintDocumentPresentation) {
+    init(currentPresentation: @escaping @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>) {
         self.currentPresentation = currentPresentation
     }
 
@@ -34,7 +34,9 @@ private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable 
             lock.lock()
             continuations[id] = continuation
             lock.unlock()
-            continuation.yield(currentPresentation())
+            if case let .success(presentation) = currentPresentation() {
+                continuation.yield(presentation)
+            }
             continuation.onTermination = { [weak self] _ in
                 self?.removeContinuation(id)
             }
@@ -42,7 +44,9 @@ private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable 
     }
 
     func publishLatest() {
-        publish(currentPresentation())
+        if case let .success(presentation) = currentPresentation() {
+            publish(presentation)
+        }
     }
 
     private func publish(_ presentation: PaintDocumentPresentation) {
@@ -58,6 +62,17 @@ private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable 
         lock.lock()
         continuations[id] = nil
         lock.unlock()
+    }
+}
+
+private extension Result where Success == DocumentCommandOutcome, Failure == DocumentMutationFailure {
+    func getOrFailureOutcome() -> DocumentCommandOutcome {
+        switch self {
+        case let .success(outcome):
+            return outcome
+        case let .failure(failure):
+            return .failure(failure)
+        }
     }
 }
 
@@ -230,9 +245,13 @@ package extension DocumentRuntime {
             case let .presentation(request):
                 switch request {
                 case .lightweight:
-                    return .presentation(composition.queryGateway.lightweightPresentation())
+                    return composition.queryGateway.lightweightPresentation()
+                        .map(DocumentCommandOutcome.presentation)
+                        .getOrFailureOutcome()
                 case .full, .current:
-                    return .presentation(composition.queryGateway.presentation())
+                    return composition.queryGateway.presentation()
+                        .map(DocumentCommandOutcome.presentation)
+                        .getOrFailureOutcome()
                 }
             case let .canvas(command):
                 switch command {
@@ -251,11 +270,11 @@ package extension DocumentRuntime {
                 case let .initializeImported(request, layerName):
                     return mutationOutcome(services.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
                 case .compositeSurface:
-                    return .compositeSurface(services.canvasCommands.compositeSurface())
+                    return services.canvasCommands.compositeSurface()
+                        .map(DocumentCommandOutcome.compositeSurface)
+                        .getOrFailureOutcome()
                 case let .setPaperStyle(style):
-                    composition.persistenceGateway.setPaperStyle(style)
-                    presentationBroadcaster.publishLatest()
-                    return .none
+                    return mutationOutcome(composition.persistenceGateway.setPaperStyle(style).map { .completed })
                 }
             case let .layer(command):
                 switch command {
@@ -292,26 +311,37 @@ package extension DocumentRuntime {
             case let .stroke(command):
                 switch command {
                 case let .begin(sample, settings):
-                    composition.strokeGateway.beginStroke(sample, settings)
-                    return .none
+                    return mutationOutcome(composition.strokeGateway.beginStroke(sample, settings).map { .completed })
                 case let .append(sample):
-                    composition.strokeGateway.appendStroke(sample)
-                    return .none
+                    return mutationOutcome(composition.strokeGateway.appendStroke(sample).map { .completed })
                 case .end:
                     return mutationOutcome(composition.strokeGateway.endStroke().map { .completed })
                 case .cancel:
-                    composition.strokeGateway.cancelStroke()
-                    return .none
+                    return mutationOutcome(composition.strokeGateway.cancelStroke().map { .completed })
                 case let .fill(sample, settings):
                     return mutationOutcome(composition.strokeGateway.fill(sample, settings).map { .completed })
                 }
             case let .history(command):
                 switch command {
                 case .state:
+                    let canUndo: Bool
+                    switch composition.historyGateway.canUndo() {
+                    case let .failure(failure):
+                        return .failure(failure)
+                    case let .success(value):
+                        canUndo = value
+                    }
+                    let canRedo: Bool
+                    switch composition.historyGateway.canRedo() {
+                    case let .failure(failure):
+                        return .failure(failure)
+                    case let .success(value):
+                        canRedo = value
+                    }
                     return .history(
                         DocumentHistoryState(
-                            canUndo: composition.historyGateway.canUndo(),
-                            canRedo: composition.historyGateway.canRedo()
+                            canUndo: canUndo,
+                            canRedo: canRedo
                         )
                     )
                 case .undo:

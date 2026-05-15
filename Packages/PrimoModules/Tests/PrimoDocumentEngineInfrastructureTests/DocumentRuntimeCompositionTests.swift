@@ -66,7 +66,7 @@ struct DocumentRuntimeCompositionTests {
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessAsFailure() throws {
         let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
 
-        let result: Result<Int, ReentrantFailure> = executor.perform { _ in
+        let result: Result<Int, ReentrantFailure> = executor.performResult(failure: .rejected) { _ in
             executor.performResult(failure: .rejected) { runtime in
                 .success(runtime.value)
             }
@@ -79,9 +79,12 @@ struct DocumentRuntimeCompositionTests {
     func lockedRuntimeExecutorReplacementSwapsRuntimeForLaterAccess() throws {
         let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
 
-        #expect(executor.perform { $0.value } == 1)
-        executor.replaceRuntime(with: MutableRuntime(value: 2))
-        #expect(executor.perform { $0.value } == 2)
+        #expect(executor.performValue(failure: ReentrantFailure.rejected) { $0.value } == .success(1))
+        guard case .success = executor.replaceRuntimeResult(with: MutableRuntime(value: 2), failure: ReentrantFailure.rejected) else {
+            Issue.record("Expected runtime replacement to succeed")
+            return
+        }
+        #expect(executor.performValue(failure: ReentrantFailure.rejected) { $0.value } == .success(2))
     }
 
     @Test
@@ -98,10 +101,12 @@ struct DocumentRuntimeCompositionTests {
         let body = try String(contentsOf: sourceURL, encoding: .utf8)
 
         #expect(body.contains("package static var reentrantAccessMessage"))
-        #expect(body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
+        #expect(!body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
         #expect(body.contains("package func performResult<Success, Failure: Error>"))
         #expect(body.contains("return .failure(failure())"))
-        #expect(body.contains("package func replaceRuntime(with newRuntime: Runtime)"))
+        #expect(body.contains("package func replaceRuntimeResult<Failure: Error>("))
+        #expect(body.contains("with newRuntime: Runtime,"))
+        #expect(body.contains("failure: @autoclosure () -> Failure"))
     }
 
 
@@ -124,7 +129,7 @@ struct DocumentRuntimeCompositionTests {
         )
         _ = try renameResult.get()
 
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         #expect(presentation.activeLayerIndex == 1)
         #expect(presentation.layerRows.count == 2)
         #expect(presentation.layerRows.first(where: { $0.index == 1 })?.name == "Ink")
@@ -135,8 +140,8 @@ struct DocumentRuntimeCompositionTests {
         let runtime = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
         let overridden = runtime.withOverrides(
             historyGateway: DocumentHistoryGateway(
-                canUndo: { false },
-                canRedo: { false },
+                canUndo: { .success(false) },
+                canRedo: { .success(false) },
                 undo: { .failure(.noUndoState) },
                 redo: { .failure(.noRedoState) }
             )
@@ -146,10 +151,10 @@ struct DocumentRuntimeCompositionTests {
             .structure(.addLayer(name: "Foreground"))
         ).get()
 
-        let presentation = runtime.queryGateway.lightweightPresentation()
+        let presentation = try runtime.queryGateway.lightweightPresentation().get()
         #expect(presentation.layerRows.count == 2)
-        #expect(overridden.historyGateway.canUndo() == false)
-        #expect(runtime.historyGateway.canUndo())
+        #expect(try overridden.historyGateway.canUndo().get() == false)
+        #expect(try runtime.historyGateway.canUndo().get())
     }
 
     @Test
@@ -209,11 +214,13 @@ struct DocumentRuntimeCompositionTests {
         )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
-        #expect(body.contains("let snapshot = runtimeExecutor.perform { $0.projectSaveSnapshot(paperStyle: paperStyle) }"))
+        #expect(body.contains("let snapshot = try runtimeExecutor.performThrowing("))
+        #expect(body.contains("$0.projectSaveSnapshot(paperStyle: paperStyle)"))
         #expect(body.contains("try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)"))
         #expect(!body.contains("try runtimeExecutor.perform { session in\n                    try session.saveProject"))
-        #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface(\n                    forMaterializedSnapshot: snapshot"))
-        #expect(body.contains("SwiftDocumentRuntime.compositePNGData(\n                    forMaterializedSnapshot: snapshot"))
+        #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface("))
+        #expect(body.contains("SwiftDocumentRuntime.compositePNGData("))
+        #expect(body.contains("forMaterializedSnapshot: $0"))
     }
 
     @Test
@@ -230,12 +237,40 @@ struct DocumentRuntimeCompositionTests {
         let body = try String(contentsOf: supportURL, encoding: .utf8)
 
         #expect(body.contains("package final class LockedDocumentRuntimeExecutor"))
-        #expect(body.contains("package func perform<T>("))
+        #expect(body.contains("package func performValue<Success, Failure: Error>("))
         #expect(body.contains("package func performResult<Success, Failure: Error>("))
         #expect(body.contains("private var isExecuting = false"))
-        #expect(body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
+        #expect(!body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
         #expect(body.contains("return .failure(failure())"))
         #expect(body.contains("NSRecursiveLock()"))
+    }
+
+    @Test
+    func uncheckedSendableRuntimeInternalsStayPackageScoped() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceFiles = [
+            "Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/DocumentRuntimeSupport.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentStore.swift",
+        ]
+        let body = try sourceFiles
+            .map { try String(contentsOf: repoRoot.appendingPathComponent($0), encoding: .utf8) }
+            .joined(separator: "\n")
+
+        #expect(!body.contains("public actor DocumentRuntimeBox"))
+        #expect(!body.contains("public final class LockedDocumentRuntimeExecutor"))
+        #expect(!body.contains("public final class GpuResourceLease"))
+        #expect(!body.contains("public final class SwiftDocumentRuntime"))
+        #expect(!body.contains("public final class SwiftDocumentStore"))
+        #expect(body.contains("package final class LockedDocumentRuntimeExecutor"))
+        #expect(body.contains("final class GpuResourceLease: @unchecked Sendable"))
+        #expect(body.contains("final class SwiftDocumentRuntime: @unchecked Sendable"))
+        #expect(body.contains("final class SwiftDocumentStore: @unchecked Sendable"))
     }
 
     @Test
@@ -259,7 +294,7 @@ struct DocumentRuntimeCompositionTests {
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessFromPerform() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
 
-        let result: DocumentMutationResult = executor.perform { _ in
+        let result: DocumentMutationResult = executor.performResult(failure: .bridgeMutationFailed("perform reentrant outer")) { _ in
             executor.performResult(failure: .bridgeMutationFailed("perform reentrant")) { _ in
                 .success(())
             }
@@ -279,7 +314,7 @@ struct DocumentRuntimeCompositionTests {
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<1_000 {
                 group.addTask {
-                    executor.perform { runtime in
+                    _ = executor.performMutation(failure: DocumentMutationFailure.bridgeMutationFailed("concurrent")) { runtime in
                         let nextValue = runtime.value + 1
                         runtime.value = nextValue
                     }
@@ -287,16 +322,16 @@ struct DocumentRuntimeCompositionTests {
             }
         }
 
-        #expect(executor.perform { $0.value } == 1_000)
+        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(1_000))
     }
 
     @Test
     func lockedRuntimeExecutorReplacementUsesSameSynchronousBoundary() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
 
-        executor.replaceRuntime(with: RuntimeCounter(value: 42))
+        _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), failure: DocumentMutationFailure.bridgeMutationFailed("replace"))
 
-        #expect(executor.perform { $0.value } == 42)
+        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(42))
     }
 
     @Test
@@ -308,7 +343,7 @@ struct DocumentRuntimeCompositionTests {
         let replacementFinished = DispatchSemaphore(value: 0)
 
         DispatchQueue.global(qos: .userInitiated).async {
-            executor.perform { runtime in
+            _ = executor.performMutation(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { runtime in
                 #expect(runtime.value == 1)
                 readStarted.signal()
                 _ = releaseRead.wait(timeout: .now() + 2)
@@ -322,7 +357,7 @@ struct DocumentRuntimeCompositionTests {
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            executor.replaceRuntime(with: RuntimeCounter(value: 42))
+            _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), failure: DocumentMutationFailure.bridgeMutationFailed("replace"))
             replacementFinished.signal()
         }
 
@@ -337,7 +372,7 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected runtime replacement to finish after read releases the lock")
             return
         }
-        #expect(executor.perform { $0.value } == 42)
+        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(42))
     }
 
     @Test

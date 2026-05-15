@@ -384,6 +384,7 @@ let package = Package(
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
+                "PrimoDocumentMutationContracts",
                 "PrimoDocumentPresentationContracts",
             ]
         ),
