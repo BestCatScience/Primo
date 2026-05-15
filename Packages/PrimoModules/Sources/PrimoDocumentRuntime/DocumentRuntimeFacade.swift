@@ -218,6 +218,9 @@ public enum DocumentPresentationRequest: Equatable, Sendable {
 }
 
 public enum DocumentCanvasCommand: Sendable {
+    case createSized(ValidCanvasSize)
+    case resizeSized(ValidCanvasSize)
+    case resizeExtentSized(ValidCanvasSize)
     case create(width: Int, height: Int)
     case resize(width: Int, height: Int)
     case resizeExtent(width: Int, height: Int)
@@ -228,6 +231,9 @@ public enum DocumentCanvasCommand: Sendable {
 
 public enum DocumentLayerCommand: Sendable {
     case edit(DocumentEditingRequest)
+    case mergeExistingLayerDown(ExistingLayerIndex)
+    case setEditableTextLayer(index: EditableLayerIndex, TextLayerData)
+    case applyEditableProcessing(index: EditableLayerIndex, LayerProcessingRequest)
     case mergeLayerDown(Int)
     case setTextLayer(index: Int, TextLayerData)
     case applyProcessing(index: Int, LayerProcessingRequest)
@@ -428,6 +434,14 @@ public struct DocumentRenderingWorkflow: Sendable {
     }
 
     public func compositedPaperPreviewRGBA(
+        _ surface: RgbaSurface,
+        _ paperStyle: CanvasPaperStyle
+    ) -> DocumentRenderingResult<Data> {
+        compositedPaperPreviewRGBAHandler(surface.data, surface.width, surface.height, paperStyle)
+    }
+
+    @available(*, deprecated, message: "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.")
+    public func compositedPaperPreviewRGBA(
         _ pixelData: Data,
         _ width: Int,
         _ height: Int,
@@ -445,6 +459,14 @@ public struct DocumentRenderingWorkflow: Sendable {
     }
 
     public func processedLayerPixelData(
+        _ source: RgbaSurface,
+        _ request: LayerProcessingRequest
+    ) -> DocumentRenderingResult<Data> {
+        processedLayerPixelDataHandler(source.data, source.width, source.height, request)
+    }
+
+    @available(*, deprecated, message: "Use processedLayerPixelData(_:_:) with RgbaSurface.")
+    public func processedLayerPixelData(
         _ source: Data,
         _ width: Int,
         _ height: Int,
@@ -453,18 +475,43 @@ public struct DocumentRenderingWorkflow: Sendable {
         processedLayerPixelDataHandler(source, width, height, request)
     }
 
+    public func alphaMask(_ surface: RgbaSurface) -> DocumentRenderingResult<[UInt8]> {
+        alphaMaskHandler(surface.data, surface.width, surface.height)
+    }
+
+    @available(*, deprecated, message: "Use alphaMask(_:) with RgbaSurface.")
     public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
         alphaMaskHandler(pixelData, width, height)
     }
 
+    public func croppedSelectionMask(_ mask: MaskSurface) -> DocumentCroppedSelectionMask? {
+        croppedSelectionMaskHandler(Array(mask.data), mask.width, mask.height)
+    }
+
+    @available(*, deprecated, message: "Use croppedSelectionMask(_:) with MaskSurface.")
     public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
         croppedSelectionMaskHandler(mask, width, height)
     }
 
+    public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry) -> DocumentRenderingResult<Data> {
+        scaledPixelDataHandler(source.data, source.width, source.height, targetGeometry.width, targetGeometry.height)
+    }
+
+    @available(*, deprecated, message: "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.")
     public func scaledPixelData(_ source: Data, _ width: Int, _ height: Int, _ targetWidth: Int, _ targetHeight: Int) -> DocumentRenderingResult<Data> {
         scaledPixelDataHandler(source, width, height, targetWidth, targetHeight)
     }
 
+    public func translatedPixelData(
+        _ source: RgbaSurface,
+        targetGeometry: PixelGeometry,
+        offsetX: Int,
+        offsetY: Int
+    ) -> DocumentRenderingResult<Data> {
+        translatedPixelDataHandler(source.data, source.width, source.height, targetGeometry.width, targetGeometry.height, offsetX, offsetY)
+    }
+
+    @available(*, deprecated, message: "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.")
     public func translatedPixelData(
         _ source: Data,
         _ width: Int,
@@ -602,6 +649,14 @@ public struct DocumentPresentationRuntime: Sendable {
     }
 
     public func compositedPaperPreviewRGBA(
+        _ surface: RgbaSurface,
+        _ paperStyle: CanvasPaperStyle
+    ) -> DocumentRenderingResult<Data> {
+        renderingPipeline.compositedPaperPreviewRGBA(surface, paperStyle)
+    }
+
+    @available(*, deprecated, message: "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.")
+    public func compositedPaperPreviewRGBA(
         _ pixelData: Data,
         _ width: Int,
         _ height: Int,
@@ -619,6 +674,14 @@ public struct DocumentPresentationRuntime: Sendable {
     }
 
     public func processedLayerPixelData(
+        _ source: RgbaSurface,
+        _ request: LayerProcessingRequest
+    ) -> DocumentRenderingResult<Data> {
+        renderingPipeline.processedLayerPixelData(source, request)
+    }
+
+    @available(*, deprecated, message: "Use processedLayerPixelData(_:_:) with RgbaSurface.")
+    public func processedLayerPixelData(
         _ source: Data,
         _ width: Int,
         _ height: Int,
@@ -627,14 +690,29 @@ public struct DocumentPresentationRuntime: Sendable {
         renderingPipeline.processedLayerPixelData(source, width, height, request)
     }
 
+    public func alphaMask(_ surface: RgbaSurface) -> DocumentRenderingResult<[UInt8]> {
+        renderingPipeline.alphaMask(surface)
+    }
+
+    @available(*, deprecated, message: "Use alphaMask(_:) with RgbaSurface.")
     public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
         renderingPipeline.alphaMask(pixelData, width, height)
     }
 
+    public func croppedSelectionMask(_ mask: MaskSurface) -> DocumentCroppedSelectionMask? {
+        renderingPipeline.croppedSelectionMask(mask)
+    }
+
+    @available(*, deprecated, message: "Use croppedSelectionMask(_:) with MaskSurface.")
     public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
         renderingPipeline.croppedSelectionMask(mask, width, height)
     }
 
+    public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry) -> DocumentRenderingResult<Data> {
+        renderingPipeline.scaledPixelData(source, targetGeometry: targetGeometry)
+    }
+
+    @available(*, deprecated, message: "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.")
     public func scaledPixelData(
         _ source: Data,
         _ width: Int,
@@ -645,6 +723,16 @@ public struct DocumentPresentationRuntime: Sendable {
         renderingPipeline.scaledPixelData(source, width, height, targetWidth, targetHeight)
     }
 
+    public func translatedPixelData(
+        _ source: RgbaSurface,
+        targetGeometry: PixelGeometry,
+        offsetX: Int,
+        offsetY: Int
+    ) -> DocumentRenderingResult<Data> {
+        renderingPipeline.translatedPixelData(source, targetGeometry: targetGeometry, offsetX: offsetX, offsetY: offsetY)
+    }
+
+    @available(*, deprecated, message: "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.")
     public func translatedPixelData(
         _ source: Data,
         _ width: Int,
@@ -675,14 +763,29 @@ public struct CanvasMutationRuntime: Sendable {
         self.historyCommands = services.historyCommands
     }
 
+    public func createCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        canvasCommands.createCanvas(size.width, size.height)
+    }
+
+    @available(*, deprecated, message: "Use createCanvas(_:) with ValidCanvasSize.")
     public func createCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.createCanvas(width, height)
     }
 
+    public func resizeCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        canvasCommands.resizeCanvas(size.width, size.height)
+    }
+
+    @available(*, deprecated, message: "Use resizeCanvas(_:) with ValidCanvasSize.")
     public func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.resizeCanvas(width, height)
     }
 
+    public func resizeCanvasExtent(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        canvasCommands.resizeCanvasExtent(size.width, size.height)
+    }
+
+    @available(*, deprecated, message: "Use resizeCanvasExtent(_:) with ValidCanvasSize.")
     public func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.resizeCanvasExtent(width, height)
     }
@@ -754,31 +857,72 @@ public struct LayerEditingRuntime: Sendable {
     }
 
     public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
+    public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index.rawValue) }
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index.rawValue, named: duplicateName) }
+    public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.moveLayer(index.rawValue, to: destinationIndex.rawValue) }
+    public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index.rawValue, toFolder: folderID?.rawValue) }
+    public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index.rawValue) }
+    public func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index.rawValue, visible: visible) }
+    public func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index.rawValue) }
+    public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index.rawValue, opacity: opacity.rawValue) }
+    public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index.rawValue, isLocked: isLocked) }
+    public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index.rawValue, isAlphaLocked: isAlphaLocked) }
+    public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index.rawValue, isClipped: isClipped) }
+    public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index.rawValue, blendMode: blendMode) }
+    public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index.rawValue, name: name) }
+    public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index.rawValue, request: request) }
+    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index.rawValue, textLayer: textLayer) }
+    public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayer(index.rawValue) }
+    public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index.rawValue, maskData: mask.bytes) }
+    public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index.rawValue) }
+    public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index.rawValue) }
+
+    @available(*, deprecated, message: "Use createFolder(named:afterLayerAt:) with ExistingLayerIndex once the caller has validated the layer index.")
     public func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
+    @available(*, deprecated, message: "Use deleteFolder(_:) with ExistingFolderID.")
     public func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
+    @available(*, deprecated, message: "Use deleteLayer(_:) with ExistingLayerIndex.")
     public func deleteLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
+    @available(*, deprecated, message: "Use duplicateLayer(_:named:) with ExistingLayerIndex.")
     public func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
+    @available(*, deprecated, message: "Use moveLayer(_:to:) with ExistingLayerIndex.")
     public func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
+    @available(*, deprecated, message: "Use assignLayer(_:toFolder:) with ExistingLayerIndex and ExistingFolderID.")
     public func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
+    @available(*, deprecated, message: "Use mergeLayerDown(_:) with ExistingLayerIndex.")
     public func mergeLayerDown(_ index: Int) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
+    @available(*, deprecated, message: "Use setLayerVisibility(_:visible:) with ExistingLayerIndex.")
     public func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
+    @available(*, deprecated, message: "Use setActiveLayer(_:) with ExistingLayerIndex.")
     public func setActiveLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index) }
+    @available(*, deprecated, message: "Use setLayerOpacity(_:opacity:) with ExistingLayerIndex and UnitInterval.")
     public func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index, opacity: opacity) }
+    @available(*, deprecated, message: "Use setLayerLocked(_:isLocked:) with ExistingLayerIndex.")
     public func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index, isLocked: isLocked) }
+    @available(*, deprecated, message: "Use setLayerAlphaLocked(_:isAlphaLocked:) with ExistingLayerIndex.")
     public func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
+    @available(*, deprecated, message: "Use setLayerClipped(_:isClipped:) with ExistingLayerIndex.")
     public func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index, isClipped: isClipped) }
     public func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID, isExpanded: isExpanded) }
     public func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID, visible: visible) }
     public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
+    @available(*, deprecated, message: "Use setLayerBlendMode(_:blendMode:) with ExistingLayerIndex.")
     public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
+    @available(*, deprecated, message: "Use setLayerName(_:name:) with ExistingLayerIndex.")
     public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
     @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
     public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
+    @available(*, deprecated, message: "Use applyLayerProcessing(_:request:) with EditableLayerIndex.")
     public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
+    @available(*, deprecated, message: "Use setTextLayer(_:textLayer:) with EditableLayerIndex.")
     public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
+    @available(*, deprecated, message: "Use clearLayer(_:) with EditableLayerIndex.")
     public func clearLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
+    @available(*, deprecated, message: "Use replaceLayerMask(_:mask:) with EditableLayerIndex and LayerMaskData.")
     public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, maskData: maskData) }
+    @available(*, deprecated, message: "Use clearLayerMask(_:) with EditableLayerIndex.")
     public func clearLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
+    @available(*, deprecated, message: "Use applyLayerMask(_:) with EditableLayerIndex.")
     public func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
     public func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
@@ -787,15 +931,31 @@ public struct LayerEditingRuntime: Sendable {
     public func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
     public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
+    public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
+    public func textLayerData(_ index: ExistingLayerIndex) -> TextLayerData? { textLayerService.textLayerData(index.rawValue) }
+    public func clearTextLayerData(_ index: EditableLayerIndex) { textLayerService.clearTextLayerData(index.rawValue) }
+    @available(*, deprecated, message: "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData.")
     public func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
+    @available(*, deprecated, message: "Use textLayerData(_:) with ExistingLayerIndex.")
     public func textLayerData(_ index: Int) -> TextLayerData? { textLayerService.textLayerData(index) }
+    @available(*, deprecated, message: "Use clearTextLayerData(_:) with EditableLayerIndex.")
     public func clearTextLayerData(_ index: Int) { textLayerService.clearTextLayerData(index) }
     public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
     public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
+    public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index.rawValue) }
+    public func ensureLayerVisible(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index.rawValue) }
+    public func applyLayerSurfaceMutation(_ index: EditableLayerIndex, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index.rawValue, payload) }
+    public func applyLayerMutation(_ index: EditableLayerIndex, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index.rawValue, payload) }
+    public func applyTextLayerMutation(_ index: EditableLayerIndex, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index.rawValue, textLayer, payload) }
+    @available(*, deprecated, message: "Use revealLayerForEditing(_:) with ExistingLayerIndex.")
     public func revealLayerForEditing(_ index: Int) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index) }
+    @available(*, deprecated, message: "Use ensureLayerVisible(_:) with ExistingLayerIndex.")
     public func ensureLayerVisible(_ index: Int) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index) }
+    @available(*, deprecated, message: "Use applyLayerSurfaceMutation(_:_:) with EditableLayerIndex.")
     public func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index, payload) }
+    @available(*, deprecated, message: "Use applyLayerMutation(_:_:) with EditableLayerIndex.")
     public func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index, payload) }
+    @available(*, deprecated, message: "Use applyTextLayerMutation(_:_:_:) with EditableLayerIndex.")
     public func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index, textLayer, payload) }
 
     public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
@@ -1315,6 +1475,12 @@ public struct DocumentRuntime: Sendable {
                 }
             case let .canvas(command):
                 switch command {
+                case let .createSized(size):
+                    return mutationOutcome(services.canvasCommands.createCanvas(size.width, size.height).map { .completed })
+                case let .resizeSized(size):
+                    return mutationOutcome(services.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
+                case let .resizeExtentSized(size):
+                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
                 case let .create(width, height):
                     return mutationOutcome(services.canvasCommands.createCanvas(width, height).map { .completed })
                 case let .resize(width, height):
@@ -1335,6 +1501,18 @@ public struct DocumentRuntime: Sendable {
                 case let .edit(request):
                     return mutationOutcome(
                         composition.editingGateway.execute(request)
+                            .map { _ in .completed }
+                    )
+                case let .mergeExistingLayerDown(index):
+                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index.rawValue).map { .completed })
+                case let .setEditableTextLayer(index, textLayer):
+                    return mutationOutcome(
+                        composition.editingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
+                            .map { _ in .completed }
+                    )
+                case let .applyEditableProcessing(index, request):
+                    return mutationOutcome(
+                        composition.editingGateway.execute(.content(.applyProcessing(index: index.rawValue, request: request)))
                             .map { _ in .completed }
                     )
                 case let .mergeLayerDown(index):

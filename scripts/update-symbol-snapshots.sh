@@ -22,7 +22,7 @@ swift package \
   --minimum-access-level public \
   --skip-synthesized-members || dump_status=$?
 
-for module in PrimoDocumentRuntime PrimoWorkspaceRuntime; do
+for module in PrimoDocumentRuntime PrimoDocumentMutationContracts PrimoDocumentApplication PrimoWorkspaceRuntime; do
   symbol_graph="$(
     find "$SCRATCH_DIR" \
       -name "$module.symbols.json" \

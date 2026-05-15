@@ -85,6 +85,17 @@ struct MetalSurfaceResourceGatewayTests {
         #expect(store.materializedPixelData(for: handle) == nil)
     }
 
+    @Test
+    func duplicateReleaseAfterFinalReleaseDoesNotResurrectOrCrashResource() throws {
+        let (store, handle, _) = try makeBufferedStore()
+
+        store.release(handle)
+        #expect(store.materializedPixelData(for: handle) == nil)
+
+        store.release(handle)
+        #expect(store.materializedPixelData(for: handle) == nil)
+    }
+
     private func makeBufferedStore() throws -> (
         store: MetalResourceStore,
         handle: MetalBufferHandle,

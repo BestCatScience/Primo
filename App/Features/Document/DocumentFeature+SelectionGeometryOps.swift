@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 
@@ -30,16 +31,10 @@ extension DocumentFeature {
             return selection.bounds
         }
         guard
-            let alphaMask = gpuOperations.alphaMask(
-                pixelData,
-                canvasWidth,
-                canvasHeight
-            ).value,
-            let cropped = gpuOperations.croppedSelectionMask(
-                alphaMask,
-                canvasWidth,
-                canvasHeight
-            )
+            let surface = RgbaSurface(width: canvasWidth, height: canvasHeight, data: pixelData),
+            let alphaMask = gpuOperations.alphaMask(surface).value,
+            let maskSurface = MaskSurface(width: canvasWidth, height: canvasHeight, data: Data(alphaMask)),
+            let cropped = gpuOperations.croppedSelectionMask(maskSurface)
         else {
             return nil
         }

@@ -541,6 +541,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             let repoRoot = try Self.repoRoot()
             let moduleNames = [
                 "PrimoDocumentRuntime",
+                "PrimoDocumentMutationContracts",
+                "PrimoDocumentApplication",
                 "PrimoWorkspaceRuntime"
             ]
             let generatedSnapshots = try Self.generatedPublicSymbolSnapshots(
@@ -765,6 +767,55 @@ struct GpuSideEffectIsolationArchitectureTests {
             "CanvasPixelSurfaceView"
         ]
         #expect(publicSymbols == expectedSymbols)
+    }
+
+    @Test
+    func documentRuntimeFacadeHasTypedOverloadsForRawRenderingAndMutationEntrypoints() throws {
+        let repoRoot = try Self.repoRoot()
+        let facade = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: facade, encoding: .utf8)
+        let signatures = Set(Self.functionSignatures(accessLevel: "public", in: body).map(Self.normalizedSignature))
+
+        let typedSignatures: Set<String> = [
+            "public func createCanvas(_ size: ValidCanvasSize)",
+            "public func resizeCanvas(_ size: ValidCanvasSize)",
+            "public func resizeCanvasExtent(_ size: ValidCanvasSize)",
+            "public func compositedPaperPreviewRGBA( _ surface: RgbaSurface, _ paperStyle: CanvasPaperStyle )",
+            "public func processedLayerPixelData( _ source: RgbaSurface, _ request: LayerProcessingRequest )",
+            "public func alphaMask(_ surface: RgbaSurface)",
+            "public func croppedSelectionMask(_ mask: MaskSurface)",
+            "public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry)",
+            "public func translatedPixelData( _ source: RgbaSurface, targetGeometry: PixelGeometry, offsetX: Int, offsetY: Int )",
+            "public func deleteLayer(_ index: ExistingLayerIndex)",
+            "public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval)",
+            "public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData)",
+            "public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData)"
+        ]
+        for signature in typedSignatures {
+            #expect(signatures.contains(signature), "Missing typed public facade overload: \(signature)")
+        }
+
+        let deprecatedRawReplacements = [
+            "Use createCanvas(_:) with ValidCanvasSize.",
+            "Use resizeCanvas(_:) with ValidCanvasSize.",
+            "Use resizeCanvasExtent(_:) with ValidCanvasSize.",
+            "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.",
+            "Use processedLayerPixelData(_:_:) with RgbaSurface.",
+            "Use alphaMask(_:) with RgbaSurface.",
+            "Use croppedSelectionMask(_:) with MaskSurface.",
+            "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.",
+            "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.",
+            "Use deleteLayer(_:) with ExistingLayerIndex.",
+            "Use setLayerOpacity(_:opacity:) with ExistingLayerIndex and UnitInterval.",
+            "Use replaceLayerMask(_:mask:) with EditableLayerIndex and LayerMaskData.",
+            "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData."
+        ]
+        for replacement in deprecatedRawReplacements {
+            #expect(body.contains("@available(*, deprecated, message: \"\(replacement)\")"))
+        }
     }
 
     @Test

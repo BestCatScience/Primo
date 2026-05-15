@@ -106,19 +106,19 @@ extension DocumentFeature {
         let scale = min(canvasRect.width / imageSize.width, canvasRect.height / imageSize.height)
         let fittedSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
 
-        guard let scaled = gpuOperations.scaledPixelData(
-            sourceSurface.pixelData,
-            sourceSurface.width,
-            sourceSurface.height,
-            max(Int(fittedSize.width.rounded()), 1),
-            max(Int(fittedSize.height.rounded()), 1)
-        ).value else {
+        let fittedWidth = max(Int(fittedSize.width.rounded()), 1)
+        let fittedHeight = max(Int(fittedSize.height.rounded()), 1)
+        guard
+            let source = RgbaSurface(width: sourceSurface.width, height: sourceSurface.height, data: sourceSurface.pixelData),
+            let targetGeometry = PixelGeometry(width: fittedWidth, height: fittedHeight),
+            let scaled = gpuOperations.scaledPixelData(source, targetGeometry: targetGeometry).value
+        else {
             return nil
         }
 
         guard let fittedSurface = DocumentCompositeSurface(
-            validatingWidth: max(Int(fittedSize.width.rounded()), 1),
-            height: max(Int(fittedSize.height.rounded()), 1),
+            validatingWidth: fittedWidth,
+            height: fittedHeight,
             pixelData: scaled
         ) else { return nil }
         return composedSurface(
@@ -149,15 +149,17 @@ extension DocumentFeature {
         let height = max(Int(canvasSize.height.rounded()), 1)
         let offsetX = max((width - source.width) / 2, 0)
         let offsetY = max((height - source.height) / 2, 0)
-        let translated = gpuOperations.translatedPixelData(
-            source.pixelData,
-            source.width,
-            source.height,
-            width,
-            height,
-            offsetX,
-            offsetY
-        ).value
+        let translated = RgbaSurface(width: source.width, height: source.height, data: source.pixelData)
+            .flatMap { sourceSurface in
+                PixelGeometry(width: width, height: height).flatMap { targetGeometry in
+                    gpuOperations.translatedPixelData(
+                        sourceSurface,
+                        targetGeometry: targetGeometry,
+                        offsetX: offsetX,
+                        offsetY: offsetY
+                    ).value
+                }
+            }
         guard let translated else { return nil }
         return DocumentCompositeSurface(
             validatingWidth: width,

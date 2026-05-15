@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
@@ -9,6 +10,18 @@ import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
 struct DocumentRuntimeCompositionTests {
+    private enum ReentrantFailure: Error, Equatable {
+        case rejected
+    }
+
+    private final class MutableRuntime: @unchecked Sendable {
+        var value: Int
+
+        init(value: Int) {
+            self.value = value
+        }
+    }
+
     @Test
     func runtimePresentationObservationPublishesInitialAndMutationSnapshots() async throws {
         let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
@@ -27,6 +40,69 @@ struct DocumentRuntimeCompositionTests {
         #expect(updated?.canvasSize.width == 3)
         #expect(updated?.canvasSize.height == 3)
     }
+
+    @Test
+    func runtimePresentationObservationPublishesInitialAndMutationSnapshotsToMultipleSubscribers() async throws {
+        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        var first = runtime.observePresentation().makeAsyncIterator()
+        var second = runtime.observePresentation().makeAsyncIterator()
+
+        #expect(await first.next()?.canvasSize.width != 4)
+        #expect(await second.next()?.canvasSize.width != 4)
+
+        let size = try #require(ValidCanvasSize(4, 4))
+        let outcome = await runtime.execute(.canvas(.createSized(size)))
+        guard case .mutation(.success) = outcome else {
+            Issue.record("Expected typed create command to succeed")
+            return
+        }
+
+        #expect(await first.next()?.canvasSize.width == 4)
+        #expect(await second.next()?.canvasSize.width == 4)
+    }
+
+    @Test
+    func lockedRuntimeExecutorPerformResultRejectsReentrantAccessAsFailure() throws {
+        let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
+
+        let result: Result<Int, ReentrantFailure> = executor.perform { _ in
+            executor.performResult(failure: .rejected) { runtime in
+                .success(runtime.value)
+            }
+        }
+
+        #expect(result == .failure(.rejected))
+    }
+
+    @Test
+    func lockedRuntimeExecutorReplacementSwapsRuntimeForLaterAccess() throws {
+        let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
+
+        #expect(executor.perform { $0.value } == 1)
+        executor.replaceRuntime(with: MutableRuntime(value: 2))
+        #expect(executor.perform { $0.value } == 2)
+    }
+
+    @Test
+    func lockedRuntimeExecutorPreconditionBoundariesStayExplicit() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/DocumentRuntimeSupport.swift"
+        )
+        let body = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(body.contains("package static var reentrantAccessMessage"))
+        #expect(body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
+        #expect(body.contains("package func performResult<Success, Failure: Error>"))
+        #expect(body.contains("return .failure(failure())"))
+        #expect(body.contains("package func replaceRuntime(with newRuntime: Runtime)"))
+    }
+
 
     @Test
     func editingGatewayExecutesLayerRequestsThroughSharedRuntime() throws {

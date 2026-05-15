@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
@@ -60,17 +61,17 @@ extension DocumentLifecycleReducer {
     }
 
     func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentCanvasCommandService.resizeCanvas(
-            dimensions.width,
-            dimensions.height
-        )
+        guard let size = ValidCanvasSize(dimensions.width, dimensions.height) else {
+            return .failure(.invalidCanvasSize(width: dimensions.width, height: dimensions.height))
+        }
+        return documentCanvasCommandService.resizeCanvas(size)
     }
 
     func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentCanvasCommandService.resizeCanvasExtent(
-            dimensions.width,
-            dimensions.height
-        )
+        guard let size = ValidCanvasSize(dimensions.width, dimensions.height) else {
+            return .failure(.invalidCanvasSize(width: dimensions.width, height: dimensions.height))
+        }
+        return documentCanvasCommandService.resizeCanvasExtent(size)
     }
 
     func undoCanvasMutation() -> DocumentMutationResult {
@@ -82,10 +83,10 @@ extension DocumentLifecycleReducer {
     }
 
     func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentCanvasCommandService.createCanvas(
-            dimensions.width,
-            dimensions.height
-        )
+        guard let size = ValidCanvasSize(dimensions.width, dimensions.height) else {
+            return .failure(.invalidCanvasSize(width: dimensions.width, height: dimensions.height))
+        }
+        return documentCanvasCommandService.createCanvas(size)
     }
 
     func initializeImportedCanvas(

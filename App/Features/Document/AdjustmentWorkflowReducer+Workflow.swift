@@ -1,6 +1,7 @@
 import Foundation
 import ComposableArchitecture
 import PrimoDocumentApplication
+import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
 
@@ -52,12 +53,10 @@ extension AdjustmentWorkflowReducer {
         else {
             return nil
         }
-        return gpuOperations.processedLayerPixelData(
-            layer.pixelData,
-            snapshot.width,
-            snapshot.height,
-            request
-        ).value
+        guard let surface = RgbaSurface(width: snapshot.width, height: snapshot.height, data: layer.pixelData) else {
+            return nil
+        }
+        return gpuOperations.processedLayerPixelData(surface, request).value
     }
 
     static func previewAdjustedActiveLayer(

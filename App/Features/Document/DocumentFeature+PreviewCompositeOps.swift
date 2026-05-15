@@ -38,12 +38,14 @@ extension DocumentFeature {
             return nil
         }
 
-        let pixelData = gpuOperations.compositedPaperPreviewRGBA(
-            snapshot.compositePixelData,
-            snapshot.width,
-            snapshot.height,
-            paperStyle
-        ).value ?? snapshot.compositePixelData
+        let sourceSurface = RgbaSurface(
+            width: snapshot.width,
+            height: snapshot.height,
+            data: snapshot.compositePixelData
+        )
+        let pixelData = sourceSurface.flatMap {
+            gpuOperations.compositedPaperPreviewRGBA($0, paperStyle).value
+        } ?? snapshot.compositePixelData
 
         return DocumentCompositeSurface(
             validatingWidth: snapshot.width,
