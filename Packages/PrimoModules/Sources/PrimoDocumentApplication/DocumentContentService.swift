@@ -55,7 +55,7 @@ public struct DocumentContentService: Sendable {
         executeContent(.setTextLayer(index: layerIndex, textLayer: textLayer))
     }
 
-    public func pixelDataForLayer(_ layerIndex: Int) -> Data {
+    public func pixelDataForLayer(_ layerIndex: Int) -> Result<Data, DocumentMutationFailure> {
         documentRenderGateway.pixelDataForLayer(layerIndex)
     }
 

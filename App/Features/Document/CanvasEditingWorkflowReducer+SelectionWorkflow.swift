@@ -409,7 +409,13 @@ extension CanvasEditingWorkflowReducer {
             return retained
         }
 
-        let sourcePixels = documentContentService.pixelDataForLayer(state.canvas.activeLayerIndex)
+        let sourcePixels: Data
+        switch documentContentService.pixelDataForLayer(state.canvas.activeLayerIndex) {
+        case let .success(pixelData):
+            sourcePixels = pixelData
+        case .failure:
+            return nil
+        }
         guard let session = makeSelectionMoveSession(
             source: sourcePixels,
             canvasWidth: snapshot.width,

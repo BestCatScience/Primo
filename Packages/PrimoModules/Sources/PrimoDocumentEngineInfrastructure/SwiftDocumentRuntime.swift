@@ -332,9 +332,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return pendingDirtyUpdate
     }
 
-    func pixelDataForLayer(index: Int) -> Data {
-        guard store.snapshot.layers.indices.contains(index) else { return Data() }
-        return currentPixelData(for: index)
+    func pixelDataForLayer(index: Int) -> Result<Data, DocumentMutationFailure> {
+        guard store.snapshot.layers.indices.contains(index) else { return .failure(.invalidLayerIndex(index)) }
+        return .success(currentPixelData(for: index))
     }
 
     func materializedSnapshot() -> SwiftDocumentStoreSnapshot {

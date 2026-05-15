@@ -26,12 +26,12 @@ public struct DocumentRenderGateway: Sendable {
     /// Live query paths should prefer `compositeSurface`.
     package let compositePixelData: @Sendable () -> Data
     package let compositeSurface: @Sendable () -> DocumentCompositeSurface
-    package let pixelDataForLayer: @Sendable (Int) -> Data
+    package let pixelDataForLayer: @Sendable (Int) -> Result<Data, DocumentMutationFailure>
 
     public init(
         compositePixelData: @escaping @Sendable () -> Data,
         compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface,
-        pixelDataForLayer: @escaping @Sendable (Int) -> Data
+        pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure>
     ) {
         self.compositePixelData = compositePixelData
         self.compositeSurface = compositeSurface

@@ -14,6 +14,51 @@ import Testing
 
 struct TimelapseExportServiceTests {
     @Test
+    func timelapseReplayServiceUsesInjectedGpuServicesForCompositeSurface() {
+        let surface = DocumentCompositeSurface(
+            unsafeUncheckedWidth: 2,
+            height: 2,
+            pixelData: Data(repeating: 0x7f, count: 16)
+        )
+        let gpuServices = RecordingTimelapseGpuServices(surface: surface)
+        let replayService = DocumentTimelapseReplayService(
+            canvasSize: CGSize(width: 2, height: 2),
+            gpuServices: gpuServices.services()
+        )
+        let callsBeforeReplay = gpuServices.compositeSurfaceCallCount
+
+        let replayedSurface = replayService.replaySurface(.setPaperStyle(.default))
+
+        #expect(replayedSurface == surface)
+        #expect(gpuServices.compositeSurfaceCallCount > callsBeforeReplay)
+    }
+
+    @Test
+    func timelapseReplayConstructionKeepsLiveGpuServicesBehindConvenienceBoundary() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let engineLiveURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+        let exportServiceURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/TimelapseExportService.swift"
+        )
+        let engineLive = try String(contentsOf: engineLiveURL, encoding: .utf8)
+        let exportService = try String(contentsOf: exportServiceURL, encoding: .utf8)
+
+        #expect(engineLive.contains("gpuServices: DocumentRuntimeGpuServices"))
+        #expect(engineLive.contains("gpuServices: DocumentRuntimeGpuServicesFactory.live()"))
+        #expect(engineLive.contains("gpuServices: gpuServices"))
+        #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServicesFactory.live()"))
+        #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServices"))
+        #expect(exportService.contains("gpuServices: gpuServices"))
+    }
+
+    @Test
     func exportVideoRejectsFrameCapturesWithFewerThanTwoFrames() {
         let capture = TimelapseCapture(
             canvasSize: CGSize(width: 64, height: 64),
@@ -107,5 +152,50 @@ struct TimelapseExportServiceTests {
         let secondRow = Array(UnsafeBufferPointer(start: byteView.advanced(by: bytesPerRow), count: 12))
         #expect(firstRow == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
         #expect(secondRow == [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24])
+    }
+}
+
+private final class RecordingTimelapseGpuServices: @unchecked Sendable {
+    private let lock = NSLock()
+    private let surface: DocumentCompositeSurface
+    private var compositeSurfaceCalls = 0
+
+    init(surface: DocumentCompositeSurface) {
+        self.surface = surface
+    }
+
+    var compositeSurfaceCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return compositeSurfaceCalls
+    }
+
+    func services() -> DocumentRuntimeGpuServices {
+        DocumentRuntimeGpuServices(
+            release: { _ in },
+            retain: { _ in false },
+            _materializedPixelData: { _ in nil },
+            _scaledPixelData: { data, _, _, _, _ in data },
+            _scaledMaskData: { data, _, _, _, _ in data },
+            _translatedPixelData: { data, _, _, _, _, _, _ in data },
+            _translatedMaskData: { data, _, _, _, _, _, _ in data },
+            _applyLayerMask: { pixelData, _, _, _ in pixelData },
+            _processLayer: { _, _, _, _ in nil },
+            _mergeLayers: { lower, _, _, _, _, _, _ in lower },
+            _rasterizeTextLayer: { _, _ in nil },
+            _blurPixels: { _, _, _, _, _, _ in nil },
+            _fillPixels: { _, _, _, _, _, _ in nil },
+            _commitStrokeMutation: { _, _, _, _, _, _, _, _ in nil },
+            _preservingExistingAlphaBufferHandle: { sourceHandle, _, _, _, _ in sourceHandle },
+            _compositedPaperPreviewRGBA: { pixelData, _, _, _ in pixelData },
+            _compositedIncrementalUpdate: { _, _ in nil },
+            _compositeDocumentSurface: { _ in
+                self.lock.lock()
+                self.compositeSurfaceCalls += 1
+                self.lock.unlock()
+                return self.surface
+            },
+            _compositeDocumentBufferHandle: { _ in nil }
+        )
     }
 }

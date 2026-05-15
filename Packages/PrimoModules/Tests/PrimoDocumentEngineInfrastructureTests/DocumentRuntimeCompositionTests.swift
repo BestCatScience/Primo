@@ -3,6 +3,8 @@ import PrimoDocumentApplication
 import PrimoDocumentInfrastructure
 import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
+@testable import PrimoDocumentPresentationContracts
+@testable import PrimoDocumentRenderingContracts
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
@@ -177,6 +179,23 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func lockedRuntimeExecutorPerformResultRejectsReentrantAccessFromPerform() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+
+        let result: DocumentMutationResult = executor.perform { _ in
+            executor.performResult(failure: .bridgeMutationFailed("perform reentrant")) { _ in
+                .success(())
+            }
+        }
+
+        guard case let .failure(failure) = result else {
+            Issue.record("Expected reentrant access failure")
+            return
+        }
+        #expect(failure == .bridgeMutationFailed("perform reentrant"))
+    }
+
+    @Test
     func lockedRuntimeExecutorSerializesConcurrentSynchronousAccess() async {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
 
@@ -201,6 +220,96 @@ struct DocumentRuntimeCompositionTests {
         executor.replaceRuntime(with: RuntimeCounter(value: 42))
 
         #expect(executor.perform { $0.value } == 42)
+    }
+
+    @Test
+    func lockedRuntimeExecutorReplacementWaitsForInFlightRead() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+        let readStarted = DispatchSemaphore(value: 0)
+        let releaseRead = DispatchSemaphore(value: 0)
+        let readFinished = DispatchSemaphore(value: 0)
+        let replacementFinished = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            executor.perform { runtime in
+                #expect(runtime.value == 1)
+                readStarted.signal()
+                _ = releaseRead.wait(timeout: .now() + 2)
+            }
+            readFinished.signal()
+        }
+
+        guard readStarted.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected in-flight runtime read to start")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            executor.replaceRuntime(with: RuntimeCounter(value: 42))
+            replacementFinished.signal()
+        }
+
+        #expect(replacementFinished.wait(timeout: .now() + 0.1) == .timedOut)
+        releaseRead.signal()
+
+        guard readFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected in-flight runtime read to finish")
+            return
+        }
+        guard replacementFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected runtime replacement to finish after read releases the lock")
+            return
+        }
+        #expect(executor.perform { $0.value } == 42)
+    }
+
+    @Test
+    func presentationObservationStopsRecordingAfterCancellation() async throws {
+        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        let presentations = LockedValues<CGSize>()
+
+        let consumer = Task {
+            for await presentation in runtime.observePresentation() {
+                presentations.append(presentation.canvasSize)
+            }
+        }
+
+        try await waitUntil {
+            presentations.count >= 1
+        }
+        consumer.cancel()
+        await consumer.value
+        let countAfterCancellation = presentations.count
+
+        let outcome = await runtime.execute(.canvas(.create(width: 7, height: 7)))
+        guard case .mutation(.success) = outcome else {
+            Issue.record("Expected create command to succeed")
+            return
+        }
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        #expect(presentations.count == countAfterCancellation)
+    }
+
+    @Test
+    func runtimeFacadesReleasePreviewLeasesThroughSharedSurfaceBoundary() {
+        let releasedHandles = LockedValues<MetalBufferHandle?>()
+        let composition = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
+            .withOverrides(
+                surfaceHandleReleaser: DocumentSurfaceHandleReleaser { handle in
+                    releasedHandles.append(handle)
+                }
+            )
+        let runtime = PrimoDocumentRuntime.DocumentApplicationRuntime(
+            composition: PrimoDocumentRuntime.DocumentRuntimeComposition(composition)
+        )
+        let strokeHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        let layerHandle = MetalBufferHandle.unsafeUnchecked(width: 3, height: 3, bytesPerRow: 12)
+
+        runtime.workflows.strokeEditing.discardPreviewLease(StrokePreviewLease(surfaceHandle: strokeHandle))
+        runtime.workflows.layerEditing.discardPreviewLease(StrokePreviewLease(surfaceHandle: layerHandle))
+
+        #expect(releasedHandles.values == [strokeHandle, layerHandle])
     }
 
     @Test
@@ -266,5 +375,42 @@ private final class RuntimeCounter {
 
     init(value: Int = 0) {
         self.value = value
+    }
+}
+
+private final class LockedValues<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Value] = []
+
+    var values: [Value] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage.count
+    }
+
+    func append(_ value: Value) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+}
+
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 2_000_000_000,
+    condition: @escaping @Sendable () -> Bool
+) async throws {
+    let deadline = ContinuousClock.now.advanced(by: .nanoseconds(Int(timeoutNanoseconds)))
+    while !condition() {
+        if ContinuousClock.now >= deadline {
+            Issue.record("Timed out waiting for condition")
+            return
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
     }
 }

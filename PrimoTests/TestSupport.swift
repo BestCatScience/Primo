@@ -322,7 +322,7 @@ extension DocumentRenderGateway {
         compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface = {
             DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
         },
-        pixelDataForLayer: @escaping @Sendable (Int) -> Data = { _ in Data() }
+        pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure> = { _ in .success(Data()) }
     ) -> Self {
         Self(
             compositePixelData: compositePixelData,

@@ -111,7 +111,13 @@ public struct CanvasEditingWorkflowService: Sendable {
             }
         }
 
-        let source = documentContentService.pixelDataForLayer(context.activeLayerIndex)
+        let source: Data
+        switch documentContentService.pixelDataForLayer(context.activeLayerIndex) {
+        case let .success(pixelData):
+            source = pixelData
+        case let .failure(failure):
+            return .failure(failure)
+        }
         let canvasWidth = max(Int(context.canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(context.canvasSize.height.rounded()), 1)
         guard let transformed = layerTransformProcessor.transformedLayerPixels(

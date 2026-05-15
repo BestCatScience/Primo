@@ -38,7 +38,7 @@ struct DocumentProjectPreviewLoaderTests {
             #expect(surface.pixelData.contains(255))
         }
 
-        let activePixels = runtime.renderGateway.pixelDataForLayer(0)
+        let activePixels = try runtime.renderGateway.pixelDataForLayer(0).get()
         #expect(activePixels.prefix(4).elementsEqual([255, 0, 0, 255]))
     }
 

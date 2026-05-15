@@ -781,7 +781,7 @@ public struct LayerEditingRuntime: Sendable {
     public func clearLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
     public func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
-    public func pixelDataForLayer(_ index: Int) -> Data { contentService.pixelDataForLayer(index) }
+    public func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
     public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
     @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
     public func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }

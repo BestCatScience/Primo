@@ -14,6 +14,21 @@ import Testing
 
 struct SwiftDocumentRuntimeUndoTests {
     @Test
+    func pixelDataForLayerReturnsFailureForInvalidLayerIndexes() {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        guard case .failure(.invalidLayerIndex(-1)) = runtime.pixelDataForLayer(index: -1) else {
+            Issue.record("Expected negative layer index read to fail")
+            return
+        }
+        guard case .failure(.invalidLayerIndex(1)) = runtime.pixelDataForLayer(index: 1) else {
+            Issue.record("Expected out-of-range layer index read to fail")
+            return
+        }
+    }
+
+    @Test
     func redundantLayerVisibilityChangeDoesNotCreateUndoStep() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x33, count: 16)])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
@@ -26,7 +41,7 @@ struct SwiftDocumentRuntimeUndoTests {
         ).get()
         _ = try runtime.undo().get()
 
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 16))
         guard case .failure(.noUndoState) = runtime.undo() else {
             Issue.record("Expected redundant visibility request not to leave an undo step")
             return
@@ -53,10 +68,10 @@ struct SwiftDocumentRuntimeUndoTests {
         ).get()
 
         _ = try runtime.undo().get()
-        #expect(runtime.pixelDataForLayer(index: 0) == firstStrokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == firstStrokePixels)
 
         _ = try runtime.undo().get()
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 16))
     }
 
     @Test
@@ -79,7 +94,7 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.undo().get()
 
-        #expect(runtime.pixelDataForLayer(index: 0) == firstStrokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == firstStrokePixels)
     }
 
     @Test
@@ -93,13 +108,13 @@ struct SwiftDocumentRuntimeUndoTests {
 
         var expected = Data(count: 24)
         expected.replaceSubrange(4..<8, with: patch)
-        #expect(runtime.pixelDataForLayer(index: 0) == expected)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == expected)
 
         _ = try runtime.undo().get()
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 24))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 24))
 
         _ = try runtime.redo().get()
-        #expect(runtime.pixelDataForLayer(index: 0) == expected)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == expected)
     }
 
     @Test
@@ -113,16 +128,16 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.undo().get()
         #expect(runtime.lightweightPresentation().layerRows[0].name == "Layer 1")
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
 
         _ = try runtime.redo().get()
         #expect(runtime.lightweightPresentation().layerRows[0].name == "Renamed")
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
 
         _ = try runtime.undo().get()
         _ = try runtime.undo().get()
         #expect(runtime.lightweightPresentation().layerRows[0].name == "Layer 1")
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 16))
     }
 
     @Test
@@ -136,16 +151,16 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.undo().get()
         #expect(runtime.lightweightPresentation().layerRows[0].visible)
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
 
         _ = try runtime.redo().get()
         #expect(!runtime.lightweightPresentation().layerRows[0].visible)
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
 
         _ = try runtime.undo().get()
         _ = try runtime.undo().get()
         #expect(runtime.lightweightPresentation().layerRows[0].visible)
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 16))
     }
 
     @Test
@@ -171,14 +186,14 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
         #expect(runtime.textLayerData(index: 0) == nil)
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
 
         _ = try runtime.undo().get()
         #expect(runtime.textLayerData(index: 0) == textLayer)
 
         _ = try runtime.redo().get()
         #expect(runtime.textLayerData(index: 0) == nil)
-        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
     }
 
     @Test
@@ -198,7 +213,7 @@ struct SwiftDocumentRuntimeUndoTests {
         _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x33, count: 64)).get()
 
         _ = try runtime.undo().get()
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(repeating: 0x22, count: 64))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(repeating: 0x22, count: 64))
         guard case .failure(.noUndoState) = runtime.undo() else {
             Issue.record("Expected older undo entries to be evicted by byte budget")
             return
@@ -281,7 +296,7 @@ struct SwiftDocumentRuntimeUndoTests {
 
         #expect(!data.isEmpty)
         #expect(data != Data(count: 16))
-        #expect(data == runtime.pixelDataForLayer(index: 0))
+        #expect(data == (try runtime.pixelDataForLayer(index: 0).get()))
     }
 
     @Test
@@ -292,11 +307,11 @@ struct SwiftDocumentRuntimeUndoTests {
         let baselinePixels = Data(count: 16)
 
         _ = try runtime.blur(samples: [sample()], brush: brush(), layerIndex: 0, captureTimelapse: false).get()
-        #expect(runtime.pixelDataForLayer(index: 0) == blurredPixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == blurredPixels)
 
         runtime.cancelBlurStroke()
 
-        #expect(runtime.pixelDataForLayer(index: 0) == baselinePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == baselinePixels)
         #expect(!runtime.canUndo())
         if case let .operations(operations) = runtime.timelapseCapture()?.source {
             #expect(!operations.contains { operation in
@@ -418,7 +433,7 @@ struct SwiftDocumentRuntimeUndoTests {
         _ = try runtime.undo().get()
 
         #expect(gpu.materializedHandleValues == [handle])
-        #expect(runtime.pixelDataForLayer(index: 0) == gpuPixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == gpuPixels)
     }
 
     @Test
@@ -474,7 +489,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale stroke GPU result to be rejected")
             return
         }
-        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
         #expect(gpu.releasedHandleCount == 1)
     }
 
@@ -499,7 +514,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale fill GPU result to be rejected")
             return
         }
-        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
     }
 
     @Test
@@ -523,7 +538,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale blur GPU result to be rejected")
             return
         }
-        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
     }
 
     @Test
@@ -545,7 +560,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected stale layer processing GPU result to be rejected")
             return
         }
-        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
     }
 
     @Test
@@ -584,7 +599,7 @@ struct SwiftDocumentRuntimeUndoTests {
             return
         }
 
-        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == Data(count: 16))
     }
 
     @Test
@@ -607,7 +622,7 @@ struct SwiftDocumentRuntimeUndoTests {
         }
         #expect(runtime.queryGateway.lightweightPresentation().canvasSize.width == 2)
         #expect(runtime.queryGateway.lightweightPresentation().canvasSize.height == 2)
-        #expect(runtime.renderGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(try runtime.renderGateway.pixelDataForLayer(0).get() == Data(count: 16))
     }
 
     private func sample() -> StylusSample {

@@ -508,11 +508,27 @@ public final class DocumentTimelapseReplayService {
     private let runtime: SwiftDocumentRuntime
     private var folderIDMap: [DocumentFolderID: Int] = [:]
 
-    public init(
+    public convenience init(
         canvasSize: CGSize,
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
+    ) {
+        self.init(
+            canvasSize: canvasSize,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient,
+            gpuServices: DocumentRuntimeGpuServicesFactory.live()
+        )
+    }
+
+    init(
+        canvasSize: CGSize,
+        fileClient: PrimoCoreTypes.FileClient = .live,
+        dateClient: PrimoCoreTypes.DateClient = .live,
+        uuidClient: PrimoCoreTypes.UUIDClient = .live,
+        gpuServices: DocumentRuntimeGpuServices
     ) {
         self.runtime = SwiftDocumentRuntime(
             width: max(Int(canvasSize.width.rounded()), 1),
@@ -520,7 +536,7 @@ public final class DocumentTimelapseReplayService {
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient,
-            gpuServices: DocumentRuntimeGpuServicesFactory.live()
+            gpuServices: gpuServices
         )
     }
 

@@ -153,6 +153,7 @@ public enum TimelapseExportService {
                 exportOperations,
                 capture: capture,
                 fileClient: fileClient,
+                gpuServices: DocumentRuntimeGpuServicesFactory.live(),
                 targetSize: targetSize,
                 input: input,
                 adaptor: adaptor,
@@ -252,6 +253,7 @@ public enum TimelapseExportService {
         _ operations: [TimelapseOperation],
         capture: TimelapseCapture,
         fileClient: FileClient,
+        gpuServices: DocumentRuntimeGpuServices,
         targetSize: CGSize,
         input: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
@@ -264,7 +266,8 @@ public enum TimelapseExportService {
         var progressGate = ProgressPreviewGate()
         let replayService = DocumentTimelapseReplayService(
             canvasSize: capture.canvasSize,
-            fileClient: fileClient
+            fileClient: fileClient,
+            gpuServices: gpuServices
         )
         var finalSurface: DocumentCompositeSurface?
 

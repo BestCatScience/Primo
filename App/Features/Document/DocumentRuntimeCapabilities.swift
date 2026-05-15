@@ -154,7 +154,7 @@ protocol LayerContentWorkflowSubmitting: Sendable {
 }
 
 protocol LayerContentSubmitting: Sendable {
-    func pixelDataForLayer(_ index: Int) -> Data
+    func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure>
     func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult
     func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult
 }

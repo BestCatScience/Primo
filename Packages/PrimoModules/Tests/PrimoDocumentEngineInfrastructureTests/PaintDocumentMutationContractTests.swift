@@ -227,7 +227,7 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func applyLayerMaskUsesGpuMutationPath() {
+    func applyLayerMaskUsesGpuMutationPath() throws {
         let runtime = DocumentEngineFactory.live()
         let presentation = runtime.queryGateway.lightweightPresentation()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
@@ -248,7 +248,7 @@ struct PaintDocumentMutationContractTests {
 
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
-            let output = runtime.renderGateway.pixelDataForLayer(0)
+            let output = try runtime.renderGateway.pixelDataForLayer(0).get()
             #expect(output.count == width * height * 4)
             #expect(output[0] == 10)
             #expect(output[1] == 20)
@@ -260,7 +260,7 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func mergeLayerDownUsesGpuMutationPath() {
+    func mergeLayerDownUsesGpuMutationPath() throws {
         let runtime = DocumentEngineFactory.live()
         let presentation = runtime.queryGateway.lightweightPresentation()
         let width = max(Int(presentation.canvasSize.width.rounded()), 1)
@@ -281,7 +281,7 @@ struct PaintDocumentMutationContractTests {
             let result = runtime.mergeLayerDown(index)
             if PrimoMetalDocumentProcessingClient.shared.isAvailable {
                 expectSuccess(result)
-                let merged = runtime.renderGateway.pixelDataForLayer(0)
+                let merged = try runtime.renderGateway.pixelDataForLayer(0).get()
                 #expect(merged.count == width * height * 4)
                 #expect(merged[2] == 255)
             } else {

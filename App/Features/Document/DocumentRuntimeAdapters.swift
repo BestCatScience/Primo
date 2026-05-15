@@ -454,7 +454,7 @@ extension DocumentLayerVisibilityAdapter {
 }
 
 extension DocumentLayerContentAdapter {
-    func pixelDataForLayer(_ index: Int) -> Data {
+    func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> {
         runtime.pixelDataForLayer(index)
     }
 

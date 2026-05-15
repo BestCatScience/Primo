@@ -491,6 +491,8 @@ let package = Package(
                 "PrimoDocumentContracts",
                 "PrimoDocumentEngineInfrastructure",
                 "PrimoDocumentInfrastructure",
+                "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRenderingContracts",
                 "PrimoDocumentRuntime",
                 "PrimoDocumentMetalRuntimeInfrastructure",
                 .product(name: "SwiftParser", package: "swift-syntax"),

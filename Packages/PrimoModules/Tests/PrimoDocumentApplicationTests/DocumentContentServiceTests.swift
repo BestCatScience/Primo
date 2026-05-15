@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoBrushRuntimeContracts
@@ -82,6 +83,44 @@ struct DocumentContentServiceTests {
         case .success:
             Issue.record("Expected invalid layer index failure")
         }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func canvasEditingTransformReturnsFailureWhenLayerPixelReadFails() {
+        let recorder = CallRecorder()
+        let contentService = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 7, layerCount: 1),
+            documentRenderGateway: renderGateway(pixelDataForLayer: { _ in .failure(.invalidLayerIndex(7)) }),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let transformProcessor = RecordingLayerTransformProcessor()
+        let service = CanvasEditingWorkflowService(
+            documentContentService: contentService,
+            layerTransformProcessor: transformProcessor
+        )
+
+        let outcome = service.execute(
+            .applyTransform,
+            state: CanvasEditingContext(
+                transformHasPreview: true,
+                transformPreviewOffset: CGSize(width: 1, height: 0),
+                transformPreviewScaleX: 1,
+                transformPreviewScaleY: 1,
+                transformPreviewRotationDegrees: 0,
+                transformMode: .standard,
+                transformPivot: nil,
+                transformQuadOffsets: .zero,
+                activeLayerIndex: 7,
+                activeTextLayer: nil,
+                selection: nil,
+                canvasSize: CGSize(width: 2, height: 2)
+            )
+        )
+
+        #expect(outcome == .failure(.invalidLayerIndex(7)))
+        #expect(transformProcessor.transformedLayerPixelsCallCount == 0)
         #expect(recorder.values.isEmpty)
     }
 
@@ -381,12 +420,67 @@ private func queryGateway(
     )
 }
 
-private func renderGateway() -> DocumentRenderGateway {
+private func renderGateway(
+    pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure> = { _ in .success(Data()) }
+) -> DocumentRenderGateway {
     DocumentRenderGateway(
         compositePixelData: { Data() },
         compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
-        pixelDataForLayer: { _ in Data() }
+        pixelDataForLayer: pixelDataForLayer
     )
+}
+
+private final class RecordingLayerTransformProcessor: LayerTransformProcessing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var transformedLayerPixelsCalls = 0
+
+    var transformedLayerPixelsCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return transformedLayerPixelsCalls
+    }
+
+    func transformedLayerPixels(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        lock.lock()
+        transformedLayerPixelsCalls += 1
+        lock.unlock()
+        return source
+    }
+
+    func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        selection
+    }
+
+    func transformationBounds(
+        selection: CanvasSelection?,
+        pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> CGRect? {
+        nil
+    }
 }
 
 private func layerRow(index: Int, isLocked: Bool = false) -> LayerRowModel {

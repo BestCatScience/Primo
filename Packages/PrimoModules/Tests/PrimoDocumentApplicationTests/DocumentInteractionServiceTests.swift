@@ -25,7 +25,7 @@ struct DocumentCommandServiceTests {
             renderGateway: DocumentRenderGateway(
                 compositePixelData: { expected },
                 compositeSurface: { expectedSurface },
-                pixelDataForLayer: { _ in Data() }
+                pixelDataForLayer: { _ in .success(Data()) }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
@@ -46,7 +46,7 @@ struct DocumentCommandServiceTests {
             renderGateway: DocumentRenderGateway(
                 compositePixelData: { Data() },
                 compositeSurface: { expectedSurface },
-                pixelDataForLayer: { _ in Data() }
+                pixelDataForLayer: { _ in .success(Data()) }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
@@ -160,7 +160,7 @@ private func renderGateway() -> DocumentRenderGateway {
     DocumentRenderGateway(
         compositePixelData: { Data() },
         compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
-        pixelDataForLayer: { _ in Data() }
+        pixelDataForLayer: { _ in .success(Data()) }
     )
 }
 
