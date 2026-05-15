@@ -40,10 +40,6 @@ public struct DecodedRasterImage: Sendable, Equatable {
         self.pixelData = pixelData
     }
 
-    public init(unsafeUncheckedWidth width: Int, height: Int, pixelData: Data) {
-        self.init(width: width, height: height, pixelData: pixelData)
-    }
-
     public init?(validatingWidth width: Int, height: Int, pixelData: Data) {
         guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
         guard pixelData.count == geometry.rgbaByteCount else { return nil }

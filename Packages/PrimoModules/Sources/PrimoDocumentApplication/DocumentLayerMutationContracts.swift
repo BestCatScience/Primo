@@ -32,7 +32,22 @@ public struct DocumentLayerMutationContext: Sendable {
     public let revision: DocumentRevision
     public let layerCount: Int
     public let folderIDs: Set<Int>
+    public let canvasGeometry: PixelGeometry?
     public let isLayerLocked: @Sendable (Int) -> Bool
+
+    public init(
+        revision: DocumentRevision = .initial,
+        layerCount: Int,
+        folderIDs: Set<Int>,
+        canvasGeometry: PixelGeometry? = nil,
+        isLayerLocked: @escaping @Sendable (Int) -> Bool
+    ) {
+        self.revision = revision
+        self.layerCount = layerCount
+        self.folderIDs = folderIDs
+        self.canvasGeometry = canvasGeometry
+        self.isLayerLocked = isLayerLocked
+    }
 
     public init(
         revision: DocumentRevision = .initial,
@@ -40,10 +55,13 @@ public struct DocumentLayerMutationContext: Sendable {
         folderIDs: Set<Int>,
         isLayerLocked: @escaping @Sendable (Int) -> Bool
     ) {
-        self.revision = revision
-        self.layerCount = layerCount
-        self.folderIDs = folderIDs
-        self.isLayerLocked = isLayerLocked
+        self.init(
+            revision: revision,
+            layerCount: layerCount,
+            folderIDs: folderIDs,
+            canvasGeometry: nil,
+            isLayerLocked: isLayerLocked
+        )
     }
 
     public func existingLayerIndex(_ rawValue: Int) -> ExistingLayerIndex? {

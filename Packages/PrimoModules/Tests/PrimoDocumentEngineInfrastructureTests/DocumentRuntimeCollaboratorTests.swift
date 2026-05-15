@@ -49,6 +49,38 @@ struct DocumentRuntimeCollaboratorTests {
     }
 
     @Test
+    func dirtyUpdatePublisherTransfersGpuHandleOwnershipOnConsume() {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let publisher = DirtyUpdatePublisher()
+        let store = SwiftDocumentStore(width: 2, height: 2)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        box.incrementalUpdates = [
+            IncrementalLayerUpdate.unsafeUnchecked(
+                layerIndex: -1,
+                originX: 0,
+                originY: 0,
+                width: 2,
+                height: 2,
+                gpuBufferHandle: handle,
+                pixelData: Data()
+            )
+        ]
+
+        publisher.captureDirtyUpdate(
+            snapshot: store.snapshot,
+            rect: nil,
+            gpuServices: services,
+            makeMetalSnapshot: CollaboratorGpuBox.metalSnapshot,
+            compositePixelData: { _ in Data(count: 16) }
+        )
+
+        #expect(publisher.consumeDirtyUpdate()?.gpuBufferHandle == handle)
+        #expect(publisher.consumeDirtyUpdate() == nil)
+        #expect(box.releasedHandles.isEmpty)
+    }
+
+    @Test
     func presentationBuilderCachesAndInvalidatesLayerThumbnailSurfaces() {
         let box = CollaboratorGpuBox()
         let services = box.services()

@@ -58,7 +58,7 @@ public struct DocumentMutationWorkflowOutcome<Selection: Equatable & Sendable, F
 }
 
 public struct DocumentMutationWorkflowService: Sendable {
-    package let documentQueryGateway: DocumentQueryGateway
+    private let documentQueryGateway: DocumentQueryGateway
     private let documentEditingGateway: DocumentEditingGateway
     private let documentLayerEffectsGateway: DocumentLayerEffectsGateway
 
@@ -275,8 +275,17 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     package func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
-        guard ValidatedLayerProcessingRequest(request) != nil else {
-            return .failure(.invalidLayerProcessingRequest("transform"))
+        let geometry: PixelGeometry
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            geometry = presentation.geometry
+        }
+        guard ValidatedLayerProcessingRequest(request, canvasGeometry: geometry) != nil else {
+            return .failure(.invalidLayerProcessingRequest(
+                ValidatedLayerProcessingRequest.validationFailure(for: request, canvasGeometry: geometry) ?? "unknown"
+            ))
         }
         return executeContent(.applyProcessing(index: index, request: request))
     }

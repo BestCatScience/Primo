@@ -8,6 +8,8 @@ let package = Package(
         .macOS(.v13),
     ],
     products: [
+        .library(name: "PrimoCoreContracts", targets: ["PrimoCoreContracts"]),
+        .library(name: "PrimoSystemContracts", targets: ["PrimoSystemContracts"]),
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
         .library(name: "PrimoSystemClients", targets: ["PrimoSystemClients"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
@@ -20,6 +22,7 @@ let package = Package(
         .library(name: "PrimoDocumentRuntimeContracts", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentRuntime", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentRuntimeLive", targets: ["PrimoDocumentRuntimeLive"]),
+        .library(name: "PrimoDocumentAppSupport", targets: ["PrimoDocumentAppSupport"]),
         .library(name: "PrimoCanvasPresentationRuntime", targets: ["PrimoCanvasPresentationRuntime"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoAIImageDomain", targets: ["PrimoAIImageDomain"]),
@@ -42,11 +45,21 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "PrimoCoreTypes"
+            name: "PrimoCoreContracts"
+        ),
+        .target(
+            name: "PrimoSystemContracts"
+        ),
+        .target(
+            name: "PrimoCoreTypes",
+            dependencies: [
+                "PrimoCoreContracts",
+                "PrimoSystemContracts",
+            ]
         ),
         .target(
             name: "PrimoSystemClients",
-            dependencies: ["PrimoCoreTypes"]
+            dependencies: ["PrimoSystemContracts"]
         ),
         .target(
             name: "PrimoLocalization"
@@ -281,6 +294,19 @@ let package = Package(
                 "PrimoDocumentStrokeInfrastructure",
             ],
             path: "Sources/PrimoDocumentRuntimeLive"
+        ),
+        .target(
+            name: "PrimoDocumentAppSupport",
+            dependencies: [
+                "PrimoBrushRuntimeContracts",
+                "PrimoCoreTypes",
+                "PrimoDocumentPersistenceContracts",
+                "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRuntime",
+                "PrimoDocumentRuntimeLive",
+                "PrimoSystemClients",
+            ],
+            path: "Sources/PrimoDocumentAppSupport"
         ),
         .target(
             name: "PrimoCanvasPresentationRuntime",

@@ -1,6 +1,6 @@
 import ComposableArchitecture
+import PrimoDocumentAppSupport
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import SwiftUI
 
 @main
@@ -9,7 +9,7 @@ struct PrimoApp: App {
 
     init() {
         let documentApplicationEnvironment = DocumentApplicationEnvironment(
-            workflows: DocumentApplicationRuntimeFactory.liveWorkflows()
+            workflows: DocumentAppRuntimeSupport.liveWorkflows()
         )
         self.store = Store(initialState: PrimoRootFeature.State()) {
             PrimoRootFeature()

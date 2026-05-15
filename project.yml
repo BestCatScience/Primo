@@ -133,7 +133,7 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentRuntime
       - package: PrimoModules
-        product: PrimoDocumentRuntimeLive
+        product: PrimoDocumentAppSupport
       - package: PrimoModules
         product: PrimoCanvasPresentationRuntime
       - package: PrimoModules

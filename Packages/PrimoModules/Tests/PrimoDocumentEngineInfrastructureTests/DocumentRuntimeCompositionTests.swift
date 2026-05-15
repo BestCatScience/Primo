@@ -500,6 +500,40 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func presentationObservationHandlesPublishAndCancellationRace() async throws {
+        let runtime = PrimoDocumentRuntimeLive.DocumentRuntimeFactory.live()
+        let receivedCounts = LockedValues<Int>()
+
+        let consumers = (0..<40).map { _ in
+            Task {
+                var count = 0
+                for await _ in runtime.observePresentation() {
+                    count += 1
+                    if count >= 2 {
+                        break
+                    }
+                }
+                receivedCounts.append(count)
+            }
+        }
+
+        try await waitUntil {
+            receivedCounts.count < consumers.count
+        }
+        for sizeValue in 3..<12 {
+            let size = try #require(ValidCanvasSize(sizeValue, sizeValue))
+            _ = await runtime.execute(.canvas(.createSized(size)))
+        }
+        for consumer in consumers {
+            consumer.cancel()
+            _ = await consumer.value
+        }
+
+        #expect(receivedCounts.count == consumers.count)
+        #expect(receivedCounts.values.allSatisfy { $0 >= 1 })
+    }
+
+    @Test
     func presentationBroadcasterInstallsTerminationHandlerBeforeInitialRead() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

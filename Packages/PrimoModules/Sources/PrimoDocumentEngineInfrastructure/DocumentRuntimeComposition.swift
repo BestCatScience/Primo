@@ -168,6 +168,7 @@ extension DocumentEngineLive {
                         return folder.id
                     }
                 ),
+                canvasGeometry: presentation.geometry,
                 isLayerLocked: { index in
                     presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
                 }

@@ -21,6 +21,18 @@ struct ArchitectureSourceInspector {
         let isStored: Bool
     }
 
+    struct TypealiasDeclaration: Equatable {
+        let name: String
+        let accessLevel: String
+        let assignedType: String
+    }
+
+    struct ExtensionDeclaration: Equatable {
+        let extendedType: String
+        let accessLevel: String
+        let inheritedTypes: [String]
+    }
+
     struct Callable: Equatable {
         struct Parameter: Equatable {
             let firstName: String?
@@ -66,6 +78,18 @@ struct ArchitectureSourceInspector {
         let visitor = PropertyVisitor(viewMode: .sourceAccurate)
         visitor.walk(tree)
         return visitor.properties
+    }
+
+    var typealiases: [TypealiasDeclaration] {
+        let visitor = TypealiasVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.typealiases
+    }
+
+    var extensions: [ExtensionDeclaration] {
+        let visitor = ExtensionVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.extensions
     }
 
     var initializerSignatures: [String] {
@@ -203,6 +227,38 @@ private final class PropertyVisitor: SyntaxVisitor {
                 )
             )
         }
+        return .skipChildren
+    }
+}
+
+private final class TypealiasVisitor: SyntaxVisitor {
+    var typealiases: [ArchitectureSourceInspector.TypealiasDeclaration] = []
+
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+        typealiases.append(
+            ArchitectureSourceInspector.TypealiasDeclaration(
+                name: node.name.text,
+                accessLevel: accessLevel(in: node.modifiers),
+                assignedType: node.initializer.value.trimmedDescription
+            )
+        )
+        return .skipChildren
+    }
+}
+
+private final class ExtensionVisitor: SyntaxVisitor {
+    var extensions: [ArchitectureSourceInspector.ExtensionDeclaration] = []
+
+    override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+        extensions.append(
+            ArchitectureSourceInspector.ExtensionDeclaration(
+                extendedType: node.extendedType.trimmedDescription,
+                accessLevel: accessLevel(in: node.modifiers),
+                inheritedTypes: node.inheritanceClause?.inheritedTypes.map {
+                    $0.type.trimmedDescription
+                } ?? []
+            )
+        )
         return .skipChildren
     }
 }

@@ -1,9 +1,9 @@
 import CoreGraphics
 import Foundation
 import PrimoBrushRuntimeContracts
+import PrimoDocumentAppSupport
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 
 extension DocumentFeature {
     static func normalizedCommittedStrokeSamples(
@@ -105,7 +105,7 @@ extension DocumentFeature {
     }
 
     static func strokeTaperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
-        BrushStrokeKernel.taperScale(
+        DocumentAppStrokeMath.taperScale(
             progress: progress,
             taperIn: taperIn,
             taperOut: taperOut
@@ -216,7 +216,7 @@ extension DocumentFeature {
     }
 
     static func resolvedStrokeRadius(for sample: StylusSample, progress: CGFloat = 0, brush: BrushRuntimeSettings) -> CGFloat {
-        BrushStrokeKernel.resolvedRadius(
+        DocumentAppStrokeMath.resolvedRadius(
             for: sample,
             progress: progress,
             brush: brush
@@ -224,6 +224,6 @@ extension DocumentFeature {
     }
 
     static func previewNoise(x: CGFloat, y: CGFloat) -> CGFloat {
-        BrushStrokeKernel.noise(x: x, y: y)
+        DocumentAppStrokeMath.noise(x: x, y: y)
     }
 }

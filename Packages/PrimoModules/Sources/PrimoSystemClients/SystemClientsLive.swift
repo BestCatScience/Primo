@@ -1,6 +1,6 @@
 import Foundation
-import PrimoCoreTypes
 import Security
+import PrimoSystemContracts
 
 public extension ProcessEnvironmentClient {
     static let live = ProcessEnvironmentClient { key in

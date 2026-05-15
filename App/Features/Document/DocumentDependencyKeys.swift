@@ -1,7 +1,7 @@
 import ComposableArchitecture
+import PrimoDocumentAppSupport
 import PrimoDocumentApplication
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import PrimoWorkspaceApplication
 
 private enum DocumentApplicationEnvironmentKey: DependencyKey {
@@ -11,7 +11,7 @@ private enum DocumentApplicationEnvironmentKey: DependencyKey {
         @Dependency(\.uuidClient) var uuidClient
 
         return DocumentApplicationEnvironment(
-            workflows: DocumentApplicationRuntimeFactory.liveWorkflows(
+            workflows: DocumentAppRuntimeSupport.liveWorkflows(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient

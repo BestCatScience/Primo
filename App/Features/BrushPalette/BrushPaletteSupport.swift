@@ -1,9 +1,9 @@
 import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoBrushRuntimeContracts
+import PrimoDocumentAppSupport
 import PrimoDocumentDomain
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import SwiftUI
 
 enum PhotoshopDynamicControl: String, CaseIterable, Identifiable {
@@ -355,7 +355,7 @@ struct BrushStrokePreview: View {
     }
 
     private func previewStampAlpha(pressure: Double, opacityJitter: Double) -> Double {
-        BrushStrokeKernel.previewStampAlpha(
+        DocumentAppStrokeMath.previewStampAlpha(
             pressure: pressure,
             opacityJitter: opacityJitter,
             opacity: style.opacity,
@@ -382,7 +382,7 @@ struct BrushStrokePreview: View {
     }
 
     private func strokeTaperScale(progress: Double, taperIn: Double, taperOut: Double) -> Double {
-        BrushStrokeKernel.taperScale(
+        DocumentAppStrokeMath.taperScale(
             progress: progress,
             taperIn: taperIn,
             taperOut: taperOut

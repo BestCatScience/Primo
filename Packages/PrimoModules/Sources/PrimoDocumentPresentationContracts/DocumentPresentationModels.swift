@@ -609,6 +609,10 @@ public struct CanvasSelection: Equatable, Sendable {
 
     public init?(validatingBounds bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
         guard let geometry = PixelGeometry(width: maskWidth, height: maskHeight) else { return nil }
+        guard bounds.origin.x.isFinite,
+              bounds.origin.y.isFinite,
+              bounds.size.width.isFinite,
+              bounds.size.height.isFinite else { return nil }
         guard maskData.count == geometry.maskByteCount else { return nil }
         self.bounds = bounds
         self.maskWidth = maskWidth

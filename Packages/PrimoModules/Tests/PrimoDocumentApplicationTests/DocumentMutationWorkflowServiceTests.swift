@@ -86,6 +86,59 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
+    func layerContentCommandsRejectNonFiniteProcessingTransformBeforeMutationGateways() {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1),
+            documentEditingGateway: .failing,
+            documentLayerEffectsGateway: .unused
+        )
+
+        let result = service.applyLayerProcessing(
+            0,
+            request: .transform(
+                translation: CGSize(width: CGFloat.nan, height: 0),
+                scale: 1,
+                rotationDegrees: 0,
+                selection: nil
+            )
+        )
+
+        expectFailure(result, .invalidLayerProcessingRequest("transform"))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
+    func layerContentCommandsRejectOutOfBoundsProcessingTransformSelectionBeforeMutationGateways() {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1),
+            documentEditingGateway: .failing,
+            documentLayerEffectsGateway: .unused
+        )
+        let selection = CanvasSelection.unsafeUnchecked(
+            bounds: CGRect(x: 0, y: 0, width: 2, height: 1),
+            maskWidth: 2,
+            maskHeight: 1,
+            maskData: Data(count: 2),
+            mode: .rectangle
+        )
+
+        let result = service.applyLayerProcessing(
+            0,
+            request: .transform(
+                translation: .zero,
+                scale: 1,
+                rotationDegrees: 0,
+                selection: selection
+            )
+        )
+
+        expectFailure(result, .invalidLayerProcessingRequest("transform"))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
     func layerContentCommandsRejectInvalidPixelPayloadBeforeMutationGateways() {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(

@@ -411,6 +411,15 @@ struct GpuSideEffectIsolationArchitectureTests {
                 )
             }
         }
+        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
+        for source in try Self.swiftSources(under: appRoot) {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let imports = Self.swiftImports(in: body)
+            #expect(
+                !imports.contains("PrimoDocumentRuntimeLive"),
+                "\(source.path) should route live document runtime wiring through PrimoDocumentAppSupport"
+            )
+        }
 
         let projectYML = try String(
             contentsOf: repoRoot.appendingPathComponent("project.yml", isDirectory: false),
@@ -434,6 +443,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             "product: PrimoWorkspaceInfrastructure"
         ]
         #expect(appTargetBlock.contains("product: PrimoDocumentRuntime"))
+        #expect(appTargetBlock.contains("product: PrimoDocumentAppSupport"))
+        #expect(!appTargetBlock.contains("product: PrimoDocumentRuntimeLive"))
         for product in bannedProducts {
             #expect(!projectYML.contains(product), "External targets should depend on runtime facades instead of \(product)")
         }
@@ -446,12 +457,21 @@ struct GpuSideEffectIsolationArchitectureTests {
             contentsOf: repoRoot.appendingPathComponent("project.yml", isDirectory: false),
             encoding: .utf8
         )
+        let package = try String(
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false),
+            encoding: .utf8
+        )
         let appSupportBlock = try #require(Self.yamlTargetBlock(named: "PrimoAppSupport", in: projectYML))
         let appTargetBlock = try #require(Self.yamlTargetBlock(named: "Primo", in: projectYML))
 
         #expect(appSupportBlock.contains("type: framework"))
         #expect(appSupportBlock.contains("path: App/Support"))
         #expect(appTargetBlock.contains("- target: PrimoAppSupport"))
+        #expect(appTargetBlock.contains("product: PrimoDocumentAppSupport"))
+        #expect(!appTargetBlock.contains("product: PrimoDocumentRuntimeLive"))
+        #expect(package.contains(".library(name: \"PrimoDocumentAppSupport\""))
+        #expect(package.contains("name: \"PrimoDocumentAppSupport\""))
+        #expect(package.contains("\"PrimoDocumentRuntimeLive\""))
 
         let runtimeWiringProducts = [
             "PrimoBrushRuntime",
@@ -474,6 +494,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "PrimoCanvasInputDomain",
             "PrimoCanvasPresentationDomain",
             "PrimoDocumentRuntime",
+            "PrimoDocumentAppSupport",
             "PrimoDocumentStrokeApplication",
             "PrimoAIImageDomain",
             "PrimoAIImageApplication"
@@ -2119,9 +2140,15 @@ struct GpuSideEffectIsolationArchitectureTests {
             encoding: .utf8
         )
 
-        #expect(!contentContracts.contains("public typealias LayerPixelData = Data"))
-        #expect(!contentContracts.contains("public typealias LayerMaskData = Data"))
-        #expect(contentContracts.contains("public struct LayerPixelReplacementCommand"))
+        let inspector = ArchitectureSourceInspector(source: contentContracts)
+        let publicTypealiases = inspector.typealiases.filter { $0.accessLevel == "public" }
+        #expect(!publicTypealiases.contains(.init(name: "LayerPixelData", accessLevel: "public", assignedType: "Data")))
+        #expect(!publicTypealiases.contains(.init(name: "LayerMaskData", accessLevel: "public", assignedType: "Data")))
+        #expect(inspector.topLevelDeclarations.contains(.init(
+            name: "LayerPixelReplacementCommand",
+            kind: "struct",
+            accessLevel: "public"
+        )))
         let pixelData = try #require(Self.declarationBody(named: "LayerPixelData", in: contentContracts))
         let maskData = try #require(Self.declarationBody(named: "LayerMaskData", in: contentContracts))
         let replacementCommand = try #require(Self.declarationBody(named: "LayerPixelReplacementCommand", in: contentContracts))
@@ -2143,8 +2170,19 @@ struct GpuSideEffectIsolationArchitectureTests {
         let sources = try Self.swiftSources(under: domainRoot)
         for source in sources {
             let body = try String(contentsOf: source, encoding: .utf8)
-            #expect(!body.contains("public init(unchecked"), "\(source.path) should keep unsafe constructors package-scoped")
-            #expect(!body.contains("public static func unchecked"), "\(source.path) should keep unsafe factories package-scoped")
+            let inspector = ArchitectureSourceInspector(source: body)
+            #expect(
+                !inspector.initializerSignatures.contains { signature in
+                    signature.hasPrefix("public init(unchecked")
+                },
+                "\(source.path) should keep unsafe constructors package-scoped"
+            )
+            #expect(
+                !inspector.callables.contains { callable in
+                    callable.accessLevel == "public" && callable.name == "unchecked"
+                },
+                "\(source.path) should keep unsafe factories package-scoped"
+            )
         }
 
         let workspaceDocumentTypes = try String(
@@ -2153,11 +2191,15 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         let relativePath = try #require(Self.typeBody(named: "RelativeProjectFolderPath", in: workspaceDocumentTypes))
         #expect(
-            relativePath.contains("public init(validatingComponents components: [String]) throws"),
+            Self.initializerSignatures(accessLevel: "public", in: relativePath).contains("public init(validatingComponents components: [String])"),
             "RelativeProjectFolderPath component construction should stay validating"
         )
         #expect(
-            relativePath.contains("package static func unsafeUnchecked(components: [String])"),
+            Self.callables(in: relativePath).contains { callable in
+                callable.accessLevel == "package" &&
+                    callable.name == "unsafeUnchecked" &&
+                    callable.parameters.first?.type == "[String]"
+            },
             "RelativeProjectFolderPath unchecked component construction should stay package-scoped"
         )
         #expect(
@@ -2305,47 +2347,74 @@ struct GpuSideEffectIsolationArchitectureTests {
     func coreTypesStayFreeOfLiveSystemSideEffects() throws {
         let repoRoot = try Self.repoRoot()
         let graph = try Self.packageTargetGraph()
+        #expect(graph["PrimoCoreContracts"] == [] as Set<String>)
+        #expect(graph["PrimoSystemContracts"] == [] as Set<String>)
+        #expect(graph["PrimoCoreTypes"] == ["PrimoCoreContracts", "PrimoSystemContracts"] as Set<String>)
         #expect(graph["PrimoCoreTypes"]?.contains("PrimoSystemClients") != true)
-        #expect(graph["PrimoSystemClients"] == ["PrimoCoreTypes"] as Set<String>)
+        #expect(graph["PrimoSystemClients"] == ["PrimoSystemContracts"] as Set<String>)
 
         let coreRoot = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoCoreTypes",
+            "Packages/PrimoModules/Sources/PrimoCoreContracts",
+            isDirectory: true
+        )
+        let systemContractsRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoSystemContracts",
             isDirectory: true
         )
         let liveRoot = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoSystemClients",
             isDirectory: true
         )
+        let compatibilityURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoCoreTypes/CoreTypesCompatibility.swift",
+            isDirectory: false
+        )
         let coreSources = try Self.swiftSources(under: coreRoot)
+        let systemContractSources = try Self.swiftSources(under: systemContractsRoot)
         let liveSources = try Self.swiftSources(under: liveRoot)
-        let coreBody = try coreSources
-            .map { try String(contentsOf: $0, encoding: .utf8) }
-            .joined(separator: "\n")
-        let liveBody = try liveSources
-            .map { try String(contentsOf: $0, encoding: .utf8) }
-            .joined(separator: "\n")
-        let semanticCoreBody = Self.swiftCodeWithCommentsAndStringsBlanked(in: coreBody)
+        let contractImports = try (coreSources + systemContractSources).flatMap { source in
+            let body = try String(contentsOf: source, encoding: .utf8)
+            return ArchitectureSourceInspector(source: body).imports.map(\.moduleName)
+        }
+        let liveImports = try liveSources.flatMap { source in
+            let body = try String(contentsOf: source, encoding: .utf8)
+            return ArchitectureSourceInspector(source: body).imports.map(\.moduleName)
+        }
 
-        let bannedCoreTokens = [
-            "import Security",
-            "FileManager.default",
-            "URLSession.shared",
-            "UserDefaults.standard",
-            "SecItem",
-            "ProcessInfo.processInfo",
-            "DispatchQueue.main",
-            "Date()",
-            "UUID()",
-            "static let live",
-            "static var live"
-        ]
-        for token in bannedCoreTokens {
+        #expect(!contractImports.contains("Security"))
+        #expect(liveImports.contains("Security"))
+        #expect(liveImports.contains("PrimoSystemContracts"))
+        #expect(!liveImports.contains("PrimoCoreTypes"))
+
+        let compatibilitySource = try String(contentsOf: compatibilityURL, encoding: .utf8)
+        let compatibilityInspector = ArchitectureSourceInspector(source: compatibilitySource)
+        let compatibilityImports = compatibilityInspector.imports
+        #expect(compatibilityImports.contains(.init(moduleName: "PrimoCoreContracts", attributes: ["_exported"])))
+        #expect(compatibilityImports.contains(.init(moduleName: "PrimoSystemContracts", attributes: ["_exported"])))
+        let compatibilityAliases = Set(compatibilityInspector.typealiases.map(\.name))
+        #expect(compatibilityAliases.isSuperset(of: [
+            "OperationRequest",
+            "OperationContract",
+            "DateClient",
+            "UUIDClient",
+            "FileClient",
+            "HTTPClient",
+            "SecretStoreClient",
+            "SecurityScopedResourceClient",
+        ]))
+
+        for source in coreSources + systemContractSources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let declarations = ArchitectureSourceInspector(source: body).topLevelDeclarations
             #expect(
-                !semanticCoreBody.contains(token),
-                "PrimoCoreTypes should define system client contracts without live side-effect token \(token)"
+                declarations.allSatisfy { $0.accessLevel == "public" },
+                "\(source.path) should expose contracts only through public declarations"
             )
         }
 
+        let liveBody = try liveSources
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
         for token in ["FileManager.default", "URLSession.shared", "UserDefaults.standard", "SecItem", "ProcessInfo.processInfo", "DispatchQueue.main"] {
             #expect(
                 liveBody.contains(token),

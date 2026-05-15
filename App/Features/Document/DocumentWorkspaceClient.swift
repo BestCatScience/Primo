@@ -1,10 +1,10 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentAppSupport
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import PrimoWorkspaceApplication
 import PrimoWorkspaceRuntime
 
@@ -67,7 +67,7 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
             uuidClient: uuidClient,
             previewGateway: DocumentWorkspacePreviewGateway(
                 loadProjectPreview: { url in
-                    let preview = try DocumentProjectPreviewLoader.loadPreview(
+                    let preview = try DocumentAppProjectPreviewSupport.loadPreview(
                         from: url,
                         fileClient: fileClient,
                         dateClient: dateClient,
@@ -124,7 +124,7 @@ private enum TimelapseExportCapabilityKey: DependencyKey {
 
         return TimelapseExportCapability(
             exportVideo: { capture, progress in
-                try TimelapseExportService.exportVideo(
+                try DocumentAppTimelapseExportSupport.exportVideo(
                     from: capture,
                     to: workspaceArtifactCapability.timelapseTemporaryDirectory(),
                     fileClient: fileClient,

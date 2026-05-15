@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 
 public struct LayerPixelData: Equatable, Sendable {
     public let width: Int
@@ -47,22 +48,87 @@ public struct LayerMaskData: Equatable, Sendable {
 public struct ValidatedLayerProcessingRequest: Equatable, Sendable {
     public let rawValue: LayerProcessingRequest
 
-    package init?(_ rawValue: LayerProcessingRequest) {
-        guard Self.isValid(rawValue) else { return nil }
+    package init?(_ rawValue: LayerProcessingRequest, canvasGeometry: PixelGeometry? = nil) {
+        guard Self.validationFailure(for: rawValue, canvasGeometry: canvasGeometry) == nil else { return nil }
         self.rawValue = rawValue
     }
 
-    private static func isValid(_ request: LayerProcessingRequest) -> Bool {
+    package static func validationFailure(
+        for request: LayerProcessingRequest,
+        canvasGeometry: PixelGeometry? = nil
+    ) -> String? {
         switch request {
-        case let .transform(translation, scale, rotationDegrees, _):
-            return translation.width.isFinite &&
-                translation.height.isFinite &&
-                scale.isFinite &&
-                scale > 0 &&
-                rotationDegrees.isFinite
+        case let .transform(translation, scale, rotationDegrees, selection):
+            guard let boundedRequest = CanvasBoundedTransformRequest(
+                translation: translation,
+                scale: scale,
+                rotationDegrees: rotationDegrees,
+                selection: selection,
+                canvasGeometry: canvasGeometry
+            ) else {
+                return "transform"
+            }
+            _ = boundedRequest
+            return nil
         default:
-            return true
+            return nil
         }
+    }
+}
+
+public struct CanvasBoundedTransformRequest: Equatable, Sendable {
+    public let translation: FiniteTranslation
+    public let scale: TransformScale
+    public let rotationDegrees: RotationDegrees
+    public let selection: CanvasSelection?
+
+    package init?(
+        translation: CGSize,
+        scale: CGFloat,
+        rotationDegrees: Double,
+        selection: CanvasSelection?,
+        canvasGeometry: PixelGeometry?
+    ) {
+        guard let translation = FiniteTranslation(translation),
+              let scale = TransformScale(scale),
+              let rotationDegrees = RotationDegrees(rotationDegrees),
+              Self.isValid(selection: selection, canvasGeometry: canvasGeometry) else {
+            return nil
+        }
+        self.translation = translation
+        self.scale = scale
+        self.rotationDegrees = rotationDegrees
+        self.selection = selection
+    }
+
+    private static func isValid(selection: CanvasSelection?, canvasGeometry: PixelGeometry?) -> Bool {
+        guard let selection else { return true }
+        guard let canvasGeometry else { return false }
+        guard let selectionGeometry = PixelGeometry(width: selection.maskWidth, height: selection.maskHeight),
+              selection.maskData.count == selectionGeometry.maskByteCount else {
+            return false
+        }
+        return selection.bounds.isFiniteAndCanvasBounded(
+            width: canvasGeometry.width,
+            height: canvasGeometry.height
+        )
+    }
+}
+
+private extension CGRect {
+    func isFiniteAndCanvasBounded(width: Int, height: Int) -> Bool {
+        guard origin.x.isFinite,
+              origin.y.isFinite,
+              size.width.isFinite,
+              size.height.isFinite,
+              !isNull,
+              !isEmpty else {
+            return false
+        }
+        return minX >= 0 &&
+            minY >= 0 &&
+            maxX <= CGFloat(width) &&
+            maxY <= CGFloat(height)
     }
 }
 
@@ -119,8 +185,16 @@ public struct LayerContentMutationCommandValidator: Sendable {
             return editableLayer(index, in: context).map { .clear(index: $0) }
         case let .applyProcessing(index, request):
             return editableLayer(index, in: context).flatMap { index in
-                guard let request = ValidatedLayerProcessingRequest(request) else {
-                    return .failure(.invalidLayerProcessingRequest("transform"))
+                guard let request = ValidatedLayerProcessingRequest(
+                    request,
+                    canvasGeometry: context.canvasGeometry
+                ) else {
+                    return .failure(.invalidLayerProcessingRequest(
+                        ValidatedLayerProcessingRequest.validationFailure(
+                            for: request,
+                            canvasGeometry: context.canvasGeometry
+                        ) ?? "unknown"
+                    ))
                 }
                 return .success(.applyProcessing(index: index, request: request))
             }

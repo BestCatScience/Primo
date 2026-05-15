@@ -654,7 +654,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testArchitectureContractsExposeLayeredProtocolVocabulary() throws {
         let contents = try String(
-            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Sources/PrimoCoreTypes/OperationContracts.swift"),
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Sources/PrimoCoreContracts/OperationContracts.swift"),
             encoding: .utf8
         )
 
@@ -717,7 +717,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         )
 
         XCTAssertTrue(contents.contains("let documentApplicationEnvironment = DocumentApplicationEnvironment"))
-        XCTAssertTrue(contents.contains("workflows: DocumentApplicationRuntimeFactory.liveWorkflows()"))
+        XCTAssertTrue(contents.contains("workflows: DocumentAppRuntimeSupport.liveWorkflows()"))
         XCTAssertTrue(contents.contains("$0.documentApplicationEnvironment = documentApplicationEnvironment"))
     }
 

@@ -128,6 +128,33 @@ public struct AdjustmentScale: Equatable, Sendable {
     }
 }
 
+public struct FiniteTranslation: Equatable, Sendable {
+    public let rawValue: CGSize
+
+    public init?(_ rawValue: CGSize) {
+        guard rawValue.width.isFinite, rawValue.height.isFinite else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct TransformScale: Equatable, Sendable {
+    public let rawValue: CGFloat
+
+    public init?(_ rawValue: CGFloat) {
+        guard rawValue.isFinite, rawValue > 0 else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
+public struct RotationDegrees: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
 public struct AdjustmentOffset: Equatable, Sendable {
     public let rawValue: Double
 
