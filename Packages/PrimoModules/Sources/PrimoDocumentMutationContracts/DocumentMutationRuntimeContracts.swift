@@ -10,9 +10,25 @@ public typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFai
 
 public struct EditableLayerIndex: Equatable, Sendable {
     public let rawValue: Int
+    public let revision: DocumentRevision
 
-    public init?(
+    public static func validated(
+        _ rawValue: Int,
+        revision: DocumentRevision = .initial,
+        layerCount: Int,
+        isLayerLocked: (Int) -> Bool
+    ) -> EditableLayerIndex? {
+        EditableLayerIndex(
+            validating: rawValue,
+            revision: revision,
+            layerCount: layerCount,
+            isLayerLocked: isLayerLocked
+        )
+    }
+
+    package init?(
         validating rawValue: Int,
+        revision: DocumentRevision = .initial,
         layerCount: Int,
         isLayerLocked: (Int) -> Bool
     ) {
@@ -20,10 +36,16 @@ public struct EditableLayerIndex: Equatable, Sendable {
             return nil
         }
         self.rawValue = rawValue
+        self.revision = revision
     }
 
     package init(_ rawValue: Int) {
+        self.init(rawValue, revision: .initial)
+    }
+
+    package init(_ rawValue: Int, revision: DocumentRevision) {
         self.rawValue = rawValue
+        self.revision = revision
     }
 }
 
@@ -118,6 +140,67 @@ public struct AdjustmentOffset: Equatable, Sendable {
             return
         }
         self.rawValue = min(max(rawValue, -1), 1)
+    }
+}
+
+public struct ThresholdValue: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (0...1).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 0.5
+            return
+        }
+        self.rawValue = min(max(rawValue, 0), 1)
+    }
+}
+
+public struct PosterizeLevels: Equatable, Sendable {
+    public static let allowedRange = 2...256
+
+    public let rawValue: Int
+
+    public init?(_ rawValue: Int) {
+        guard Self.allowedRange.contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init?(rounding rawValue: Double) {
+        guard rawValue.isFinite else { return nil }
+        self.init(Int(rawValue.rounded()))
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 6
+            return
+        }
+        let roundedValue = Int(rawValue.rounded())
+        self.rawValue = min(max(roundedValue, Self.allowedRange.lowerBound), Self.allowedRange.upperBound)
+    }
+}
+
+public typealias PosterizeLevelCount = PosterizeLevels
+
+public struct GradientStopPosition: Equatable, Sendable {
+    public let rawValue: Double
+
+    public init?(_ rawValue: Double) {
+        guard rawValue.isFinite, (0...1).contains(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(clamping rawValue: Double) {
+        guard rawValue.isFinite else {
+            self.rawValue = 0
+            return
+        }
+        self.rawValue = min(max(rawValue, 0), 1)
     }
 }
 
@@ -219,67 +302,79 @@ public struct LevelsAdjustmentSettings: Equatable, Sendable {
 }
 
 public struct ToneCurveSettings: Equatable, Sendable {
-    public var shadows: Double = 0
-    public var midtones: Double = 0
-    public var highlights: Double = 0
+    public let shadowsValue: AdjustmentOffset
+    public let midtonesValue: AdjustmentOffset
+    public let highlightsValue: AdjustmentOffset
+
     public init(shadows: Double = 0, midtones: Double = 0, highlights: Double = 0) {
-        self.shadows = shadows
-        self.midtones = midtones
-        self.highlights = highlights
+        self.init(
+            shadows: AdjustmentOffset(clamping: shadows),
+            midtones: AdjustmentOffset(clamping: midtones),
+            highlights: AdjustmentOffset(clamping: highlights)
+        )
     }
+
+    public init(shadows: AdjustmentOffset, midtones: AdjustmentOffset, highlights: AdjustmentOffset) {
+        self.shadowsValue = shadows
+        self.midtonesValue = midtones
+        self.highlightsValue = highlights
+    }
+
+    public var shadows: Double { shadowsValue.rawValue }
+    public var midtones: Double { midtonesValue.rawValue }
+    public var highlights: Double { highlightsValue.rawValue }
 }
 
 public struct ColorBalanceSettings: Equatable, Sendable {
-    public var redCyan: Double = 0
-    public var greenMagenta: Double = 0
-    public var blueYellow: Double = 0
+    public let redCyanValue: AdjustmentOffset
+    public let greenMagentaValue: AdjustmentOffset
+    public let blueYellowValue: AdjustmentOffset
+
     public init(redCyan: Double = 0, greenMagenta: Double = 0, blueYellow: Double = 0) {
-        self.redCyan = redCyan
-        self.greenMagenta = greenMagenta
-        self.blueYellow = blueYellow
+        self.init(
+            redCyan: AdjustmentOffset(clamping: redCyan),
+            greenMagenta: AdjustmentOffset(clamping: greenMagenta),
+            blueYellow: AdjustmentOffset(clamping: blueYellow)
+        )
     }
+
+    public init(redCyan: AdjustmentOffset, greenMagenta: AdjustmentOffset, blueYellow: AdjustmentOffset) {
+        self.redCyanValue = redCyan
+        self.greenMagentaValue = greenMagenta
+        self.blueYellowValue = blueYellow
+    }
+
+    public var redCyan: Double { redCyanValue.rawValue }
+    public var greenMagenta: Double { greenMagentaValue.rawValue }
+    public var blueYellow: Double { blueYellowValue.rawValue }
 }
 
 public struct ThresholdSettings: Equatable, Sendable {
-    public var threshold: Double = 0.5
+    public let thresholdValue: ThresholdValue
+
     public init(threshold: Double = 0.5) {
-        self.threshold = threshold
-    }
-}
-
-public struct PosterizeLevelCount: Equatable, Sendable {
-    public static let allowedRange = 2...256
-
-    public let rawValue: Int
-
-    public init?(_ rawValue: Int) {
-        guard Self.allowedRange.contains(rawValue) else { return nil }
-        self.rawValue = rawValue
+        self.init(threshold: ThresholdValue(clamping: threshold))
     }
 
-    public init?(rounding rawValue: Double) {
-        guard rawValue.isFinite else { return nil }
-        self.init(Int(rawValue.rounded()))
+    public init(threshold: ThresholdValue) {
+        self.thresholdValue = threshold
     }
 
-    public init(clamping rawValue: Double) {
-        guard rawValue.isFinite else {
-            self.rawValue = 6
-            return
-        }
-        let roundedValue = Int(rawValue.rounded())
-        self.rawValue = min(max(roundedValue, Self.allowedRange.lowerBound), Self.allowedRange.upperBound)
-    }
+    public var threshold: Double { thresholdValue.rawValue }
 }
 
 public struct PosterizeSettings: Equatable, Sendable {
-    public let levelsValue: PosterizeLevelCount
+    public let levelsValue: PosterizeLevels
 
     public init(levels: Double = 6) {
-        self.init(levels: PosterizeLevelCount(clamping: levels))
+        self.init(levels: PosterizeLevels(clamping: levels))
     }
 
-    public init(levels: PosterizeLevelCount) {
+    public init(levels: Int) {
+        self.init(levels: PosterizeLevels(levels) ?? PosterizeLevels(clamping: Double(levels)))
+    }
+
+    public init(levels: PosterizeLevels) {
         self.levelsValue = levels
     }
 
@@ -298,7 +393,7 @@ public enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identi
 
 public struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
     public let id: UUID
-    public var position: Double
+    public let positionValue: GradientStopPosition
     public var red: UInt8
     public var green: UInt8
     public var blue: UInt8
@@ -310,12 +405,30 @@ public struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
         green: UInt8,
         blue: UInt8
     ) {
+        self.init(
+            id: id,
+            position: GradientStopPosition(clamping: position),
+            red: red,
+            green: green,
+            blue: blue
+        )
+    }
+
+    public init(
+        id: UUID = UUID(),
+        position: GradientStopPosition,
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8
+    ) {
         self.id = id
-        self.position = position
+        self.positionValue = position
         self.red = red
         self.green = green
         self.blue = blue
     }
+
+    public var position: Double { positionValue.rawValue }
 }
 
 public struct GradientMapSettings: Equatable, Sendable {

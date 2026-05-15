@@ -217,9 +217,28 @@ extension CanvasEditingWorkflowReducer {
             in: state
         ) {
         case let .success(layer):
+            guard let pixelData = LayerPixelData(
+                width: session.canvasWidth,
+                height: session.canvasHeight,
+                rgba: movedLayerPixels
+            ) else {
+                state.canvas.cancelSelectionMove()
+                state.canvas.resetStrokePreview()
+                return documentMutationFeedbackEffect(
+                    for: DocumentMutationFeedbackMapper().feedback(
+                        for: .gpu(
+                            .invalidPayloadSize(
+                                operation: "selectionMoveCommit",
+                                expected: session.canvasWidth * session.canvasHeight * 4,
+                                actual: movedLayerPixels.count
+                            )
+                        )
+                    )
+                )
+            }
             command = ValidatedLayerContentReplacementCommand(
                 layer: layer,
-                pixelData: movedLayerPixels
+                pixelData: pixelData
             )
 
         case let .failure(failure):

@@ -597,6 +597,61 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentMutationWorkflowServicePublicContentMethodsUseValidatedCommands() throws {
+        let repoRoot = try Self.repoRoot()
+        let workflow = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let contentContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        for token in [
+            "public enum LayerContentMutationCommand",
+            "public enum ValidatedLayerContentMutationCommand"
+        ] {
+            #expect(contentContracts.contains(token))
+        }
+
+        for token in [
+            "private func executeContent(_ command: LayerContentMutationCommand)",
+            "private func executeContent(_ command: ValidatedLayerContentMutationCommand)",
+            "private func validateFreshLayerIndex(_ index: EditableLayerIndex)"
+        ] {
+            #expect(workflow.contains(token))
+        }
+
+        let publicContentMethods = [
+            "replaceLayerPixels(_ index: Int, pixelData: Data)",
+            "applyLayerProcessing(_ index: Int, request: LayerProcessingRequest)",
+            "setTextLayer(_ index: Int, textLayer: TextLayerData)",
+            "clearLayer(_ index: Int)",
+            "replaceLayerMask(_ index: Int, maskData: Data)",
+            "clearLayerMask(_ index: Int)",
+            "applyLayerMask(_ index: Int)"
+        ]
+        for signature in publicContentMethods {
+            let body = try #require(Self.functionBody(matching: "public func \(signature)", in: workflow))
+            #expect(
+                body.contains("executeContent("),
+                "\(signature) should enter the validated content command path before raw gateway execution"
+            )
+            #expect(!body.contains("documentMutationGateway."))
+            #expect(!body.contains("textLayerGateway."))
+        }
+        #expect(workflow.contains("LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData)"))
+        #expect(workflow.contains("LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData)"))
+    }
+
+    @Test
     func documentRuntimeFacadeDoesNotReexportConcreteInfrastructureModules() throws {
         let repoRoot = try Self.repoRoot()
         let facade = repoRoot.appendingPathComponent(
@@ -606,26 +661,43 @@ struct GpuSideEffectIsolationArchitectureTests {
         let body = try String(contentsOf: facade, encoding: .utf8)
         #expect(!body.contains("@_exported import"), "PrimoDocumentRuntime should expose explicit App-facing wrappers instead of reexporting infrastructure modules")
         #expect(!body.contains("public typealias"), "PrimoDocumentRuntime should wrap App-facing infrastructure APIs instead of typealiasing them")
-        #expect(!body.contains("public let queryGateway:"))
-        #expect(!body.contains("public let gpuOperationGateway:"))
-        #expect(!body.contains("public let textLayerGateway:"))
-        #expect(!body.contains("public let mutationGateway:"))
-        #expect(!body.contains("public let canvasCommands:"))
-        #expect(!body.contains("public let layerCommands:"))
-        #expect(!body.contains("public let strokeCommands:"))
-        #expect(!body.contains("public let historyCommands:"))
-        #expect(!body.contains("public let mutationWorkflow:"))
-        #expect(!body.contains("public let contentService:"))
-        #expect(!body.contains("public let canvasEditingWorkflow:"))
-        #expect(!body.contains("public let selectionWorkflow:"))
-        #expect(!body.contains("public let renderingWorkflow:"))
-        #expect(!body.contains("public let textLayerService:"))
-        #expect(!body.contains("public let exportClient:"))
-        #expect(!body.contains("public let persistenceClient:"))
-        #expect(!body.contains("public let stroke: CanvasStrokeRuntime"))
-        #expect(!body.contains("public var strokeEditing: StrokeEditingRuntime"))
+        let publicStoredProperties = Set(Self.storedPropertyNames(accessLevel: "public", in: body))
+        let bannedPublicStoredProperties: Set<String> = [
+            "queryGateway",
+            "gpuOperationGateway",
+            "textLayerGateway",
+            "mutationGateway",
+            "canvasCommands",
+            "layerCommands",
+            "strokeCommands",
+            "historyCommands",
+            "mutationWorkflow",
+            "contentService",
+            "canvasEditingWorkflow",
+            "selectionWorkflow",
+            "renderingWorkflow",
+            "textLayerService",
+            "exportClient",
+            "persistenceClient"
+        ]
+        #expect(
+            publicStoredProperties.isDisjoint(with: bannedPublicStoredProperties),
+            "Runtime facade wrappers should expose behavior through methods/properties, not public raw service storage"
+        )
         #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
         #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
+
+        let renderingWorkflowBody = try #require(Self.typeBody(named: "DocumentRenderingWorkflow", in: body))
+        let publicRenderingInitializers = Self.initializerSignatures(accessLevel: "public", in: renderingWorkflowBody)
+        #expect(
+            publicRenderingInitializers.allSatisfy { !$0.contains("compositedPaperPreviewRGBA") },
+            "DocumentRenderingWorkflow should not publicly accept raw rendering closure tables"
+        )
+        #expect(
+            Self.initializerSignatures(accessLevel: "package", in: renderingWorkflowBody)
+                .contains(where: { $0.contains("compositedPaperPreviewRGBA") }),
+            "Raw rendering closure construction should stay package-scoped"
+        )
 
         let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
         let expectedSymbols: Set<String> = [
@@ -868,7 +940,9 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         #expect(body.contains("struct DocumentApplicationEnvironment: Sendable"))
         #expect(body.contains("protocol SelectionWorkflowRequesting: Sendable"))
-        #expect(body.contains("typealias CanvasStrokeWorkflowAccess"))
+        #expect(body.contains("protocol StrokePreviewPort"))
+        #expect(body.contains("protocol CanvasEditingPresentationPort"))
+        #expect(!body.contains("typealias CanvasStrokeWorkflowAccess"))
         #expect(body.contains("private enum DocumentApplicationEnvironmentKey: DependencyKey"))
         #expect(validation.contains("struct DocumentWorkflowCommandValidator: Sendable"))
         #expect(!paintDocumentClientBody.contains("struct DocumentWorkflowCommandValidator"))
@@ -876,6 +950,70 @@ struct GpuSideEffectIsolationArchitectureTests {
         for key in bannedKeys {
             #expect(!body.contains(key), "PaintDocumentClient should derive \(key) from DocumentApplicationEnvironment")
         }
+    }
+
+    @Test
+    func canvasEditingReducerUsesNarrowPortsInsteadOfBroadWorkflowAccess() throws {
+        let repoRoot = try Self.repoRoot()
+        let capabilities = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentRuntimeCapabilities.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let reducer = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let strokeWorkflow = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer+StrokeWorkflow.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let dependencies = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentDependencyKeys.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        for port in [
+            "protocol StrokePreviewPort",
+            "protocol StrokeCommitPort",
+            "protocol LayerVisibilityPort",
+            "protocol LayerContentPort",
+            "protocol SelectionProcessingPort",
+            "protocol CanvasTransformPort",
+            "protocol CanvasEditingPresentationPort",
+            "protocol PaperStylePort"
+        ] {
+            #expect(capabilities.contains(port), "Missing narrow canvas editing port \(port)")
+        }
+        #expect(!capabilities.contains("CanvasStrokeWorkflowAccess"))
+        #expect(!reducer.contains("canvasStrokeWorkflowAccess"))
+        #expect(!dependencies.contains("canvasStrokeWorkflowAccess"))
+
+        for dependency in [
+            "@Dependency(\\.strokePreviewPort)",
+            "@Dependency(\\.strokeCommitPort)",
+            "@Dependency(\\.layerVisibilityPort)",
+            "@Dependency(\\.layerContentPort)",
+            "@Dependency(\\.selectionProcessingPort)",
+            "@Dependency(\\.canvasTransformPort)",
+            "@Dependency(\\.canvasEditingPresentationPort)",
+            "@Dependency(\\.paperStylePort)"
+        ] {
+            #expect(reducer.contains(dependency), "Canvas editing reducer should inject \(dependency)")
+        }
+        #expect(strokeWorkflow.contains(".run { [paperStylePort] _ in"))
+        #expect(!strokeWorkflow.contains(".run { [canvasStrokeWorkflowAccess]"))
     }
 
     @Test
@@ -1140,7 +1278,17 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         #expect(mutationContracts.contains("public struct EditableLayerIndex"))
-        #expect(mutationContracts.contains("public init?(\n        validating rawValue: Int"))
+        let editableLayerIndex = try #require(Self.typeBody(named: "EditableLayerIndex", in: mutationContracts))
+        #expect(
+            Self.initializerSignatures(accessLevel: "public", in: editableLayerIndex).isEmpty,
+            "EditableLayerIndex should not be publicly constructible outside validation code"
+        )
+        #expect(
+            Self.initializerSignatures(accessLevel: "package", in: editableLayerIndex)
+                .contains(where: { $0.contains("validating rawValue: Int") }),
+            "EditableLayerIndex validating construction should stay package-scoped"
+        )
+        #expect(editableLayerIndex.contains("public static func validated("))
         #expect(mutationContracts.contains("package init(_ rawValue: Int)"))
         #expect(validation.contains("let layerIndex: EditableLayerIndex"))
         #expect(!validation.contains("let layerIndex: Int"))
@@ -1288,6 +1436,9 @@ struct GpuSideEffectIsolationArchitectureTests {
             "HueSaturationBrightnessSettings",
             "BrightnessContrastSettings",
             "LevelsAdjustmentSettings",
+            "ToneCurveSettings",
+            "ColorBalanceSettings",
+            "ThresholdSettings",
             "PosterizeSettings"
         ] {
             let body = try #require(Self.typeBody(named: typeName, in: mutationContracts))
@@ -1303,16 +1454,48 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public var gamma: Double =",
             "public var outputBlack: Double =",
             "public var outputWhite: Double =",
-            "public var levels: Double ="
+            "public var shadows: Double =",
+            "public var midtones: Double =",
+            "public var highlights: Double =",
+            "public var redCyan: Double =",
+            "public var greenMagenta: Double =",
+            "public var blueYellow: Double =",
+            "public var threshold: Double =",
+            "public var levels: Double =",
+            "public var position: Double ="
         ] {
             #expect(!mutationContracts.contains(token), "Adjustment settings should not store \(token)")
         }
         #expect(mutationContracts.contains("public struct HueAdjustmentDegrees"))
         #expect(mutationContracts.contains("public struct AdjustmentScale"))
         #expect(mutationContracts.contains("public struct AdjustmentOffset"))
+        #expect(mutationContracts.contains("public struct ThresholdValue"))
+        #expect(mutationContracts.contains("public struct PosterizeLevels"))
+        #expect(mutationContracts.contains("public typealias PosterizeLevelCount = PosterizeLevels"))
+        #expect(mutationContracts.contains("public struct GradientStopPosition"))
         #expect(mutationContracts.contains("public let gammaValue: PositiveFiniteDouble"))
-        #expect(mutationContracts.contains("public struct PosterizeLevelCount"))
-        #expect(mutationContracts.contains("public let levelsValue: PosterizeLevelCount"))
+        #expect(mutationContracts.contains("public let thresholdValue: ThresholdValue"))
+        #expect(mutationContracts.contains("public let levelsValue: PosterizeLevels"))
+        #expect(mutationContracts.contains("public let positionValue: GradientStopPosition"))
+    }
+
+    @Test
+    func layerContentPayloadsAreValueObjectsInsteadOfDataAliases() throws {
+        let repoRoot = try Self.repoRoot()
+        let contentContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        #expect(!contentContracts.contains("public typealias LayerPixelData = Data"))
+        #expect(!contentContracts.contains("public typealias LayerMaskData = Data"))
+        #expect(contentContracts.contains("public struct LayerPixelData"))
+        #expect(contentContracts.contains("public let rgba: Data"))
+        #expect(contentContracts.contains("public struct LayerMaskData"))
+        #expect(contentContracts.contains("public let bytes: Data"))
     }
 
     @Test
@@ -1676,8 +1859,88 @@ struct GpuSideEffectIsolationArchitectureTests {
             .filter { $0.hasSuffix("Infrastructure") }
     }
 
+    private static func storedPropertyNames(accessLevel: String, in source: String) -> [String] {
+        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
+        let pattern = #"^\s*\#(accessLevel)\s+(?:private\(set\)\s+)?(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)"#
+        let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
+        let range = NSRange(code.startIndex..<code.endIndex, in: code)
+        return regex?.matches(in: code, range: range).compactMap { match in
+            guard let nameRange = Range(match.range(at: 1), in: code) else { return nil }
+            let lineEnd = code[nameRange.upperBound...].firstIndex(of: "\n") ?? code.endIndex
+            guard !code[nameRange.upperBound..<lineEnd].contains("{") else { return nil }
+            return String(code[nameRange])
+        } ?? []
+    }
+
+    private static func initializerSignatures(accessLevel: String, in source: String) -> [String] {
+        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
+        let marker = "\(accessLevel) init"
+        var signatures: [String] = []
+        var searchStart = code.startIndex
+
+        while let markerRange = code.range(of: marker, range: searchStart..<code.endIndex),
+              let openParen = code[markerRange.upperBound...].firstIndex(of: "("),
+              let closeParen = Self.matchingDelimiter(in: code, open: openParen, opening: "(", closing: ")") {
+            let end = code.index(after: closeParen)
+            signatures.append(
+                String(code[markerRange.lowerBound..<end])
+                    .split(whereSeparator: \.isNewline)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .joined(separator: " ")
+            )
+            searchStart = end
+        }
+
+        return signatures
+    }
+
+    private static func matchingDelimiter(
+        in text: String,
+        open: String.Index,
+        opening: Character,
+        closing: Character
+    ) -> String.Index? {
+        var depth = 0
+        var cursor = open
+        while cursor < text.endIndex {
+            let character = text[cursor]
+            if character == opening {
+                depth += 1
+            } else if character == closing {
+                depth -= 1
+                if depth == 0 { return cursor }
+            }
+            cursor = text.index(after: cursor)
+        }
+        return nil
+    }
+
     private static func typeBody(named typeName: String, in source: String) -> String? {
         guard let declaration = source.range(of: "struct \(typeName)") ?? source.range(of: "enum \(typeName)") else {
+            return nil
+        }
+        guard let openingBrace = source[declaration.lowerBound...].firstIndex(of: "{") else {
+            return nil
+        }
+        var depth = 0
+        var index = openingBrace
+        while index < source.endIndex {
+            let character = source[index]
+            if character == "{" {
+                depth += 1
+            } else if character == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return String(source[openingBrace...index])
+                }
+            }
+            index = source.index(after: index)
+        }
+        return nil
+    }
+
+    private static func functionBody(matching signature: String, in source: String) -> String? {
+        guard let declaration = source.range(of: signature) else {
             return nil
         }
         guard let openingBrace = source[declaration.lowerBound...].firstIndex(of: "{") else {

@@ -13,6 +13,17 @@ import Testing
 
 struct DocumentContentServiceTests {
     @Test
+    func layerPixelAndMaskPayloadsValidateByteCounts() {
+        #expect(LayerPixelData(width: 2, height: 2, rgba: Data(repeating: 0, count: 16)) != nil)
+        #expect(LayerPixelData(width: 2, height: 2, rgba: Data(repeating: 0, count: 15)) == nil)
+        #expect(LayerPixelData(width: 0, height: 2, rgba: Data()) == nil)
+
+        #expect(LayerMaskData(width: 2, height: 2, bytes: Data(repeating: 0, count: 4)) != nil)
+        #expect(LayerMaskData(width: 2, height: 2, bytes: Data(repeating: 0, count: 5)) == nil)
+        #expect(LayerMaskData(width: 2, height: -1, bytes: Data()) == nil)
+    }
+
+    @Test
     func applyPixelsRejectsInvalidExistingLayerBeforeMutationGateway() {
         let recorder = CallRecorder()
         let service = DocumentContentService(
@@ -28,6 +39,28 @@ struct DocumentContentServiceTests {
         )
 
         #expect(result == .failure(.invalidLayerIndex(4)))
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func directPixelReplacementRejectsInvalidPayloadBeforeMutationGateway() {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
+            documentMutationGateway: mutationGateway(recorder: recorder),
+            textLayerGateway: textLayerGateway()
+        )
+
+        let result = service.replaceLayerPixels(0, Data(repeating: 0xff, count: 16))
+
+        guard case let .failure(.gpu(.invalidPayloadSize(operation, expected, actual))) = result else {
+            Issue.record("Expected invalid payload size failure")
+            return
+        }
+        #expect(operation == "replaceLayerPixels")
+        #expect(expected == 64 * 64 * 4)
+        #expect(actual == 16)
         #expect(recorder.values.isEmpty)
     }
 
@@ -48,6 +81,27 @@ struct DocumentContentServiceTests {
             #expect(failure == .invalidLayerIndex(2))
         case .success:
             Issue.record("Expected invalid layer index failure")
+        }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func directPixelReplacementRejectsLockedLayerBeforeMutationGateway() {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1, lockedLayerIndexes: [0]),
+            documentRenderGateway: renderGateway(),
+            documentMutationGateway: mutationGateway(recorder: recorder),
+            textLayerGateway: textLayerGateway()
+        )
+
+        let result = service.replaceLayerPixels(0, Data(repeating: 0xff, count: 16))
+
+        switch result {
+        case let .failure(failure):
+            #expect(failure == .layerLocked(0))
+        case .success:
+            Issue.record("Expected locked layer failure")
         }
         #expect(recorder.values.isEmpty)
     }
@@ -94,7 +148,7 @@ struct DocumentContentServiceTests {
         )
 
         let result = service.applyPixels(
-            Data(),
+            Data(repeating: 0xff, count: 64 * 64 * 4),
             to: .newLayer(name: "Generated")
         )
 
@@ -188,12 +242,16 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
     queryGateway(activeLayerIndex: activeLayerIndex, layerCount: 0)
 }
 
-private func queryGateway(activeLayerIndex: Int, layerCount: Int) -> DocumentQueryGateway {
+private func queryGateway(
+    activeLayerIndex: Int,
+    layerCount: Int,
+    lockedLayerIndexes: Set<Int> = []
+) -> DocumentQueryGateway {
     var indices = Array(0..<layerCount)
     if !indices.contains(activeLayerIndex) {
         indices.append(activeLayerIndex)
     }
-    let rows = indices.map(layerRow)
+    let rows = indices.map { layerRow(index: $0, isLocked: lockedLayerIndexes.contains($0)) }
     let presentation = PaintDocumentPresentation(
         validatingCanvasSize: CGSize(width: 64, height: 64),
         activeLayerIndex: activeLayerIndex,
@@ -215,13 +273,13 @@ private func renderGateway() -> DocumentRenderGateway {
     )
 }
 
-private func layerRow(index: Int) -> LayerRowModel {
+private func layerRow(index: Int, isLocked: Bool = false) -> LayerRowModel {
     LayerRowModel(
         validatingIndex: index,
         name: "Layer \(index)",
         visible: true,
         opacity: UnitInterval(1)!,
-        isLocked: false,
+        isLocked: isLocked,
         isAlphaLocked: false,
         isClipped: false,
         blendMode: .normal,

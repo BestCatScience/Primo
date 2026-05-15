@@ -11,8 +11,8 @@ import PrimoDocumentStrokeApplication
 
 extension CanvasEditingWorkflowReducer {
     func synchronizePaperStyleEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
-        .run { [canvasStrokeWorkflowAccess] _ in
-            canvasStrokeWorkflowAccess.setPaperStyle(paperStyle)
+        .run { [paperStylePort] _ in
+            paperStylePort.setPaperStyle(paperStyle)
         }
     }
 
@@ -246,21 +246,21 @@ extension CanvasEditingWorkflowReducer {
 
     var canvasStrokeStateCoordinator: CanvasStrokeStateCoordinator {
         CanvasStrokeStateCoordinator(
-            layerCommands: documentLayerCommandService,
-            strokeCommands: documentStrokeCommandService
+            layerVisibility: documentLayerCommandService,
+            strokeCommit: documentStrokeCommandService
         )
     }
 
     var documentCanvasStrokeStateCoordinator: DocumentFeature.CanvasStrokeStateCoordinator {
         DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: documentLayerCommandService,
-            strokeCommands: documentStrokeCommandService
+            layerVisibility: documentLayerCommandService,
+            strokeCommit: documentStrokeCommandService
         )
     }
 
     var documentCanvasStrokeSessionCoordinator: DocumentFeature.CanvasStrokeSessionCoordinator {
         return DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerCommands: documentLayerCommandService,
+            layerVisibility: documentLayerCommandService,
             strokeInteraction: canvasStrokeInteractionService
         )
     }

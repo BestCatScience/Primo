@@ -19,8 +19,16 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeSessionCoordinator {
-        let layerCommands: any LayerMutationSubmitting
-        let strokeInteraction: any StrokePreviewResolving & StrokePreviewLeasing
+        let layerVisibility: any LayerVisibilityPort
+        let strokeInteraction: any StrokePreviewPort
+
+        init(
+            layerVisibility: any LayerVisibilityPort,
+            strokeInteraction: any StrokePreviewPort
+        ) {
+            self.layerVisibility = layerVisibility
+            self.strokeInteraction = strokeInteraction
+        }
 
         func resolveAppendedStrokePreview(
             state: DocumentEditingState,
@@ -78,7 +86,7 @@ extension DocumentFeature {
                 previewBrush: context.previewBrush
             )
             if keepsSelectionCleared {
-                switch layerCommands.ensureLayerVisible(context.activeLayerIndex) {
+                switch layerVisibility.ensureLayerVisible(context.activeLayerIndex) {
                 case .success:
                     break
                 case let .failure(failure):
@@ -107,7 +115,7 @@ extension DocumentFeature {
                 ) else {
                     return .failed(.bridgeMutationFailed("GPU stroke commit invalid payload"))
                 }
-                switch layerCommands.applyLayerSurfaceMutation(mutation.surface.layerIndex, payload) {
+                switch layerVisibility.applyLayerSurfaceMutation(mutation.surface.layerIndex, payload) {
                 case .success:
                     break
                 case let .failure(failure):
@@ -147,15 +155,15 @@ extension DocumentFeature {
     }
 
     struct CanvasStrokeStateCoordinator {
-        let layerCommands: any LayerMutationSubmitting
-        let strokeCommands: any StrokeMutationSubmitting
+        let layerVisibility: any LayerVisibilityPort
+        let strokeCommit: any StrokeCommitPort
 
         init(
-            layerCommands: any LayerMutationSubmitting,
-            strokeCommands: any StrokeMutationSubmitting
+            layerVisibility: any LayerVisibilityPort,
+            strokeCommit: any StrokeCommitPort
         ) {
-            self.layerCommands = layerCommands
-            self.strokeCommands = strokeCommands
+            self.layerVisibility = layerVisibility
+            self.strokeCommit = strokeCommit
         }
 
         init(
@@ -163,8 +171,8 @@ extension DocumentFeature {
             strokeCommands: DocumentStrokeCommandService
         ) {
             self.init(
-                layerCommands: DocumentLayerCommandMutationSubmitter(service: layerCommands),
-                strokeCommands: DocumentStrokeCommandMutationSubmitter(service: strokeCommands)
+                layerVisibility: DocumentLayerCommandMutationSubmitter(service: layerCommands),
+                strokeCommit: DocumentStrokeCommandMutationSubmitter(service: strokeCommands)
             )
         }
 
@@ -225,14 +233,14 @@ extension DocumentFeature {
             state: inout DocumentEditingState,
             clearSelectionWithoutRefresh: (inout DocumentEditingState) -> Void
         ) -> DocumentMutationResult {
-            switch layerCommands.ensureLayerVisible(state.canvas.activeLayerIndex) {
+            switch layerVisibility.ensureLayerVisible(state.canvas.activeLayerIndex) {
             case .success:
                 break
             case let .failure(failure):
                 return .failure(failure)
             }
             clearSelectionWithoutRefresh(&state)
-            strokeCommands.cancelStroke()
+            strokeCommit.cancelStroke()
             return .success(())
         }
 

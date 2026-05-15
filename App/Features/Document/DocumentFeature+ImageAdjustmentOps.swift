@@ -81,17 +81,21 @@ extension DocumentFeature {
         }
 
         for index in sortedStops.indices {
-            sortedStops[index].position = min(max(sortedStops[index].position, 0.0), 1.0)
+            sortedStops[index] = sortedStops[index].withPosition(
+                min(max(sortedStops[index].position, 0.0), 1.0)
+            )
         }
 
-        sortedStops[0].position = 0.0
-        sortedStops[sortedStops.count - 1].position = 1.0
+        sortedStops[0] = sortedStops[0].withPosition(0.0)
+        sortedStops[sortedStops.count - 1] = sortedStops[sortedStops.count - 1].withPosition(1.0)
 
         if sortedStops.count > 2 {
             for index in 1..<(sortedStops.count - 1) {
                 let lowerBound = sortedStops[index - 1].position + 0.01
                 let upperBound = sortedStops[index + 1].position - 0.01
-                sortedStops[index].position = min(max(sortedStops[index].position, lowerBound), upperBound)
+                sortedStops[index] = sortedStops[index].withPosition(
+                    min(max(sortedStops[index].position, lowerBound), upperBound)
+                )
             }
         }
 
@@ -125,4 +129,16 @@ extension DocumentFeature {
         )
     }
 
+}
+
+private extension GradientMapStopSettings {
+    func withPosition(_ position: Double) -> GradientMapStopSettings {
+        GradientMapStopSettings(
+            id: id,
+            position: position,
+            red: red,
+            green: green,
+            blue: blue
+        )
+    }
 }

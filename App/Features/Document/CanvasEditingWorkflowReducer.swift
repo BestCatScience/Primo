@@ -18,42 +18,49 @@ struct CanvasEditingWorkflowReducer: Reducer {
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
     typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
 
-    @Dependency(\.canvasStrokeWorkflowAccess) var canvasStrokeWorkflowAccess
+    @Dependency(\.strokePreviewPort) var strokePreviewPort
+    @Dependency(\.strokeCommitPort) var strokeCommitPort
+    @Dependency(\.layerVisibilityPort) var layerVisibilityPort
+    @Dependency(\.layerContentPort) var layerContentPort
+    @Dependency(\.selectionProcessingPort) var selectionProcessingPort
+    @Dependency(\.canvasTransformPort) var canvasTransformPort
+    @Dependency(\.canvasEditingPresentationPort) var canvasEditingPresentationPort
+    @Dependency(\.paperStylePort) var paperStylePort
 
-    var canvasStrokeInteractionService: any StrokePreviewLeasing & StrokePreviewResolving {
-        canvasStrokeWorkflowAccess
+    var canvasStrokeInteractionService: any StrokePreviewPort {
+        strokePreviewPort
     }
 
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
-        canvasStrokeWorkflowAccess.renderingWorkflow
+        canvasEditingPresentationPort.renderingWorkflow
     }
 
-    var documentLayerCommandService: any LayerMutationSubmitting {
-        canvasStrokeWorkflowAccess
+    var documentLayerCommandService: any LayerVisibilityPort {
+        layerVisibilityPort
     }
 
     var documentPresentationReader: DocumentPresentationReader {
-        canvasStrokeWorkflowAccess.presentationReader
+        canvasEditingPresentationPort.presentationReader
     }
 
-    var documentStrokeCommandService: any StrokeMutationSubmitting {
-        canvasStrokeWorkflowAccess
+    var documentStrokeCommandService: any StrokeCommitPort {
+        strokeCommitPort
     }
 
     var canvasEditingWorkflowService: any CanvasEditingExecuting {
-        canvasStrokeWorkflowAccess
+        canvasTransformPort
     }
 
-    var documentContentService: any LayerContentSubmitting {
-        canvasStrokeWorkflowAccess
+    var documentContentService: any LayerContentPort {
+        layerContentPort
     }
 
     var layerTransformProcessor: any LayerTransformProcessing {
-        canvasStrokeWorkflowAccess
+        canvasTransformPort
     }
 
-    var selectionWorkflowService: any SelectionWorkflowRequesting {
-        canvasStrokeWorkflowAccess
+    var selectionWorkflowService: any SelectionProcessingPort {
+        selectionProcessingPort
     }
 
     var documentWorkflowCommandValidator: DocumentWorkflowCommandValidator {

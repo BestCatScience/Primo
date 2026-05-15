@@ -101,31 +101,41 @@ package enum DocumentEngineFactory {
             resizeCanvasExtent: { width, height in
                 performResizeCanvasExtent(width: width, height: height, runtimeExecutor: runtimeExecutor)
             },
-            addLayer: { name in runtimeExecutor.perform { $0.addLayer(name: name) } },
-            deleteLayer: { index in runtimeExecutor.perform { $0.deleteLayer(index: index) } },
-            setActiveLayer: { index in runtimeExecutor.perform { $0.setActiveLayer(index: index) } },
-            setLayerName: { index, name in runtimeExecutor.perform { $0.setLayerName(index: index, name: name) } },
+            addLayer: { name in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("addLayer")) { $0.addLayer(name: name) } },
+            deleteLayer: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("deleteLayer")) { $0.deleteLayer(index: index) } },
+            setActiveLayer: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setActiveLayer")) { $0.setActiveLayer(index: index) } },
+            setLayerName: { index, name in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerName")) { $0.setLayerName(index: index, name: name) } },
             setLayerVisibility: { index, isVisible in
-                runtimeExecutor.perform { $0.setLayerVisibility(index: index, isVisible: isVisible) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerVisibility")) {
+                    $0.setLayerVisibility(index: index, isVisible: isVisible)
+                }
             },
-            revealLayerForEditing: { index in runtimeExecutor.perform { $0.revealLayerForEditing(index: index) } },
-            replaceLayerPixels: { index, data in runtimeExecutor.perform { $0.replaceLayerPixels(index: index, data: data) } },
+            revealLayerForEditing: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("revealLayerForEditing")) { $0.revealLayerForEditing(index: index) } },
+            replaceLayerPixels: { index, data in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("replaceLayerPixels")) { $0.replaceLayerPixels(index: index, data: data) } },
             replaceLayerPixelsInRect: { index, rect, data in
-                runtimeExecutor.perform { $0.replaceLayerPixels(index: index, in: rect, data: data) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("replaceLayerPixelsInRect")) {
+                    $0.replaceLayerPixels(index: index, in: rect, data: data)
+                }
             },
             applyLayerSurfaceMutation: { index, payload in
-                runtimeExecutor.perform { $0.applyLayerSurfaceMutation(index: index, payload: payload) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyLayerSurfaceMutation")) {
+                    $0.applyLayerSurfaceMutation(index: index, payload: payload)
+                }
             },
             applyLayerMutation: { index, payload in
-                runtimeExecutor.perform { $0.applyLayerMutation(index: index, payload: payload) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyLayerMutation")) {
+                    $0.applyLayerMutation(index: index, payload: payload)
+                }
             },
             applyTextLayerMutation: { index, textLayer, payload in
-                runtimeExecutor.perform { $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyTextLayerMutation")) {
+                    $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload)
+                }
             },
-            replaceLayerMask: { index, data in runtimeExecutor.perform { $0.replaceLayerMask(index: index, data: data) } },
-            clearLayerMask: { index in runtimeExecutor.perform { $0.clearLayerMask(index: index) } },
-            applyLayerMask: { index in runtimeExecutor.perform { $0.applyLayerMask(index: index) } },
-            clearLayer: { index in runtimeExecutor.perform { $0.clearLayer(index: index) } },
+            replaceLayerMask: { index, data in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("replaceLayerMask")) { $0.replaceLayerMask(index: index, data: data) } },
+            clearLayerMask: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("clearLayerMask")) { $0.clearLayerMask(index: index) } },
+            applyLayerMask: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyLayerMask")) { $0.applyLayerMask(index: index) } },
+            clearLayer: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("clearLayer")) { $0.clearLayer(index: index) } },
             applyLayerProcessing: { index, request in
                 performLayerProcessing(index: index, request: request, runtimeExecutor: runtimeExecutor)
             }
@@ -141,7 +151,7 @@ package enum DocumentEngineFactory {
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
                 performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeExecutor: runtimeExecutor)
             },
-            endBlurStroke: { runtimeExecutor.perform { $0.endBlurStroke() } },
+            endBlurStroke: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("endBlurStroke")) { $0.endBlurStroke() } },
             cancelBlurStroke: { runtimeExecutor.perform { $0.cancelBlurStroke() } },
             fill: { sample, brush in
                 performFill(sample: sample, brush: brush, runtimeExecutor: runtimeExecutor)
@@ -154,8 +164,8 @@ package enum DocumentEngineFactory {
         let historyGateway = DocumentHistoryGateway(
             canUndo: { runtimeExecutor.perform { $0.canUndo() } },
             canRedo: { runtimeExecutor.perform { $0.canRedo() } },
-            undo: { runtimeExecutor.perform { $0.undo() } },
-            redo: { runtimeExecutor.perform { $0.redo() } },
+            undo: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("undo")) { $0.undo() } },
+            redo: { runtimeExecutor.performResult(failure: reentrantRuntimeFailure("redo")) { $0.redo() } },
             trimForMemoryPressure: { runtimeExecutor.perform { $0.trimUndoHistoryForMemoryPressure() } }
         )
 
@@ -224,7 +234,9 @@ package enum DocumentEngineFactory {
         let textLayerGateway = TextLayerGateway(
             textLayerData: { index in runtimeExecutor.perform { $0.textLayerData(index: index) } },
             setTextLayer: { index, textLayer in
-                runtimeExecutor.perform { $0.setTextLayer(index: index, textLayer: textLayer) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setTextLayer")) {
+                    $0.setTextLayer(index: index, textLayer: textLayer)
+                }
             },
             clearTextLayerData: { index in runtimeExecutor.perform { $0.clearTextLayerData(index: index) } }
         )
@@ -239,37 +251,57 @@ package enum DocumentEngineFactory {
             persistenceGateway: persistenceGateway,
             exportGateway: exportGateway,
             textLayerGateway: textLayerGateway,
-            duplicateLayer: { index, name in runtimeExecutor.perform { $0.duplicateLayer(index: index, name: name) } },
-            moveLayer: { index, destination in runtimeExecutor.perform { $0.moveLayer(from: index, to: destination) } },
-            createFolder: { name, anchor in runtimeExecutor.perform { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
-            deleteFolder: { folderID in runtimeExecutor.perform { $0.deleteFolder(folderID: folderID) } },
+            duplicateLayer: { index, name in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("duplicateLayer")) { $0.duplicateLayer(index: index, name: name) } },
+            moveLayer: { index, destination in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("moveLayer")) { $0.moveLayer(from: index, to: destination) } },
+            createFolder: { name, anchor in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("createFolder")) { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
+            deleteFolder: { folderID in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("deleteFolder")) { $0.deleteFolder(folderID: folderID) } },
             setFolderVisibility: { folderID, isVisible in
-                runtimeExecutor.perform { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setFolderVisibility")) {
+                    $0.setFolderVisibility(folderID: folderID, isVisible: isVisible)
+                }
             },
-            setFolderName: { folderID, name in runtimeExecutor.perform { $0.setFolderName(folderID: folderID, name: name) } },
+            setFolderName: { folderID, name in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setFolderName")) { $0.setFolderName(folderID: folderID, name: name) } },
             setFolderExpanded: { folderID, isExpanded in
-                runtimeExecutor.perform { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setFolderExpanded")) {
+                    $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)
+                }
             },
             assignLayerToFolder: { index, folderID in
-                runtimeExecutor.perform { $0.assignLayerToFolder(index: index, folderID: folderID) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("assignLayerToFolder")) {
+                    $0.assignLayerToFolder(index: index, folderID: folderID)
+                }
             },
             setLayerLocked: { index, isLocked in
-                runtimeExecutor.perform { $0.setLayerLocked(index: index, isLocked: isLocked) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerLocked")) {
+                    $0.setLayerLocked(index: index, isLocked: isLocked)
+                }
             },
             setLayerAlphaLocked: { index, isAlphaLocked in
-                runtimeExecutor.perform { $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerAlphaLocked")) {
+                    $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
+                }
             },
             setLayerClipped: { index, isClipped in
-                runtimeExecutor.perform { $0.setLayerClipped(index: index, isClipped: isClipped) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerClipped")) {
+                    $0.setLayerClipped(index: index, isClipped: isClipped)
+                }
             },
             setLayerOpacity: { index, opacity in
-                runtimeExecutor.perform { $0.setLayerOpacity(index: index, opacity: opacity) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerOpacity")) {
+                    $0.setLayerOpacity(index: index, opacity: opacity)
+                }
             },
             setLayerBlendMode: { index, blendMode in
-                runtimeExecutor.perform { $0.setLayerBlendMode(index: index, blendMode: blendMode) }
+                runtimeExecutor.performResult(failure: reentrantRuntimeFailure("setLayerBlendMode")) {
+                    $0.setLayerBlendMode(index: index, blendMode: blendMode)
+                }
             },
-            mergeLayerDown: { index in runtimeExecutor.perform { $0.mergeLayerDown(index: index) } }
+            mergeLayerDown: { index in runtimeExecutor.performResult(failure: reentrantRuntimeFailure("mergeLayerDown")) { $0.mergeLayerDown(index: index) } }
         )
+    }
+
+    private static func reentrantRuntimeFailure(_ operation: String) -> DocumentMutationFailure {
+        .bridgeMutationFailed("\(LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>.reentrantAccessMessage): \(operation)")
     }
 
     private static func performResizeCanvas(
@@ -277,7 +309,9 @@ package enum DocumentEngineFactory {
         height: Int,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform { $0.makeResizeCanvasPlan(width: width, height: height) }
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeResizeCanvasPlan")) {
+            $0.makeResizeCanvasPlan(width: width, height: height)
+        }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -286,7 +320,9 @@ package enum DocumentEngineFactory {
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvas")))
             }
-            return runtimeExecutor.perform { $0.applyResizeCanvasPlan(plan, layers: layers) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyResizeCanvasPlan")) {
+                $0.applyResizeCanvasPlan(plan, layers: layers)
+            }
         }
     }
 
@@ -295,7 +331,9 @@ package enum DocumentEngineFactory {
         height: Int,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform { $0.makeResizeCanvasExtentPlan(width: width, height: height) }
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeResizeCanvasExtentPlan")) {
+            $0.makeResizeCanvasExtentPlan(width: width, height: height)
+        }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -304,7 +342,9 @@ package enum DocumentEngineFactory {
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvasExtent")))
             }
-            return runtimeExecutor.perform { $0.applyResizeCanvasPlan(plan, layers: layers) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyResizeCanvasExtentPlan")) {
+                $0.applyResizeCanvasPlan(plan, layers: layers)
+            }
         }
     }
 
@@ -313,7 +353,9 @@ package enum DocumentEngineFactory {
         request: LayerProcessingRequest,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform { $0.makeLayerProcessingPlan(index: index, request: request) }
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeLayerProcessingPlan")) {
+            $0.makeLayerProcessingPlan(index: index, request: request)
+        }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -326,7 +368,9 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "applyLayerProcessing")))
             }
-            return runtimeExecutor.perform { $0.applyLayerProcessingPlan(plan, payload: payload) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyLayerProcessingPlan")) {
+                $0.applyLayerProcessingPlan(plan, payload: payload)
+            }
         }
     }
 
@@ -335,7 +379,9 @@ package enum DocumentEngineFactory {
         brush: BrushRuntimeSettings,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform { $0.makeFillPlan(sample: sample, brush: brush) }
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeFillPlan")) {
+            $0.makeFillPlan(sample: sample, brush: brush)
+        }
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
@@ -350,7 +396,9 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "fill")))
             }
-            return runtimeExecutor.perform { $0.applyFillPlan(plan, payload: payload) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyFillPlan")) {
+                $0.applyFillPlan(plan, payload: payload)
+            }
         }
     }
 
@@ -360,7 +408,7 @@ package enum DocumentEngineFactory {
         layerIndex: Int,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform {
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeStrokeCommitPlan")) {
             $0.makeStrokeCommitPlan(samples: samples, brush: brush, layerIndex: layerIndex)
         }
         switch planResult {
@@ -379,14 +427,18 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "applyCommittedStroke")))
             }
-            return runtimeExecutor.perform { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyStrokeCommitPlan")) {
+                $0.applyStrokeCommitPlan(plan, gpuResult: result)
+            }
         }
     }
 
     private static func performCurrentStrokeCommit(
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform { $0.currentStrokeCommitPlan() }
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("currentStrokeCommitPlan")) {
+            $0.currentStrokeCommitPlan()
+        }
         switch planResult {
         case let .failure(failure):
             Self.logger.error("Current stroke commit plan failed: \(String(describing: failure), privacy: .public)")
@@ -408,7 +460,9 @@ package enum DocumentEngineFactory {
                 Self.logger.error("Current stroke GPU commit failed: \(String(describing: failure), privacy: .public)")
                 return .failure(failure)
             }
-            let mutationResult = runtimeExecutor.perform { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            let mutationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyCurrentStrokeCommitPlan")) {
+                $0.applyStrokeCommitPlan(plan, gpuResult: result)
+            }
             switch mutationResult {
             case .success:
                 runtimeExecutor.perform { $0.clearCurrentStroke() }
@@ -426,7 +480,7 @@ package enum DocumentEngineFactory {
         captureTimelapse: Bool,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
-        let planResult = runtimeExecutor.perform {
+        let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeBlurPlan")) {
             $0.makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
         }
         switch planResult {
@@ -443,7 +497,9 @@ package enum DocumentEngineFactory {
             ) else {
                 return .failure(.gpu(.kernelFailed(operation: "blurStroke")))
             }
-            return runtimeExecutor.perform { $0.applyBlurPlan(plan, payload: payload) }
+            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyBlurPlan")) {
+                $0.applyBlurPlan(plan, payload: payload)
+            }
         }
     }
 }

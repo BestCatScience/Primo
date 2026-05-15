@@ -44,8 +44,36 @@ extension DependencyValues {
         documentApplicationEnvironment.layerWorkflowEnvironment
     }
 
-    var canvasStrokeWorkflowAccess: any CanvasStrokeWorkflowAccess {
-        documentApplicationEnvironment.canvasStrokeWorkflowAccess
+    var strokePreviewPort: any StrokePreviewPort {
+        documentApplicationEnvironment.strokePreviewPort
+    }
+
+    var strokeCommitPort: any StrokeCommitPort {
+        documentApplicationEnvironment.strokeCommitPort
+    }
+
+    var layerVisibilityPort: any LayerVisibilityPort {
+        documentApplicationEnvironment.layerVisibilityPort
+    }
+
+    var layerContentPort: any LayerContentPort {
+        documentApplicationEnvironment.layerContentPort
+    }
+
+    var selectionProcessingPort: any SelectionProcessingPort {
+        documentApplicationEnvironment.selectionProcessingPort
+    }
+
+    var canvasTransformPort: any CanvasTransformPort {
+        documentApplicationEnvironment.canvasTransformPort
+    }
+
+    var canvasEditingPresentationPort: any CanvasEditingPresentationPort {
+        documentApplicationEnvironment.canvasEditingPresentationPort
+    }
+
+    var paperStylePort: any PaperStylePort {
+        documentApplicationEnvironment.paperStylePort
     }
 
     var documentExportCapability: DocumentExportCapability {

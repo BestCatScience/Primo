@@ -654,6 +654,7 @@ extension DocumentApplicationRuntime {
         )
         let historyCommands = DocumentHistoryCommandService(historyGateway: historyGateway)
         let mutationWorkflow = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway,
             documentEditingGateway: resolvedEditingGateway,
             documentLayerEffectsGateway: layerEffectsGateway,
             documentMutationGateway: mutationGateway,

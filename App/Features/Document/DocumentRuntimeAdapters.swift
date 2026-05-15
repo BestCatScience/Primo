@@ -51,7 +51,16 @@ struct DocumentPresentationWorkflowAccess: PresentationWorkflowAccess {
         presentationRuntime.renderingWorkflow
     }
 }
-struct DocumentCanvasStrokeWorkflowAccess: CanvasStrokeWorkflowAccess {
+struct DocumentCanvasEditingAccess:
+    StrokePreviewPort,
+    StrokeCommitPort,
+    LayerVisibilityPort,
+    LayerContentPort,
+    SelectionProcessingPort,
+    CanvasTransformPort,
+    CanvasEditingPresentationPort,
+    PaperStylePort
+{
     private let strokeRuntime: StrokeEditingRuntime
     private let layerEditingRuntime: LayerEditingRuntime
     private let presentationAccess: DocumentPresentationWorkflowAccess
@@ -94,22 +103,26 @@ extension LayerMutationSubmitting {
 
 extension LayerContentSubmitting {
     func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult {
-        replaceLayerPixels(command.layer.layerIndex.rawValue, command.pixelData)
+        replaceLayerPixels(command.layer.layerIndex.rawValue, command.pixelData.rgba)
     }
 }
 
-extension StrokeEditingRuntime: StrokePreviewLeasing, StrokePreviewResolving, StrokeMutationSubmitting {}
+extension StrokeEditingRuntime: StrokePreviewPort, StrokeMutationSubmitting, StrokeCommitPort {}
 
 extension LayerEditingRuntime:
     LayerMutationWorkflowSubmitting,
     LayerContentWorkflowSubmitting,
     LayerMutationSubmitting,
+    LayerVisibilityPort,
     LayerContentSubmitting,
+    LayerContentPort,
     CanvasEditingExecuting,
-    SelectionWorkflowRequesting
+    SelectionWorkflowRequesting,
+    SelectionProcessingPort,
+    CanvasTransformPort
 {}
 
-struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting {
+struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisibilityPort {
     let service: DocumentLayerCommandService
 
     func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
@@ -125,7 +138,7 @@ struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting {
     }
 }
 
-struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting {
+struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting, StrokeCommitPort {
     let service: DocumentStrokeCommandService
 
     func cancelStroke() {
@@ -152,6 +165,20 @@ struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting {
     func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
         service.fill(sample, brush)
     }
+
+    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
+        service.blurStroke(
+            command.samples,
+            command.brush,
+            command.layer.layerIndex.rawValue,
+            command.clearSelectionAfterBlur
+        )
+    }
+
+    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult {
+        service.fill(command.sample, command.brush)
+    }
+
 }
 
 extension PresentationReadable {
@@ -251,7 +278,7 @@ extension LayerWorkflowEnvironment {
     }
 }
 
-extension DocumentCanvasStrokeWorkflowAccess {
+extension DocumentCanvasEditingAccess {
     func lightweightPresentation() -> PaintDocumentPresentation {
         presentationAccess.lightweightPresentation()
     }
@@ -274,6 +301,10 @@ extension DocumentCanvasStrokeWorkflowAccess {
 
     var renderingWorkflow: DocumentRenderingWorkflow {
         presentationAccess.renderingWorkflow
+    }
+
+    var presentationReader: DocumentPresentationReader {
+        presentationAccess.presentationReader
     }
 
     func cancel() -> GpuStrokeSessionOutcome {
@@ -346,13 +377,8 @@ extension DocumentCanvasStrokeWorkflowAccess {
         strokeRuntime.cancelStroke()
     }
 
-    func blurStroke(
-        _ samples: [StylusSample],
-        _ brush: BrushRuntimeSettings,
-        _ layerIndex: Int,
-        _ clearSelectionAfterBlur: Bool
-    ) -> DocumentMutationResult {
-        strokeRuntime.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
+        strokeRuntime.blurStroke(command)
     }
 
     func endBlurStroke() -> DocumentMutationResult {
@@ -363,16 +389,24 @@ extension DocumentCanvasStrokeWorkflowAccess {
         strokeRuntime.cancelBlurStroke()
     }
 
-    func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
-        strokeRuntime.fill(sample, brush)
+    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult {
+        strokeRuntime.fill(command)
     }
 
     func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
         layerEditingRuntime.revealLayerForEditing(index)
     }
 
+    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        layerEditingRuntime.revealLayerForEditing(command)
+    }
+
     func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
         layerEditingRuntime.ensureLayerVisible(index)
+    }
+
+    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        layerEditingRuntime.ensureLayerVisible(command)
     }
 
     func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
@@ -540,20 +574,6 @@ extension DocumentExportRuntime {
             compositeSurface: compositeSurface,
             compositePNGData: compositePNGData,
             timelapseCapture: timelapseCapture
-        )
-    }
-}
-
-extension DocumentPresentationRuntime {
-    var renderingWorkflow: DocumentRenderingWorkflow {
-        DocumentRenderingWorkflow(
-            compositedPaperPreviewRGBA: compositedPaperPreviewRGBA,
-            compositedPreviewPixelData: compositedPreviewPixelData,
-            processedLayerPixelData: processedLayerPixelData,
-            alphaMask: alphaMask,
-            croppedSelectionMask: croppedSelectionMask,
-            scaledPixelData: scaledPixelData,
-            translatedPixelData: translatedPixelData
         )
     }
 }

@@ -6,7 +6,14 @@ struct DocumentApplicationEnvironment: Sendable {
     let canvasMutationCapability: DocumentCanvasMutationCapability
     let layerMutationCapability: DocumentLayerMutationCapability
     let layerWorkflowEnvironment: LayerWorkflowEnvironment
-    let canvasStrokeWorkflowAccess: any CanvasStrokeWorkflowAccess
+    let strokePreviewPort: any StrokePreviewPort
+    let strokeCommitPort: any StrokeCommitPort
+    let layerVisibilityPort: any LayerVisibilityPort
+    let layerContentPort: any LayerContentPort
+    let selectionProcessingPort: any SelectionProcessingPort
+    let canvasTransformPort: any CanvasTransformPort
+    let canvasEditingPresentationPort: any CanvasEditingPresentationPort
+    let paperStylePort: any PaperStylePort
     let exportCapability: DocumentExportCapability
     let persistenceCapability: DocumentPersistenceCapability
     let previewRenderingCapability: DocumentPreviewRenderingCapability
@@ -32,11 +39,19 @@ struct DocumentApplicationEnvironment: Sendable {
             presentationRuntime: runtime.presentation,
             strokeRuntime: runtime.strokeEditing
         )
-        self.canvasStrokeWorkflowAccess = DocumentCanvasStrokeWorkflowAccess(
+        let canvasEditingAccess = DocumentCanvasEditingAccess(
             strokeRuntime: runtime.strokeEditing,
             layerEditingRuntime: runtime.layerEditing,
             presentationAccess: presentationWorkflowAccess
         )
+        self.strokePreviewPort = canvasEditingAccess
+        self.strokeCommitPort = canvasEditingAccess
+        self.layerVisibilityPort = canvasEditingAccess
+        self.layerContentPort = canvasEditingAccess
+        self.selectionProcessingPort = canvasEditingAccess
+        self.canvasTransformPort = canvasEditingAccess
+        self.canvasEditingPresentationPort = canvasEditingAccess
+        self.paperStylePort = canvasEditingAccess
         self.exportCapability = DocumentExportCapability(exportRuntime: runtime.export)
         self.persistenceCapability = DocumentPersistenceCapability(persistenceRuntime: runtime.persistence)
         self.previewRenderingCapability = DocumentPreviewRenderingCapability(previewRuntime: runtime.preview)

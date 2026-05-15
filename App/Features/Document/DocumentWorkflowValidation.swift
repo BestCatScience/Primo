@@ -17,7 +17,7 @@ struct ValidatedDocumentLayerMutationCommand: Equatable, Sendable {
 
 struct ValidatedLayerContentReplacementCommand: Equatable, Sendable {
     let layer: ValidatedDocumentLayerMutationCommand
-    let pixelData: Data
+    let pixelData: LayerPixelData
 }
 
 struct ValidatedBlurStrokeMutationCommand: Equatable, Sendable {
@@ -44,8 +44,8 @@ struct DocumentWorkflowCommandValidator: Sendable {
         if let issue = validator.validate(command, in: validationContext(for: state)) {
             return .failure(issue.documentMutationFailure)
         }
-        guard let layerIndex = EditableLayerIndex(
-            validating: index,
+        guard let layerIndex = EditableLayerIndex.validated(
+            index,
             layerCount: state.layerSidebar.layers.count,
             isLayerLocked: { candidate in
                 state.layerSidebar.layers.first(where: { $0.index == candidate })?.isLocked ?? false

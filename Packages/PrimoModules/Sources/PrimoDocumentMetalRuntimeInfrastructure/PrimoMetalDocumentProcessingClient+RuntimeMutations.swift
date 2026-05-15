@@ -1490,15 +1490,17 @@ extension PrimoMetalDocumentProcessingClient {
                 ]
             }
             for index in normalized.indices {
-                normalized[index].position = min(max(normalized[index].position, 0.0), 1.0)
+                normalized[index] = normalized[index].withPosition(min(max(normalized[index].position, 0.0), 1.0))
             }
-            normalized[0].position = 0.0
-            normalized[normalized.count - 1].position = 1.0
+            normalized[0] = normalized[0].withPosition(0.0)
+            normalized[normalized.count - 1] = normalized[normalized.count - 1].withPosition(1.0)
             if normalized.count > 2 {
                 for index in 1..<(normalized.count - 1) {
                     let lowerBound = normalized[index - 1].position + 0.01
                     let upperBound = normalized[index + 1].position - 0.01
-                    normalized[index].position = min(max(normalized[index].position, lowerBound), upperBound)
+                    normalized[index] = normalized[index].withPosition(
+                        min(max(normalized[index].position, lowerBound), upperBound)
+                    )
                 }
             }
             stops = normalized.map { stop in
@@ -1892,5 +1894,17 @@ extension PrimoMetalDocumentProcessingClient {
             }
         }
         return bits
+    }
+}
+
+private extension GradientMapStopSettings {
+    func withPosition(_ position: Double) -> GradientMapStopSettings {
+        GradientMapStopSettings(
+            id: id,
+            position: position,
+            red: red,
+            green: green,
+            blue: blue
+        )
     }
 }

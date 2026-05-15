@@ -14,12 +14,38 @@ import Testing
 
 struct PaintDocumentMutationContractTests {
     @Test
+    func adjustmentValueObjectsValidateBounds() throws {
+        #expect(ThresholdValue(0)?.rawValue == 0)
+        #expect(ThresholdValue(1)?.rawValue == 1)
+        #expect(ThresholdValue(-0.01) == nil)
+        #expect(ThresholdValue(.nan) == nil)
+        #expect(ThresholdSettings(threshold: .infinity).threshold == 0.5)
+        #expect(ThresholdSettings(threshold: -4).threshold == 0)
+        #expect(ThresholdSettings(threshold: 4).threshold == 1)
+
+        #expect(GradientStopPosition(0)?.rawValue == 0)
+        #expect(GradientStopPosition(1)?.rawValue == 1)
+        #expect(GradientStopPosition(1.01) == nil)
+        #expect(GradientStopPosition(.infinity) == nil)
+        #expect(GradientMapStopSettings(position: .nan, red: 1, green: 2, blue: 3).position == 0)
+        #expect(GradientMapStopSettings(position: 2, red: 1, green: 2, blue: 3).position == 1)
+
+        #expect(ToneCurveSettings(shadows: -2, midtones: .nan, highlights: 2).shadows == -1)
+        #expect(ToneCurveSettings(shadows: -2, midtones: .nan, highlights: 2).midtones == 0)
+        #expect(ToneCurveSettings(shadows: -2, midtones: .nan, highlights: 2).highlights == 1)
+        #expect(ColorBalanceSettings(redCyan: -2, greenMagenta: .nan, blueYellow: 2).redCyan == -1)
+        #expect(ColorBalanceSettings(redCyan: -2, greenMagenta: .nan, blueYellow: 2).greenMagenta == 0)
+        #expect(ColorBalanceSettings(redCyan: -2, greenMagenta: .nan, blueYellow: 2).blueYellow == 1)
+    }
+
+    @Test
     func posterizeSettingsStoreValidatedLevelCount() throws {
-        #expect(PosterizeLevelCount(1) == nil)
+        #expect(PosterizeLevels(1) == nil)
+        #expect(PosterizeLevels(2)?.rawValue == 2)
+        #expect(PosterizeLevels(256)?.rawValue == 256)
+        #expect(PosterizeLevels(257) == nil)
+        #expect(PosterizeLevels(rounding: .infinity) == nil)
         #expect(PosterizeLevelCount(2)?.rawValue == 2)
-        #expect(PosterizeLevelCount(256)?.rawValue == 256)
-        #expect(PosterizeLevelCount(257) == nil)
-        #expect(PosterizeLevelCount(rounding: .infinity) == nil)
         #expect(PosterizeSettings(levels: -8).levelsValue.rawValue == 2)
         #expect(PosterizeSettings(levels: 6.4).levelsValue.rawValue == 6)
         #expect(PosterizeSettings(levels: .nan).levelsValue.rawValue == 6)

@@ -52,7 +52,7 @@ public struct DocumentContentService: Sendable {
         _ layerIndex: Int,
         _ textLayer: TextLayerData
     ) -> DocumentMutationResult {
-        switch existingLayerIndex(layerIndex) {
+        switch editableLayerIndex(layerIndex) {
         case let .failure(failure):
             return .failure(failure)
         case let .success(index):
@@ -68,11 +68,23 @@ public struct DocumentContentService: Sendable {
         _ layerIndex: Int,
         _ pixelData: Data
     ) -> DocumentMutationResult {
-        switch existingLayerIndex(layerIndex) {
+        switch editableLayerIndex(layerIndex) {
         case let .failure(failure):
             return .failure(failure)
         case let .success(index):
-            return documentMutationGateway.replaceLayerPixels(index.rawValue, pixelData)
+            let geometry = documentQueryGateway.lightweightPresentation().geometry
+            guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
+                return .failure(
+                    .gpu(
+                        .invalidPayloadSize(
+                            operation: "replaceLayerPixels",
+                            expected: geometry.rgbaByteCount,
+                            actual: pixelData.count
+                        )
+                    )
+                )
+            }
+            return documentMutationGateway.replaceLayerPixels(index.rawValue, payload.rgba)
         }
     }
 
@@ -80,12 +92,66 @@ public struct DocumentContentService: Sendable {
         _ pixelData: Data,
         to target: LayerContentMutationTarget
     ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
-        apply(target: target) { targetLayerIndex in
-            switch documentMutationGateway.replaceLayerPixels(targetLayerIndex, pixelData) {
+        let resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
+        switch resolve(target) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(target):
+            resolvedTarget = target
+        }
+
+        let geometry = documentQueryGateway.lightweightPresentation().geometry
+        guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
+            if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
+                return .failure(
+                    .transactionFailure(
+                        primary: .gpu(
+                            .invalidPayloadSize(
+                                operation: "applyPixels",
+                                expected: geometry.rgbaByteCount,
+                                actual: pixelData.count
+                            )
+                        ),
+                        rollback: rollbackFailure
+                    )
+                )
+            }
+            return .failure(
+                .gpu(
+                    .invalidPayloadSize(
+                        operation: "applyPixels",
+                        expected: geometry.rgbaByteCount,
+                        actual: pixelData.count
+                    )
+                )
+            )
+        }
+
+        switch documentMutationGateway.replaceLayerPixels(resolvedTarget.index, payload.rgba) {
+        case let .failure(failure):
+            if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
+                return .failure(
+                    .transactionFailure(
+                        primary: failure,
+                        rollback: rollbackFailure
+                    )
+                )
+            }
+            return .failure(failure)
+        case .success:
+            switch documentMutationGateway.setActiveLayer(resolvedTarget.index) {
             case let .failure(failure):
+                if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
+                    return .failure(
+                        .transactionFailure(
+                            primary: failure,
+                            rollback: rollbackFailure
+                        )
+                    )
+                }
                 return .failure(failure)
             case .success:
-                return documentMutationGateway.setActiveLayer(targetLayerIndex)
+                return .success(AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index))
             }
         }
     }
@@ -141,7 +207,7 @@ public struct DocumentContentService: Sendable {
         let originalActiveLayerIndex = documentQueryGateway.lightweightPresentation().activeLayerIndex
         switch target {
         case let .existingLayer(index):
-            switch existingLayerIndex(index) {
+            switch editableLayerIndex(index) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(index):
@@ -184,9 +250,17 @@ public struct DocumentContentService: Sendable {
         return rollbackFailure
     }
 
-    private func existingLayerIndex(_ rawValue: Int) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
+    private func editableLayerIndex(_ rawValue: Int) -> Result<EditableLayerIndex, DocumentMutationFailure> {
         let context = layerMutationContext()
-        guard let index = context.existingLayerIndex(rawValue) else {
+        guard let index = EditableLayerIndex.validated(
+            rawValue,
+            revision: context.revision,
+            layerCount: context.layerCount,
+            isLayerLocked: context.isLayerLocked
+        ) else {
+            if (0..<context.layerCount).contains(rawValue), context.isLayerLocked(rawValue) {
+                return .failure(.layerLocked(rawValue))
+            }
             return .failure(.invalidLayerIndex(rawValue))
         }
         return .success(index)

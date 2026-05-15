@@ -152,9 +152,28 @@ struct DocumentRuntimeCompositionTests {
 
         #expect(body.contains("package final class LockedDocumentRuntimeExecutor"))
         #expect(body.contains("package func perform<T>("))
+        #expect(body.contains("package func performResult<Success, Failure: Error>("))
         #expect(body.contains("private var isExecuting = false"))
-        #expect(body.contains("precondition(!isExecuting, \"Reentrant document runtime access\")"))
+        #expect(body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
+        #expect(body.contains("return .failure(failure())"))
         #expect(body.contains("NSRecursiveLock()"))
+    }
+
+    @Test
+    func lockedRuntimeExecutorResultBoundaryReturnsFailureForReentrantAccess() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+
+        let result: DocumentMutationResult = executor.performResult(failure: .emptyInput) { _ in
+            executor.performResult(failure: .bridgeMutationFailed("reentrant")) { _ in
+                .success(())
+            }
+        }
+
+        guard case let .failure(failure) = result else {
+            Issue.record("Expected reentrant access failure")
+            return
+        }
+        #expect(failure == .bridgeMutationFailed("reentrant"))
     }
 
     @Test
@@ -206,14 +225,14 @@ struct DocumentRuntimeCompositionTests {
         for operation in gpuOperations {
             #expect(body.contains(operation), "DocumentEngineLive should keep \(operation) visible outside runtime executor bodies")
         }
-        #expect(body.contains("let planResult = runtimeExecutor.perform { $0.makeLayerProcessingPlan"))
-        #expect(body.contains("return runtimeExecutor.perform { $0.applyLayerProcessingPlan"))
-        #expect(body.contains("let planResult = runtimeExecutor.perform { $0.makeFillPlan"))
-        #expect(body.contains("return runtimeExecutor.perform { $0.applyFillPlan"))
-        #expect(body.contains("let planResult = runtimeExecutor.perform {\n            $0.makeStrokeCommitPlan"))
-        #expect(body.contains("return runtimeExecutor.perform { $0.applyStrokeCommitPlan"))
-        #expect(body.contains("let planResult = runtimeExecutor.perform {\n            $0.makeBlurPlan"))
-        #expect(body.contains("return runtimeExecutor.perform { $0.applyBlurPlan"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeLayerProcessingPlan\"))"))
+        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyLayerProcessingPlan\"))"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeFillPlan\"))"))
+        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyFillPlan\"))"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeStrokeCommitPlan\"))"))
+        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyStrokeCommitPlan\"))"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeBlurPlan\"))"))
+        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyBlurPlan\"))"))
     }
 
     @Test

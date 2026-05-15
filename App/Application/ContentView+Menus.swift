@@ -1028,19 +1028,19 @@ extension ContentView {
                     adjustmentSlider(
                         title: StudioStrings.shadows(language),
                         valueText: String(format: "%.2f", toneCurveSettings.shadows),
-                        value: $toneCurveSettings.shadows,
+                        value: toneCurveAdjustmentBinding(\.shadows),
                         range: -1...1
                     )
                     adjustmentSlider(
                         title: StudioStrings.midtones(language),
                         valueText: String(format: "%.2f", toneCurveSettings.midtones),
-                        value: $toneCurveSettings.midtones,
+                        value: toneCurveAdjustmentBinding(\.midtones),
                         range: -1...1
                     )
                     adjustmentSlider(
                         title: StudioStrings.highlights(language),
                         valueText: String(format: "%.2f", toneCurveSettings.highlights),
-                        value: $toneCurveSettings.highlights,
+                        value: toneCurveAdjustmentBinding(\.highlights),
                         range: -1...1
                     )
                 }
@@ -1079,19 +1079,19 @@ extension ContentView {
                     adjustmentSlider(
                         title: StudioStrings.redCyan(language),
                         valueText: String(format: "%.2f", colorBalanceSettings.redCyan),
-                        value: $colorBalanceSettings.redCyan,
+                        value: colorBalanceAdjustmentBinding(\.redCyan),
                         range: -1...1
                     )
                     adjustmentSlider(
                         title: StudioStrings.greenMagenta(language),
                         valueText: String(format: "%.2f", colorBalanceSettings.greenMagenta),
-                        value: $colorBalanceSettings.greenMagenta,
+                        value: colorBalanceAdjustmentBinding(\.greenMagenta),
                         range: -1...1
                     )
                     adjustmentSlider(
                         title: StudioStrings.blueYellow(language),
                         valueText: String(format: "%.2f", colorBalanceSettings.blueYellow),
-                        value: $colorBalanceSettings.blueYellow,
+                        value: colorBalanceAdjustmentBinding(\.blueYellow),
                         range: -1...1
                     )
                 }
@@ -1130,7 +1130,7 @@ extension ContentView {
                     adjustmentSlider(
                         title: StudioStrings.threshold(language),
                         valueText: String(format: "%.2f", thresholdSettings.threshold),
-                        value: $thresholdSettings.threshold,
+                        value: thresholdAdjustmentBinding,
                         range: 0...1
                     )
                 }
@@ -1493,7 +1493,7 @@ extension ContentView {
                 adjustmentSlider(
                     title: language.localized("位置"),
                     valueText: String(format: "%.2f", stop.wrappedValue.position),
-                    value: stop.position,
+                    value: gradientStopPositionBinding(stop),
                     range: 0.05...0.95
                 )
             }
@@ -1629,7 +1629,14 @@ extension ContentView {
         guard width > 0 else { return }
         guard let index = gradientMapSettings.stops.firstIndex(where: { $0.id == id }) else { return }
         guard !isEndpointStop(id: id) else { return }
-        gradientMapSettings.stops[index].position = min(max(Double(x / width), 0.0), 1.0)
+        let position = min(max(Double(x / width), 0.0), 1.0)
+        gradientMapSettings.stops[index] = GradientMapStopSettings(
+            id: gradientMapSettings.stops[index].id,
+            position: position,
+            red: gradientMapSettings.stops[index].red,
+            green: gradientMapSettings.stops[index].green,
+            blue: gradientMapSettings.stops[index].blue
+        )
         gradientMapSettings = normalizedGradientMapSettings
     }
 
@@ -2301,11 +2308,61 @@ extension ContentView {
         )
     }
 
+    func toneCurveAdjustmentBinding(_ keyPath: KeyPath<ToneCurveSettings, Double>) -> Binding<Double> {
+        Binding(
+            get: { toneCurveSettings[keyPath: keyPath] },
+            set: { value in
+                toneCurveSettings = ToneCurveSettings(
+                    shadows: keyPath == \.shadows ? value : toneCurveSettings.shadows,
+                    midtones: keyPath == \.midtones ? value : toneCurveSettings.midtones,
+                    highlights: keyPath == \.highlights ? value : toneCurveSettings.highlights
+                )
+            }
+        )
+    }
+
+    func colorBalanceAdjustmentBinding(_ keyPath: KeyPath<ColorBalanceSettings, Double>) -> Binding<Double> {
+        Binding(
+            get: { colorBalanceSettings[keyPath: keyPath] },
+            set: { value in
+                colorBalanceSettings = ColorBalanceSettings(
+                    redCyan: keyPath == \.redCyan ? value : colorBalanceSettings.redCyan,
+                    greenMagenta: keyPath == \.greenMagenta ? value : colorBalanceSettings.greenMagenta,
+                    blueYellow: keyPath == \.blueYellow ? value : colorBalanceSettings.blueYellow
+                )
+            }
+        )
+    }
+
+    var thresholdAdjustmentBinding: Binding<Double> {
+        Binding(
+            get: { thresholdSettings.threshold },
+            set: { value in
+                thresholdSettings = ThresholdSettings(threshold: value)
+            }
+        )
+    }
+
     var posterizeLevelBinding: Binding<Double> {
         Binding(
             get: { posterizeSettings.levels },
             set: { value in
                 posterizeSettings = PosterizeSettings(levels: value)
+            }
+        )
+    }
+
+    func gradientStopPositionBinding(_ stop: Binding<GradientMapStopSettings>) -> Binding<Double> {
+        Binding(
+            get: { stop.wrappedValue.position },
+            set: { value in
+                stop.wrappedValue = GradientMapStopSettings(
+                    id: stop.wrappedValue.id,
+                    position: value,
+                    red: stop.wrappedValue.red,
+                    green: stop.wrappedValue.green,
+                    blue: stop.wrappedValue.blue
+                )
             }
         )
     }

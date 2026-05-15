@@ -391,7 +391,7 @@ public struct DocumentRenderingWorkflow: Sendable {
     private let scaledPixelDataHandler: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
     private let translatedPixelDataHandler: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
 
-    public init(
+    package init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
         compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
         processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>,
@@ -514,6 +514,7 @@ private struct DocumentRuntimeServices: Sendable {
         )
         self.historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
         self.mutationWorkflow = DocumentMutationWorkflowService(
+            documentQueryGateway: composition.queryGateway,
             documentEditingGateway: composition.editingGateway,
             documentLayerEffectsGateway: composition.layerEffectsGateway,
             documentMutationGateway: composition.mutationGateway,
@@ -568,7 +569,7 @@ private struct DocumentRuntimeServices: Sendable {
 
 public struct DocumentPresentationRuntime: Sendable {
     private let presentationReader: DocumentPresentationReader
-    private let renderingWorkflow: DocumentRenderingWorkflow
+    private let renderingPipeline: DocumentRenderingWorkflow
 
     public init(
         lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
@@ -579,12 +580,12 @@ public struct DocumentPresentationRuntime: Sendable {
             lightweightPresentation: lightweightPresentation,
             presentation: presentation
         )
-        self.renderingWorkflow = renderingWorkflow
+        self.renderingPipeline = renderingWorkflow
     }
 
     fileprivate init(services: DocumentRuntimeServices) {
         self.presentationReader = services.presentationReader
-        self.renderingWorkflow = services.renderingWorkflow
+        self.renderingPipeline = services.renderingWorkflow
     }
 
     public func lightweightPresentation() -> PaintDocumentPresentation {
@@ -595,13 +596,17 @@ public struct DocumentPresentationRuntime: Sendable {
         presentationReader.presentation()
     }
 
+    public var renderingWorkflow: DocumentRenderingWorkflow {
+        renderingPipeline
+    }
+
     public func compositedPaperPreviewRGBA(
         _ pixelData: Data,
         _ width: Int,
         _ height: Int,
         _ paperStyle: CanvasPaperStyle
     ) -> DocumentRenderingResult<Data> {
-        renderingWorkflow.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle)
+        renderingPipeline.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle)
     }
 
     public func compositedPreviewPixelData(
@@ -609,7 +614,7 @@ public struct DocumentPresentationRuntime: Sendable {
         _ activeLayerIndex: Int,
         _ adjustedActiveLayerPixels: Data
     ) -> DocumentRenderingResult<Data> {
-        renderingWorkflow.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
+        renderingPipeline.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
     }
 
     public func processedLayerPixelData(
@@ -618,15 +623,15 @@ public struct DocumentPresentationRuntime: Sendable {
         _ height: Int,
         _ request: LayerProcessingRequest
     ) -> DocumentRenderingResult<Data> {
-        renderingWorkflow.processedLayerPixelData(source, width, height, request)
+        renderingPipeline.processedLayerPixelData(source, width, height, request)
     }
 
     public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
-        renderingWorkflow.alphaMask(pixelData, width, height)
+        renderingPipeline.alphaMask(pixelData, width, height)
     }
 
     public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
-        renderingWorkflow.croppedSelectionMask(mask, width, height)
+        renderingPipeline.croppedSelectionMask(mask, width, height)
     }
 
     public func scaledPixelData(
@@ -636,7 +641,7 @@ public struct DocumentPresentationRuntime: Sendable {
         _ targetWidth: Int,
         _ targetHeight: Int
     ) -> DocumentRenderingResult<Data> {
-        renderingWorkflow.scaledPixelData(source, width, height, targetWidth, targetHeight)
+        renderingPipeline.scaledPixelData(source, width, height, targetWidth, targetHeight)
     }
 
     public func translatedPixelData(
@@ -648,7 +653,7 @@ public struct DocumentPresentationRuntime: Sendable {
         _ offsetX: Int,
         _ offsetY: Int
     ) -> DocumentRenderingResult<Data> {
-        renderingWorkflow.translatedPixelData(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
+        renderingPipeline.translatedPixelData(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
     }
 }
 

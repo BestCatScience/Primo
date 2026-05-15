@@ -2,6 +2,7 @@ import Foundation
 import PrimoBrushDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentDomain
+import PrimoDocumentRenderingContracts
 
 public enum DocumentCanvasMutationIntent<Selection: Equatable & Sendable>: Equatable, Sendable {
     case none
@@ -57,17 +58,21 @@ public struct DocumentMutationWorkflowOutcome<Selection: Equatable & Sendable, F
 }
 
 public struct DocumentMutationWorkflowService: Sendable {
+    package let documentQueryGateway: DocumentQueryGateway
     public let documentEditingGateway: DocumentEditingGateway
     public let documentLayerEffectsGateway: DocumentLayerEffectsGateway
     package let documentMutationGateway: DocumentMutationGateway
-    public let textLayerGateway: TextLayerGateway
+    package let textLayerGateway: TextLayerGateway
+    private let contentMutationValidator = LayerContentMutationCommandValidator()
 
     public init(
+        documentQueryGateway: DocumentQueryGateway,
         documentEditingGateway: DocumentEditingGateway,
         documentLayerEffectsGateway: DocumentLayerEffectsGateway,
         documentMutationGateway: DocumentMutationGateway,
         textLayerGateway: TextLayerGateway
     ) {
+        self.documentQueryGateway = documentQueryGateway
         self.documentEditingGateway = documentEditingGateway
         self.documentLayerEffectsGateway = documentLayerEffectsGateway
         self.documentMutationGateway = documentMutationGateway
@@ -151,31 +156,55 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
-        documentMutationGateway.replaceLayerPixels(index, pixelData)
+        let geometry = documentQueryGateway.lightweightPresentation().geometry
+        guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
+            return .failure(
+                .gpu(
+                    .invalidPayloadSize(
+                        operation: "replaceLayerPixels",
+                        expected: geometry.rgbaByteCount,
+                        actual: pixelData.count
+                    )
+                )
+            )
+        }
+        return executeContent(.replacePixels(index: index, pixelData: payload))
     }
 
     public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
-        documentMutationGateway.applyLayerProcessing(index, request)
+        executeContent(.applyProcessing(index: index, request: request))
     }
 
     public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
-        textLayerGateway.setTextLayer(index, textLayer)
+        executeContent(.setTextLayer(index: index, textLayer: textLayer))
     }
 
     public func clearLayer(_ index: Int) -> DocumentMutationResult {
-        documentMutationGateway.clearLayer(index)
+        executeContent(.clear(index: index))
     }
 
     public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult {
-        documentMutationGateway.replaceLayerMask(index, maskData)
+        let geometry = documentQueryGateway.lightweightPresentation().geometry
+        guard let payload = LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData) else {
+            return .failure(
+                .gpu(
+                    .invalidPayloadSize(
+                        operation: "replaceLayerMask",
+                        expected: geometry.maskByteCount,
+                        actual: maskData.count
+                    )
+                )
+            )
+        }
+        return executeContent(.replaceMask(index: index, mask: payload))
     }
 
     public func clearLayerMask(_ index: Int) -> DocumentMutationResult {
-        documentMutationGateway.clearLayerMask(index)
+        executeContent(.clearMask(index: index))
     }
 
     public func applyLayerMask(_ index: Int) -> DocumentMutationResult {
-        documentMutationGateway.applyLayerMask(index)
+        executeContent(.applyMask(index: index))
     }
 
     private func execute(_ request: DocumentEditingRequest) -> DocumentMutationResult {
@@ -188,6 +217,110 @@ public struct DocumentMutationWorkflowService: Sendable {
                 return .failure(.bridgeMutationFailed("documentEditingGateway"))
             }
             return .success(index)
+        }
+    }
+
+    private func executeContent(_ command: LayerContentMutationCommand) -> DocumentMutationResult {
+        switch contentMutationValidator.validated(command, in: layerMutationContext()) {
+        case let .failure(failure):
+            return .failure(failure.documentMutationFailure)
+        case let .success(validatedCommand):
+            return executeContent(validatedCommand)
+        }
+    }
+
+    private func executeContent(_ command: ValidatedLayerContentMutationCommand) -> DocumentMutationResult {
+        switch command {
+        case let .replacePixels(index, pixelData):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.replaceLayerPixels(index.rawValue, pixelData.rgba)
+        case let .setTextLayer(index, textLayer):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return textLayerGateway.setTextLayer(index.rawValue, textLayer)
+        case let .clear(index):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.clearLayer(index.rawValue)
+        case let .applyProcessing(index, request):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.applyLayerProcessing(index.rawValue, request)
+        case let .replaceMask(index, mask):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.replaceLayerMask(index.rawValue, mask.bytes)
+        case let .clearMask(index):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.clearLayerMask(index.rawValue)
+        case let .applyMask(index):
+            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+            return documentMutationGateway.applyLayerMask(index.rawValue)
+        }
+    }
+
+    private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentMutationFailure? {
+        let currentRevision = documentQueryGateway.lightweightPresentation().revision
+        guard index.revision == currentRevision else {
+            return .staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: currentRevision
+            )
+        }
+        return nil
+    }
+
+    private func layerMutationContext() -> DocumentLayerMutationContext {
+        let presentation = documentQueryGateway.lightweightPresentation()
+        return DocumentLayerMutationContext(
+            revision: presentation.revision,
+            layerCount: presentation.layerRows.count,
+            folderIDs: Set(
+                presentation.layerSidebarRows.compactMap { row in
+                    guard case let .folder(folder) = row else { return nil }
+                    return folder.id
+                }
+            ),
+            isLayerLocked: { index in
+                presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
+            }
+        )
+    }
+}
+
+private extension DocumentLayerMutationFailure {
+    var documentMutationFailure: DocumentMutationFailure {
+        switch self {
+        case let .invalidLayerIndex(index):
+            return .invalidLayerIndex(index)
+        case let .staleLayerIndex(index, validationRevision, currentRevision):
+            return .staleLayerIndex(
+                index: index,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .invalidFolderID(folderID):
+            return .invalidFolderID(folderID)
+        case let .layerLocked(index):
+            return .layerLocked(index)
+        case let .alphaLocked(index):
+            return .alphaLocked(index)
+        case let .invalidCanvasSize(width, height):
+            return .invalidCanvasSize(width: width, height: height)
+        case let .invalidOpacity(opacity):
+            return .invalidOpacity(opacity)
+        case .emptyInput:
+            return .emptyInput
+        case .noUndoState:
+            return .noUndoState
+        case .noRedoState:
+            return .noRedoState
+        case let .bridgeMutationFailed(message):
+            return .bridgeMutationFailed(message)
+        case let .incompatibleLayerType(index):
+            return .incompatibleLayerType(index)
+        case let .transactionFailure(primary, rollback):
+            return .transactionFailure(
+                primary: primary.documentMutationFailure,
+                rollback: rollback.documentMutationFailure
+            )
         }
     }
 }

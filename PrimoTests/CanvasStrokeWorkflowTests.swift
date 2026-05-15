@@ -23,7 +23,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         strokeInteraction: StrokeEditingRuntime
     ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
         DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerCommands: layerCommands,
+            layerVisibility: layerCommands,
             strokeInteraction: strokeInteraction
         )
     }
@@ -886,8 +886,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
         let workflows = runtime.workflows
         let stateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: workflows.layerEditing,
-            strokeCommands: workflows.strokeEditing
+            layerVisibility: workflows.layerEditing,
+            strokeCommit: workflows.strokeEditing
         )
         let sessionCoordinator = makeStrokeSessionCoordinator(
             layerCommands: workflows.layerEditing,
