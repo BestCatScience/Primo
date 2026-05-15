@@ -78,7 +78,7 @@ private extension Result where Success == DocumentCommandOutcome, Failure == Doc
 }
 
 package extension PrimoDocumentRuntime.DocumentRuntimeComposition {
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentRuntimeComposition) {
+    init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeComposition) {
         self.init(
             queryGateway: infrastructure.queryGateway,
             renderGateway: infrastructure.renderGateway,
@@ -101,14 +101,14 @@ package extension PrimoDocumentRuntime.DocumentRuntimeComposition {
     }
 }
 
-package enum DocumentRuntimeCompositionFactory {
+package enum DocumentEngineRuntimeCompositionFactory {
     package static func live(
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live
     ) -> PrimoDocumentRuntime.DocumentRuntimeComposition {
         PrimoDocumentRuntime.DocumentRuntimeComposition(
-            PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live(
+            PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient
@@ -352,7 +352,7 @@ public enum DocumentApplicationRuntimeFactory {
         uuidClient: UUIDClient = .live
     ) -> DocumentApplicationRuntime {
         DocumentApplicationRuntime(
-            composition: DocumentRuntimeCompositionFactory.live(
+            composition: DocumentEngineRuntimeCompositionFactory.live(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient
@@ -380,7 +380,7 @@ public enum DocumentRuntimeFactory {
         uuidClient: UUIDClient = .live
     ) -> DocumentRuntime {
         DocumentRuntime(
-            composition: DocumentRuntimeCompositionFactory.live(
+            composition: DocumentEngineRuntimeCompositionFactory.live(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient

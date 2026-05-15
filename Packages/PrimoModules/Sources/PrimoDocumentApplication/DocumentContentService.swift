@@ -381,12 +381,7 @@ public struct DocumentContentService: Sendable {
         case let .success(mutationContext):
             context = mutationContext
         }
-        guard let index = EditableLayerIndex.validated(
-            rawValue,
-            revision: context.revision,
-            layerCount: context.layerCount,
-            isLayerLocked: context.isLayerLocked
-        ) else {
+        guard let index = context.editableLayerIndex(rawValue) else {
             if (0..<context.layerCount).contains(rawValue), context.isLayerLocked(rawValue) {
                 return .failure(.layerLocked(rawValue))
             }
@@ -412,12 +407,7 @@ public struct DocumentContentService: Sendable {
                 )
             )
         }
-        guard let validated = EditableLayerIndex.validated(
-            index.rawValue,
-            revision: context.revision,
-            layerCount: context.layerCount,
-            isLayerLocked: context.isLayerLocked
-        ) else {
+        guard let validated = context.editableLayerIndex(index.rawValue) else {
             if (0..<context.layerCount).contains(index.rawValue), context.isLayerLocked(index.rawValue) {
                 return .failure(.layerLocked(index.rawValue))
             }

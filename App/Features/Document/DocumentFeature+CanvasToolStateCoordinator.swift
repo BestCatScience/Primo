@@ -157,7 +157,7 @@ extension DocumentFeature {
             state: DocumentEditingState,
             brush: BrushRuntimeSettings
         ) -> Bool {
-            true
+            CanvasResponsivePreviewPolicy.usesResponsivePreview(for: brush)
         }
     }
 
@@ -412,5 +412,13 @@ extension DocumentFeature {
                 isTransparent: state.brushPalette.paper.isTransparent
             ) ?? .default
         }
+    }
+}
+
+private enum CanvasResponsivePreviewPolicy {
+    private static let policy: any StrokePreviewPolicy = GpuOnlyStrokePreviewPolicy()
+
+    static func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        policy.usesResponsivePreview(for: brush)
     }
 }

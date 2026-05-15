@@ -260,7 +260,7 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
   home project selection、tab reservation、autosave、save history、project load / persistence の workflow を扱います。
 - [Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift](Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift)
   app-facing runtime façade です。engine infrastructure の composition を公開用 `DocumentRuntime` と services に変換します。
-- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift)
   runtime、stroke use case、GPU operation gateway を app 向けに組み合わせる composition root です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift)
   `SwiftDocumentRuntime` を `LockedDocumentRuntimeExecutor` の後ろに保持し、gateway 群として公開する live engine です。

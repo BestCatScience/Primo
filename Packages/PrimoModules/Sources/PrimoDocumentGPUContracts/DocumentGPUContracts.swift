@@ -66,6 +66,18 @@ public enum StrokePreviewContinuationPolicy {
     }
 }
 
+public protocol StrokePreviewPolicy: Sendable {
+    func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool
+}
+
+public struct GpuOnlyStrokePreviewPolicy: StrokePreviewPolicy {
+    public init() {}
+
+    public func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        StrokePreviewContinuationPolicy.shouldUseGpuOnlyResponsivePreview(for: brush)
+    }
+}
+
 public struct GpuLayerSurface: Equatable, Sendable {
     public let layerIndex: Int
     public let width: Int

@@ -520,6 +520,18 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func packageDoesNotPublishRuntimeContractsAliasBackedByFacade() throws {
+        let repoRoot = try Self.repoRoot()
+        let package = try String(
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false),
+            encoding: .utf8
+        )
+
+        #expect(!package.contains(".library(name: \"PrimoDocumentRuntimeContracts\""))
+        #expect(package.contains(".library(name: \"PrimoDocumentRuntime\", targets: [\"PrimoDocumentRuntime\"])"))
+    }
+
+    @Test
     func architectureSourceParsersIgnoreNonSemanticTokens() {
         let imports = Self.swiftImports(
             in: """
@@ -828,7 +840,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let bannedWiringTokens = [
             "Factory.live(",
             ".live(",
-            "DocumentRuntimeCompositionFactory.live",
+            "DocumentEngineRuntimeCompositionFactory.live",
             "DocumentGpuOperationGatewayFactory.live",
             "PrimoDocumentEngineInfrastructure."
         ]
@@ -886,8 +898,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(publicLiveSymbols.contains("DocumentRuntimeFactory"))
         #expect(publicLiveSymbols.contains("DocumentProjectPreviewLoader"))
         #expect(publicLiveSymbols.contains("TimelapseExportService"))
-        #expect(liveBody.contains("package enum DocumentRuntimeCompositionFactory"))
-        #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live("))
+        #expect(liveBody.contains("package enum DocumentEngineRuntimeCompositionFactory"))
+        #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo("))
         #expect(liveBody.contains("package init(gpuOperations: DocumentGpuOperationGateway)"))
@@ -1192,7 +1204,7 @@ struct GpuSideEffectIsolationArchitectureTests {
     func runtimeCompositionStoresNarrowGpuCapabilities() throws {
         let repoRoot = try Self.repoRoot()
         let compositionFiles = [
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift",
             "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift"
         ]
 
@@ -1753,7 +1765,16 @@ struct GpuSideEffectIsolationArchitectureTests {
                 .contains(where: { $0.contains("validating rawValue: Int") }),
             "EditableLayerIndex validating construction should stay package-scoped"
         )
-        #expect(Self.functionSignatures(accessLevel: "public", in: editableLayerIndex).contains(where: { $0.hasPrefix("public static func validated(") }))
+        #expect(
+            !Self.functionSignatures(accessLevel: "public", in: editableLayerIndex)
+                .contains(where: { $0.hasPrefix("public static func validated(") }),
+            "EditableLayerIndex validating construction should not be public minting authority"
+        )
+        #expect(
+            Self.functionSignatures(accessLevel: "package", in: editableLayerIndex)
+                .contains(where: { $0.hasPrefix("package static func validated(") }),
+            "EditableLayerIndex validating construction should stay package-scoped"
+        )
         #expect(Self.storedPropertyNames(accessLevel: "public", in: editableLayerIndex) == ["rawValue", "revision"])
         #expect(Self.initializerSignatures(accessLevel: "package", in: editableLayerIndex).contains("package init(_ rawValue: Int)"))
         #expect(validation.contains("let existingLayerIndex: ExistingLayerIndex"))
@@ -1775,7 +1796,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let layerContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift")
         let contentContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift")
         let editorUseCase = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentEditorUseCase.swift")
-        let runtimeComposition = try read("Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift")
+        let runtimeComposition = try read("Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift")
         let readme = try read("README.md")
 
         #expect(layerContracts.contains("authoritative contract boundary"))
@@ -1808,7 +1829,7 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         let runtimeComposition = try String(
             contentsOf: repoRoot.appendingPathComponent(
-                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift",
                 isDirectory: false
             ),
             encoding: .utf8
@@ -1842,7 +1863,7 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         let composition = try String(
             contentsOf: repoRoot.appendingPathComponent(
-                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift",
                 isDirectory: false
             ),
             encoding: .utf8
@@ -2027,7 +2048,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentMutationWorkflowServiceTests.swift",
         ]
         let allowedMutationGatewayUseFiles: Set<String> = [
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/DocumentProjectPreviewLoaderTests.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/PaintDocumentMutationContractTests.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentRuntimeUndoTests.swift",

@@ -142,6 +142,71 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
     }
 
+    func testStrokePreviewUsesResponsivePolicyForOilSmudgeBrushOnly() {
+        let recordedCommands = TestRecorder<GpuStrokeSessionCommand>()
+        let coordinator = makeStrokeSessionCoordinator(
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: .stub { command in
+                    recordedCommands.record(command)
+                    return .failure(.bridgeMutationFailed("recorded"))
+                }
+            )
+        )
+        var state = DocumentEditingState()
+        state.brushPalette.brush.tipKind = .oil
+        state.brushPalette.brush.smudgeEngineEnabled = true
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+
+        _ = coordinator.resolveAppendedStrokePreview(
+            state: state,
+            samples: [.testValue()],
+            context: DocumentCanvasStrokeContext(
+                activeLayer: .testValue(),
+                activeLayerIndex: 0,
+                brush: brush,
+                previewBrush: brush
+            )
+        )
+
+        guard let command = recordedCommands.values.first,
+              case let .append(_, _, _, _, _, _, usesResponsivePreview) = command else {
+            XCTFail("Expected append preview command")
+            return
+        }
+        XCTAssertTrue(usesResponsivePreview)
+    }
+
+    func testStrokePreviewDoesNotUseResponsivePolicyForRegularBrush() {
+        let recordedCommands = TestRecorder<GpuStrokeSessionCommand>()
+        let coordinator = makeStrokeSessionCoordinator(
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: .stub { command in
+                    recordedCommands.record(command)
+                    return .failure(.bridgeMutationFailed("recorded"))
+                }
+            )
+        )
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
+
+        _ = coordinator.resolveAppendedStrokePreview(
+            state: DocumentEditingState(),
+            samples: [.testValue()],
+            context: DocumentCanvasStrokeContext(
+                activeLayer: .testValue(),
+                activeLayerIndex: 0,
+                brush: brush,
+                previewBrush: brush
+            )
+        )
+
+        guard let command = recordedCommands.values.first,
+              case let .append(_, _, _, _, _, _, usesResponsivePreview) = command else {
+            XCTFail("Expected append preview command")
+            return
+        }
+        XCTAssertFalse(usesResponsivePreview)
+    }
+
     func testDeferredPresentationLoadedDoesNotApplyStaleRenderSnapshot() async {
         let currentSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 8)
         let pendingSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 9)

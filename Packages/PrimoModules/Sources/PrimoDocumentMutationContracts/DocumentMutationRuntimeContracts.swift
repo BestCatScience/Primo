@@ -12,7 +12,7 @@ public struct EditableLayerIndex: Equatable, Sendable {
     public let rawValue: Int
     public let revision: DocumentRevision
 
-    public static func validated(
+    package static func validated(
         _ rawValue: Int,
         revision: DocumentRevision = .initial,
         layerCount: Int,

@@ -113,7 +113,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func editingGatewayExecutesLayerRequestsThroughSharedRuntime() throws {
-        let runtime = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
 
         let addResult = runtime.editingGateway.execute(
             .structure(.addLayer(name: "Foreground"))
@@ -138,7 +138,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func compositionOverridesReturnNewBoundaryWhilePreservingSharedRuntime() throws {
-        let runtime = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
         let overridden = runtime.withOverrides(
             historyGateway: DocumentHistoryGateway(
                 canUndo: { .success(false) },
@@ -167,11 +167,11 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let compositionURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift"
         )
         let body = try String(contentsOf: compositionURL, encoding: .utf8)
 
-        #expect(body.contains("package struct DocumentRuntimeComposition"))
+        #expect(body.contains("package struct DocumentEngineRuntimeComposition"))
         #expect(body.contains("package let queryGateway: DocumentQueryGateway"))
         #expect(body.contains("package let renderGateway: DocumentRenderGateway"))
         #expect(body.contains("package let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
@@ -191,15 +191,15 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let compositionURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
-        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+        let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
         #expect(body.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
         #expect(body.contains("return .staleLayerIndex("))
         #expect(body.contains("validationRevision: index.revision"))
-        #expect(body.contains("currentRevision: currentRevision"))
+        #expect(body.contains("currentRevision: currentPresentation.revision"))
     }
 
     @Test
@@ -210,15 +210,40 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let compositionURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
-        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+        let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
         #expect(body.contains("private func validateFreshFolderID(_ folderID: ExistingFolderID)"))
         #expect(body.contains("return .staleFolderID("))
         #expect(body.contains("validationRevision: folderID.revision"))
         #expect(body.contains("currentFolderIDs.contains(folderID.rawValue)"))
+    }
+
+    @Test
+    func liveEditingGatewayCombinesValidationAndMutationInOneRuntimeOperation() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+        let compositionURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift"
+        )
+        let factoryBody = try String(contentsOf: factoryURL, encoding: .utf8)
+        let compositionBody = try String(contentsOf: compositionURL, encoding: .utf8)
+
+        #expect(factoryBody.contains("runtimeExecutor.performResult(operation: \"executeDocumentEditorRequest\")"))
+        #expect(factoryBody.contains("let gateway = RuntimeDocumentEditorGateway("))
+        #expect(factoryBody.contains("return runtime.clearLayer(index: index.rawValue)"))
+        #expect(factoryBody.contains("return runtime.replaceLayerMask(index: index.rawValue, data: mask.bytes)"))
+        #expect(factoryBody.contains("return runtime.deleteLayer(index: index.rawValue)"))
+        #expect(compositionBody.contains("editingGateway: runtime.editingGateway"))
     }
 
     @Test
@@ -554,7 +579,7 @@ struct DocumentRuntimeCompositionTests {
     @Test
     func runtimeFacadesReleasePreviewLeasesThroughSharedSurfaceBoundary() {
         let releasedHandles = LockedValues<MetalBufferHandle?>()
-        let composition = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
+        let composition = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
             .withOverrides(
                 surfaceHandleReleaser: DocumentSurfaceHandleReleaser { handle in
                     releasedHandles.append(handle)
@@ -604,7 +629,7 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeBlurPlan\")"))
         #expect(body.contains("let mutationResult = performGpuPayloadApply(\n                operation: \"applyBlurPlan\""))
         #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
-        #expect(body.contains("if !didEnterRuntime {\n            gpuServices.release(handle)\n        }"))
+        #expect(body.contains("if !didTransferPayloadOwnershipToRuntime {\n                gpuServices.release(handle)\n            }"))
     }
 
     @Test
@@ -615,10 +640,10 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let compositionURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
-        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+        let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
         #expect(body.contains("case let .alphaLocked(index):\n        return .alphaLocked(index)"))
         #expect(body.contains("case let .invalidCanvasSize(width, height):\n        return .invalidCanvasSize(width: width, height: height)"))

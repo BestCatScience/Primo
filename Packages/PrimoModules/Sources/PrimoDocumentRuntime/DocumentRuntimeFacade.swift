@@ -690,30 +690,30 @@ public struct LayerEditingRuntime: Sendable {
     }
 
     public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
-    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue ?? -1) }
-    public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID.rawValue) }
-    public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index.rawValue) }
-    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index.rawValue, named: duplicateName) }
-    public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.moveLayer(index.rawValue, to: destinationIndex.rawValue) }
-    public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index.rawValue, toFolder: folderID?.rawValue) }
-    public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index.rawValue) }
-    public func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index.rawValue, visible: visible) }
-    public func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index.rawValue) }
-    public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index.rawValue, opacity: opacity.rawValue) }
-    public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index.rawValue, isLocked: isLocked) }
-    public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index.rawValue, isAlphaLocked: isAlphaLocked) }
-    public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index.rawValue, isClipped: isClipped) }
-    public func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID.rawValue, isExpanded: isExpanded) }
-    public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID.rawValue, visible: visible) }
-    public func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID.rawValue, name: name) }
-    public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index.rawValue, blendMode: blendMode) }
-    public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index.rawValue, name: name) }
-    public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index.rawValue, request: request) }
-    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index.rawValue, textLayer: textLayer) }
-    public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayer(index.rawValue) }
-    public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index.rawValue, maskData: mask.bytes) }
-    public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index.rawValue) }
-    public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index.rawValue) }
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
+    public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
+    public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
+    public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
+    public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
+    public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
+    public func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
+    public func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index) }
+    public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index, opacity: opacity) }
+    public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index, isLocked: isLocked) }
+    public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
+    public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index, isClipped: isClipped) }
+    public func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID, isExpanded: isExpanded) }
+    public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID, visible: visible) }
+    public func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
+    public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
+    public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
+    public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
+    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
+    public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
+    public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, mask: mask) }
+    public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
+    public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
     @available(*, deprecated, message: "Use createFolder(named:afterLayerAt:) with LayerAnchorIndex once the caller has validated the layer index.")
     package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }

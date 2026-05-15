@@ -721,6 +721,6 @@ private extension DocumentStrokeContext {
 
 private extension DocumentEditingState {
     func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
-        true
+        GpuOnlyStrokePreviewPolicy().usesResponsivePreview(for: brush)
     }
 }

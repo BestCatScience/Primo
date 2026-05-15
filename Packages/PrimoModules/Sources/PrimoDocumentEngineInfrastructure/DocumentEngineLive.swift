@@ -22,6 +22,7 @@ package struct DocumentEngineLive: Sendable {
     package let persistenceGateway: DocumentPersistenceGateway
     package let exportGateway: DocumentExportGateway
     package let textLayerGateway: TextLayerGateway
+    package let editingGateway: DocumentEditingGateway
 
     package let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
     package let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
@@ -317,6 +318,33 @@ package enum DocumentEngineFactory {
             }
         )
 
+        let editorUseCase = DocumentEditorUseCase()
+        let editingGateway = DocumentEditingGateway { request in
+            runtimeExecutor.performResult(operation: "executeDocumentEditorRequest") { runtime in
+                let presentation = runtime.lightweightPresentation()
+                let context = DocumentLayerMutationContext(
+                    revision: presentation.revision,
+                    layerCount: presentation.layerRows.count,
+                    folderIDs: Set(
+                        presentation.layerSidebarRows.compactMap { row in
+                            guard case let .folder(folder) = row else { return nil }
+                            return folder.id
+                        }
+                    ),
+                    canvasGeometry: presentation.geometry,
+                    isLayerLocked: { index in
+                        presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
+                    }
+                )
+                let gateway = RuntimeDocumentEditorGateway(
+                    runtime: runtime,
+                    currentPresentation: presentation
+                )
+                return editorUseCase.execute(request, in: context, gateway: gateway)
+                    .mapError(mapDocumentEditorFailure)
+            }
+        }
+
         return DocumentEngineLive(
             queryGateway: queryGateway,
             renderGateway: renderGateway,
@@ -327,6 +355,7 @@ package enum DocumentEngineFactory {
             persistenceGateway: persistenceGateway,
             exportGateway: exportGateway,
             textLayerGateway: textLayerGateway,
+            editingGateway: editingGateway,
             duplicateLayer: { index, name in runtimeExecutor.performResult(operation: "duplicateLayer") { $0.duplicateLayer(index: index, name: name) } },
             moveLayer: { index, destination in runtimeExecutor.performResult(operation: "moveLayer") { $0.moveLayer(from: index, to: destination) } },
             createFolder: { name, anchor in runtimeExecutor.performResult(operation: "createFolder") { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
@@ -635,21 +664,309 @@ package enum DocumentEngineFactory {
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>,
         _ body: (SwiftDocumentRuntime) -> DocumentMutationResult
     ) -> DocumentMutationResult {
-        var didEnterRuntime = false
-        let result = runtimeExecutor.performResult(operation: operation) { runtime in
-            didEnterRuntime = true
+        var didTransferPayloadOwnershipToRuntime = false
+        defer {
+            if !didTransferPayloadOwnershipToRuntime {
+                gpuServices.release(handle)
+            }
+        }
+        return runtimeExecutor.performResult(operation: operation) { runtime in
+            didTransferPayloadOwnershipToRuntime = true
             return body(runtime)
         }
-        if !didEnterRuntime {
-            gpuServices.release(handle)
-        }
-        return result
     }
 }
 
-public final class DocumentTimelapseReplayService {
-    private let runtime: SwiftDocumentRuntime
-    private var folderIDMap: [DocumentFolderID: Int] = [:]
+private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
+    let runtime: SwiftDocumentRuntime
+    let currentPresentation: PaintDocumentPresentation
+
+    func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
+        runtime.addLayer(name: name)
+            .map { AddedAndSelectedLayer.addedAndSelected(index: $0) }
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setActiveLayer(index: index.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.duplicateLayer(index: index.rawValue, name: name)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.deleteLayer(index: index.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        if let failure = validateFreshLayerIndex(destinationIndex) { return .failure(failure) }
+        return runtime.moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult {
+        runtime.createFolder(name: name, anchorLayerIndex: anchorLayerIndex)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult {
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.deleteFolder(folderID: folderID.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        if let folderID, let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.assignLayerToFolder(index: index, folderID: folderID)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerName(_ name: String, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerName(index: index.rawValue, name: name)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerVisible(_ isVisible: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerVisibility(index: index.rawValue, isVisible: isVisible)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerLocked(_ isLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerLocked(index: index.rawValue, isLocked: isLocked)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerAlphaLocked(index: index.rawValue, isAlphaLocked: isAlphaLocked)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerClipped(_ isClipped: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerClipped(index: index.rawValue, isClipped: isClipped)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerOpacity(_ opacity: ValidatedLayerOpacity, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerOpacity(index: index.rawValue, opacity: opacity.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerBlendMode(index: index.rawValue, blendMode: blendMode)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setFolderExpanded(_ isExpanded: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderExpanded(folderID: folderID.rawValue, isExpanded: isExpanded)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setFolderVisible(_ isVisible: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderVisibility(folderID: folderID.rawValue, isVisible: isVisible)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setFolderName(_ name: String, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderName(folderID: folderID.rawValue, name: name)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func replaceLayerPixels(index: EditableLayerIndex, pixelData: LayerPixelData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.replaceLayerPixels(index: index.rawValue, data: pixelData.rgba)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func setTextLayer(index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setTextLayer(index: index.rawValue, textLayer: textLayer)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func clearLayer(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.clearLayer(index: index.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func applyLayerProcessing(
+        index: EditableLayerIndex,
+        request: ValidatedLayerProcessingRequest
+    ) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.applyLayerProcessing(index: index.rawValue, request: request.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func replaceLayerMask(index: EditableLayerIndex, mask: LayerMaskData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.replaceLayerMask(index: index.rawValue, data: mask.bytes)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func clearLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.clearLayerMask(index: index.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    func applyLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.applyLayerMask(index: index.rawValue)
+            .mapError(mapDocumentRuntimeFailure)
+    }
+
+    private func validateFreshLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
+        guard index.revision == currentPresentation.revision else {
+            return .staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: currentPresentation.revision
+            )
+        }
+        guard currentPresentation.layerRows.contains(where: { $0.index == index.rawValue }) else {
+            return .invalidLayerIndex(index.rawValue)
+        }
+        return nil
+    }
+
+    private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentLayerMutationFailure? {
+        guard index.revision == currentPresentation.revision else {
+            return .staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: currentPresentation.revision
+            )
+        }
+        guard let layer = currentPresentation.layerRows.first(where: { $0.index == index.rawValue }) else {
+            return .invalidLayerIndex(index.rawValue)
+        }
+        guard !layer.isLocked else {
+            return .layerLocked(index.rawValue)
+        }
+        return nil
+    }
+
+    private func validateFreshFolderID(_ folderID: ExistingFolderID) -> DocumentLayerMutationFailure? {
+        let currentFolderIDs: Set<Int> = Set(currentPresentation.layerSidebarRows.compactMap { row in
+            guard case let .folder(folder) = row else { return nil }
+            return folder.id
+        })
+        guard folderID.revision == currentPresentation.revision else {
+            return .staleFolderID(
+                folderID: folderID.rawValue,
+                validationRevision: folderID.revision,
+                currentRevision: currentPresentation.revision
+            )
+        }
+        guard currentFolderIDs.contains(folderID.rawValue) else {
+            return .invalidFolderID(folderID.rawValue)
+        }
+        return nil
+    }
+}
+
+private func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure {
+    switch failure {
+    case let .invalidLayerIndex(index):
+        return .invalidLayerIndex(index)
+    case let .staleLayerIndex(index, validationRevision, currentRevision):
+        return .staleLayerIndex(index: index, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .invalidFolderID(folderID):
+        return .invalidFolderID(folderID)
+    case let .staleFolderID(folderID, validationRevision, currentRevision):
+        return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .layerLocked(index):
+        return .layerLocked(index)
+    case let .alphaLocked(index):
+        return .alphaLocked(index)
+    case let .invalidCanvasSize(width, height):
+        return .invalidCanvasSize(width: width, height: height)
+    case let .invalidOpacity(opacity):
+        return .invalidOpacity(opacity)
+    case let .invalidLayerProcessingRequest(reason):
+        return .invalidLayerProcessingRequest(reason)
+    case .emptyInput:
+        return .emptyInput
+    case .noUndoState:
+        return .noUndoState
+    case .noRedoState:
+        return .noRedoState
+    case let .gpu(failure):
+        return .gpu(failure)
+    case let .bridgeMutationFailed(message):
+        return .bridgeMutationFailed(message)
+    case let .incompatibleLayerType(index):
+        return .incompatibleLayerType(index)
+    case let .transactionFailure(primary, rollback):
+        return .transactionFailure(
+            primary: mapDocumentEditorFailure(primary),
+            rollback: mapDocumentEditorFailure(rollback)
+        )
+    }
+}
+
+private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLayerMutationFailure {
+    switch failure {
+    case let .invalidLayerIndex(index):
+        return .invalidLayerIndex(index)
+    case let .staleLayerIndex(index, validationRevision, currentRevision):
+        return .staleLayerIndex(index: index, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .invalidFolderID(folderID):
+        return .invalidFolderID(folderID)
+    case let .staleFolderID(folderID, validationRevision, currentRevision):
+        return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .layerLocked(index):
+        return .layerLocked(index)
+    case let .alphaLocked(index):
+        return .alphaLocked(index)
+    case let .invalidCanvasSize(width, height):
+        return .invalidCanvasSize(width: width, height: height)
+    case let .invalidOpacity(opacity):
+        return .invalidOpacity(opacity)
+    case let .invalidLayerProcessingRequest(reason):
+        return .invalidLayerProcessingRequest(reason)
+    case .emptyInput:
+        return .emptyInput
+    case .noUndoState:
+        return .noUndoState
+    case .noRedoState:
+        return .noRedoState
+    case let .gpu(failure):
+        return .gpu(failure)
+    case let .bridgeMutationFailed(message):
+        return .bridgeMutationFailed(message)
+    case let .incompatibleLayerType(index):
+        return .incompatibleLayerType(index)
+    case let .transactionFailure(primary, rollback):
+        return .transactionFailure(
+            primary: mapDocumentRuntimeFailure(primary),
+            rollback: mapDocumentRuntimeFailure(rollback)
+        )
+    }
+}
+
+public final class DocumentTimelapseReplayService: @unchecked Sendable {
+    private let stateExecutor: LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>
 
     public convenience init(
         canvasSize: CGSize,
@@ -673,19 +990,25 @@ public final class DocumentTimelapseReplayService {
         uuidClient: PrimoCoreTypes.UUIDClient = .live,
         gpuServices: DocumentRuntimeGpuServices
     ) {
-        self.runtime = SwiftDocumentRuntime(
-            width: max(Int(canvasSize.width.rounded()), 1),
-            height: max(Int(canvasSize.height.rounded()), 1),
-            fileClient: fileClient,
-            dateClient: dateClient,
-            uuidClient: uuidClient,
-            gpuServices: gpuServices
+        self.stateExecutor = LockedDocumentRuntimeExecutor(
+            runtime: DocumentTimelapseReplayState(
+                runtime: SwiftDocumentRuntime(
+                    width: max(Int(canvasSize.width.rounded()), 1),
+                    height: max(Int(canvasSize.height.rounded()), 1),
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient,
+                    gpuServices: gpuServices
+                )
+            )
         )
     }
 
     public func replaySurface(_ operation: TimelapseOperation) -> DocumentCompositeSurface? {
-        runtime.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
-        return runtime.timelapseCompositeSurface()
+        try? stateExecutor.performThrowing(operation: "replayTimelapseOperation") { state in
+            state.runtime.replayTimelapseOperation(operation, folderIDMap: &state.folderIDMap)
+            return state.runtime.timelapseCompositeSurface()
+        }
     }
 
     // Legacy convenience retained for callers that still expect CGImage.
@@ -693,6 +1016,23 @@ public final class DocumentTimelapseReplayService {
     @available(*, deprecated, message: "Prefer replaySurface(_:) for live replay paths.")
     public func replay(_ operation: TimelapseOperation) -> CGImage? {
         guard let surface = replaySurface(operation) else { return nil }
-        return runtime.cgImage(from: surface.pixelData, width: surface.width, height: surface.height)
+        let result = stateExecutor.performValue(operation: "timelapseReplayCGImage") {
+            $0.runtime.cgImage(from: surface.pixelData, width: surface.width, height: surface.height)
+        }
+        switch result {
+        case let .success(image):
+            return image
+        case .failure:
+            return nil
+        }
+    }
+}
+
+private final class DocumentTimelapseReplayState {
+    let runtime: SwiftDocumentRuntime
+    var folderIDMap: [DocumentFolderID: Int] = [:]
+
+    init(runtime: SwiftDocumentRuntime) {
+        self.runtime = runtime
     }
 }

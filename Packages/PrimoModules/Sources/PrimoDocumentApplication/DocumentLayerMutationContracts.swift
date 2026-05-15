@@ -69,6 +69,15 @@ public struct DocumentLayerMutationContext: Sendable {
         return ExistingLayerIndex(rawValue, revision: revision)
     }
 
+    public func editableLayerIndex(_ rawValue: Int) -> EditableLayerIndex? {
+        EditableLayerIndex.validated(
+            rawValue,
+            revision: revision,
+            layerCount: layerCount,
+            isLayerLocked: isLayerLocked
+        )
+    }
+
     public func newlyCreatedLayerIndex(_ rawValue: Int) -> ExistingLayerIndex {
         ExistingLayerIndex(rawValue, revision: revision.advanced())
     }

@@ -54,14 +54,7 @@ struct DocumentWorkflowCommandValidator: Sendable {
         guard let existingLayerIndex = layerMutationContext.existingLayerIndex(index) else {
             return .failure(.invalidLayerIndex(index))
         }
-        guard let layerIndex = EditableLayerIndex.validated(
-            index,
-            revision: layerMutationContext.revision,
-            layerCount: state.layerSidebar.layers.count,
-            isLayerLocked: { candidate in
-                state.layerSidebar.layers.first(where: { $0.index == candidate })?.isLocked ?? false
-            }
-        ) else {
+        guard let layerIndex = layerMutationContext.editableLayerIndex(index) else {
             return .failure(.invalidLayerIndex(index))
         }
         return .success(

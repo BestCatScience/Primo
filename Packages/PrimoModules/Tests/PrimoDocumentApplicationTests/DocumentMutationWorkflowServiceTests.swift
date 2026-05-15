@@ -201,6 +201,46 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
+    func typedLayerCommandsRejectStaleIndexesBeforeRawMutation() throws {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1, revision: { DocumentRevision(2) }),
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentLayerEffectsGateway: .unused
+        )
+        let staleIndex = try #require(editableLayerIndex(0, revision: DocumentRevision(1), layerCount: 1))
+
+        let result = service.clearLayer(staleIndex)
+
+        expectFailure(result, .staleLayerIndex(
+            index: 0,
+            validationRevision: DocumentRevision(1),
+            currentRevision: DocumentRevision(2)
+        ))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
+    func typedPixelReplacementRejectsMismatchedGeometryBeforeRawMutation() throws {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1),
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentLayerEffectsGateway: .unused
+        )
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
+        let pixelData = try #require(LayerPixelData(width: 2, height: 1, rgba: Data(repeating: 0xff, count: 8)))
+
+        let result = service.replaceLayerPixels(LayerPixelReplacementCommand(index: index, pixelData: pixelData))
+
+        expectFailure(
+            result,
+            .gpu(.invalidPayloadSize(operation: "replaceLayerPixels", expected: 4, actual: 8))
+        )
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
     func validLayerContentCommandsRouteThroughValidatedIndexes() throws {
         let recorder = MutationRecorder()
         let textLayer = try #require(TextLayerData(
@@ -395,6 +435,22 @@ private func queryGateway(
             .success(presentation(layerCount: layerCount, lockedLayerIndexes: lockedLayerIndexes, revision: revision()))
         }
     )
+}
+
+private func editableLayerIndex(
+    _ rawValue: Int,
+    revision: DocumentRevision = .initial,
+    layerCount: Int,
+    lockedLayerIndexes: Set<Int> = []
+) -> EditableLayerIndex? {
+    DocumentLayerMutationContext(
+        revision: revision,
+        layerCount: layerCount,
+        folderIDs: [],
+        canvasGeometry: PixelGeometry(width: 1, height: 1),
+        isLayerLocked: { lockedLayerIndexes.contains($0) }
+    )
+    .editableLayerIndex(rawValue)
 }
 
 private func presentation(

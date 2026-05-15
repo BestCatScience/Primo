@@ -19,7 +19,6 @@ let package = Package(
         .library(name: "PrimoDocumentGPUContracts", targets: ["PrimoDocumentGPUContracts"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
-        .library(name: "PrimoDocumentRuntimeContracts", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentRuntime", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentRuntimeLive", targets: ["PrimoDocumentRuntimeLive"]),
         .library(name: "PrimoDocumentAppSupport", targets: ["PrimoDocumentAppSupport"]),

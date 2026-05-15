@@ -211,12 +211,7 @@ public struct LayerContentMutationCommandValidator: Sendable {
         _ rawValue: Int,
         in context: DocumentLayerMutationContext
     ) -> Result<EditableLayerIndex, DocumentLayerMutationFailure> {
-        guard let index = EditableLayerIndex.validated(
-            rawValue,
-            revision: context.revision,
-            layerCount: context.layerCount,
-            isLayerLocked: context.isLayerLocked
-        ) else {
+        guard let index = context.editableLayerIndex(rawValue) else {
             if (0..<context.layerCount).contains(rawValue), context.isLayerLocked(rawValue) {
                 return .failure(.layerLocked(rawValue))
             }

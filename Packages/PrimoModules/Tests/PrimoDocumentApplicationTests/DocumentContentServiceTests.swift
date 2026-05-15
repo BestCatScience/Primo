@@ -159,7 +159,7 @@ struct DocumentContentServiceTests {
             documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
-        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
 
         let result = service.replaceLayerPixels(
@@ -179,7 +179,7 @@ struct DocumentContentServiceTests {
             documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
-        let index = try #require(EditableLayerIndex.validated(0, revision: .initial, layerCount: 1, isLayerLocked: { _ in false }))
+        let index = try #require(editableLayerIndex(0, revision: .initial, layerCount: 1))
         let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
 
         let result = service.replaceLayerPixels(
@@ -204,7 +204,7 @@ struct DocumentContentServiceTests {
             documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
-        let index = try #require(EditableLayerIndex.validated(1, layerCount: 2, isLayerLocked: { _ in false }))
+        let index = try #require(editableLayerIndex(1, layerCount: 2))
         let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
 
         let result = service.replaceLayerPixels(
@@ -229,7 +229,7 @@ struct DocumentContentServiceTests {
             documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
-        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
 
         let result = service.replaceLayerPixels(
@@ -254,7 +254,7 @@ struct DocumentContentServiceTests {
             documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
-        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let pixelData = try #require(LayerPixelData(width: 1, height: 1, rgba: Data(repeating: 0xff, count: 4)))
 
         let result = service.replaceLayerPixels(
@@ -499,6 +499,21 @@ private func layerRow(index: Int, isLocked: Bool = false) -> LayerRowModel {
         isTextLayer: false,
         textLayer: nil
     )!
+}
+
+private func editableLayerIndex(
+    _ rawValue: Int,
+    revision: DocumentRevision = .initial,
+    layerCount: Int,
+    lockedLayerIndexes: Set<Int> = []
+) -> EditableLayerIndex? {
+    DocumentLayerMutationContext(
+        revision: revision,
+        layerCount: layerCount,
+        folderIDs: [],
+        isLayerLocked: { lockedLayerIndexes.contains($0) }
+    )
+    .editableLayerIndex(rawValue)
 }
 
 private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway {
