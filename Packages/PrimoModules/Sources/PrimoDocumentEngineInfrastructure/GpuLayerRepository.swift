@@ -2,7 +2,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentPresentationContracts
 
-struct GpuLayerStoragePolicy: Sendable {
+struct GpuLayerRepository: Sendable {
     private var handles: [Int: MetalBufferHandle] = [:]
 
     func handle(for index: Int) -> MetalBufferHandle? {

@@ -224,33 +224,17 @@ final class GpuResourceLease: @unchecked Sendable {
     }
 }
 
-private struct TimelapseRecorder: Sendable {
-    func record(
-        _ event: TimelapseOperation?,
-        marksOperationPersistence: Bool = false,
-        in store: SwiftDocumentStore
-    ) {
-        if let event {
-            if marksOperationPersistence {
-                store.snapshot.timelapseUsesOperationPersistence = true
-            }
-            store.snapshot.timelapseEvents.append(event)
-        }
-    }
-}
-
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
     private let services: DocumentEngineServices
     private let gpuServices: DocumentRuntimeGpuServices
     private let store: SwiftDocumentStore
-    private var undoPolicy: UndoSnapshotPolicy
-    private var pendingDirtyUpdate: IncrementalLayerUpdate?
-    private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
-    private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
-    private var thumbnailSurfaceCache: [Int: DocumentCompositeSurface] = [:]
-    private var gpuLayerStorage = GpuLayerStoragePolicy()
+    private var undoHistory: UndoHistoryCoordinator
+    private var strokeCoordinator = StrokeCommitCoordinator()
+    private let presentationBuilder = DocumentPresentationBuilder()
+    private let dirtyUpdatePublisher = DirtyUpdatePublisher()
+    private var gpuLayerRepository = GpuLayerRepository()
     private let timelapseRecorder = TimelapseRecorder()
     private let documentGeneration = UUID()
 
@@ -271,11 +255,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
         self.gpuServices = gpuServices
         self.store = SwiftDocumentStore(width: width, height: height)
-        self.undoPolicy = UndoSnapshotPolicy(
-            limits: UndoSnapshotPolicy.Limits(
-                maxEntryCount: maxUndoEntryCount,
-                maxRetainedBytes: maxUndoRetainedBytes
-            )
+        self.undoHistory = UndoHistoryCoordinator(
+            maxUndoEntryCount: maxUndoEntryCount,
+            maxUndoRetainedBytes: maxUndoRetainedBytes
         )
         captureDirtyUpdate()
     }
@@ -285,33 +267,18 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {
-        let snapshot = store.validatedSnapshot()
-        guard let presentation = PaintDocumentPresentation(
-            canvasSize: canvasSize,
-            activeLayerIndex: snapshot.activeLayerIndex,
-            layerRows: buildLayerRows(from: snapshot),
-            layerSidebarRows: buildSidebarRows(from: snapshot),
-            renderSnapshot: nil,
-            revision: DocumentRevision(snapshot.revision)
-        ) else {
-            preconditionFailure("SwiftDocumentStore produced an invalid lightweight presentation")
-        }
-        return presentation
+        presentationBuilder.lightweightPresentation(
+            snapshot: store.validatedSnapshot(),
+            canvasSize: canvasSize
+        )
     }
 
     func presentation() -> PaintDocumentPresentation {
-        let snapshot = store.validatedSnapshot()
-        guard let presentation = PaintDocumentPresentation(
+        presentationBuilder.presentation(
+            snapshot: store.validatedSnapshot(),
             canvasSize: canvasSize,
-            activeLayerIndex: snapshot.activeLayerIndex,
-            layerRows: buildLayerRows(from: snapshot),
-            layerSidebarRows: buildSidebarRows(from: snapshot),
-            renderSnapshot: makeRenderSnapshot(),
-            revision: DocumentRevision(snapshot.revision)
-        ) else {
-            preconditionFailure("SwiftDocumentStore produced an invalid presentation")
-        }
-        return presentation
+            renderSnapshot: makeRenderSnapshot()
+        )
     }
 
     func prewarmDrawingResources() {
@@ -328,8 +295,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
-        defer { pendingDirtyUpdate = nil }
-        return pendingDirtyUpdate
+        dirtyUpdatePublisher.consumeDirtyUpdate()
     }
 
     func pixelDataForLayer(index: Int) -> Result<Data, DocumentMutationFailure> {
@@ -353,7 +319,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func gpuBackedMaterializedSnapshot() -> SwiftDocumentStoreSnapshot {
-        gpuLayerStorage.materializedSnapshot(
+        gpuLayerRepository.materializedSnapshot(
             from: store.snapshot,
             rgbaByteCount: rgbaByteCount,
             services: gpuServices
@@ -361,7 +327,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func materializeGpuBackedLayerPixels() {
-        gpuLayerStorage.materializeGpuBackedLayerPixels(
+        gpuLayerRepository.materializeGpuBackedLayerPixels(
             in: store,
             rgbaByteCount: rgbaByteCount,
             services: gpuServices
@@ -369,24 +335,24 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func canUndo() -> Bool {
-        undoPolicy.canUndo
+        undoHistory.canUndo
     }
 
     func canRedo() -> Bool {
-        undoPolicy.canRedo
+        undoHistory.canRedo
     }
 
     func undo() -> DocumentMutationResult {
         let currentRevision = store.snapshot.revision
         let previous: SwiftDocumentStoreSnapshot
-        switch undoPolicy.restoreUndo(current: undoSnapshot()) {
+        switch undoHistory.restoreUndo(current: undoSnapshot()) {
         case let .success(snapshot):
             previous = snapshot
         case let .failure(failure):
             return .failure(failure)
         }
         store.restore(previous)
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         timelapseRecorder.record(.undo, in: store)
         store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
@@ -397,14 +363,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func redo() -> DocumentMutationResult {
         let currentRevision = store.snapshot.revision
         let next: SwiftDocumentStoreSnapshot
-        switch undoPolicy.restoreRedo(current: undoSnapshot()) {
+        switch undoHistory.restoreRedo(current: undoSnapshot()) {
         case let .success(snapshot):
             next = snapshot
         case let .failure(failure):
             return .failure(failure)
         }
         store.restore(next)
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         timelapseRecorder.record(.redo, in: store)
         store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
@@ -413,7 +379,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func trimUndoHistoryForMemoryPressure() {
-        let stats = undoPolicy.trimForMemoryPressure()
+        let stats = undoHistory.trimForMemoryPressure()
         logUndoHistoryStats(stats, reason: "memoryPressure")
     }
 
@@ -509,7 +475,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         store.snapshot = resizedSnapshot
         store.snapshot.thumbnailCache.removeAll()
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         recordMutation(before: plan.before, timelapseEvent: nil)
         return .success(())
@@ -1024,13 +990,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     ) -> Result<RuntimeBlurPlan, DocumentMutationFailure> {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        let baseline = currentBlurStroke?.baseline ?? undoSnapshot()
+        let baseline = strokeCoordinator.blurStrokeState?.baseline ?? undoSnapshot()
         let source = layerSourceForGpuPlan(index: layerIndex)
-        currentBlurStroke = (
+        strokeCoordinator.beginOrAppendBlur(
             baseline: baseline,
             layerIndex: layerIndex,
             brush: brush,
-            samples: (currentBlurStroke?.samples ?? []) + samples
+            samples: samples
         )
         return .success(
             RuntimeBlurPlan(
@@ -1109,7 +1075,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func currentStrokeCommitPlan() -> Result<RuntimeStrokeCommitPlan?, DocumentMutationFailure> {
-        guard let currentStroke else { return .success(nil) }
+        guard let currentStroke = strokeCoordinator.currentStrokePlanInput() else { return .success(nil) }
         return makeStrokeCommitPlan(
             samples: currentStroke.samples,
             brush: currentStroke.brush,
@@ -1118,7 +1084,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func clearCurrentStroke() {
-        currentStroke = nil
+        strokeCoordinator.clearCurrentStroke()
     }
 
     func release(_ handle: MetalBufferHandle?) {
@@ -1374,11 +1340,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
-        currentStroke = (layerIndex: store.snapshot.activeLayerIndex, brush: brush, samples: [sample])
+        strokeCoordinator.beginStroke(layerIndex: store.snapshot.activeLayerIndex, sample: sample, brush: brush)
     }
 
     func appendStroke(sample: StylusSample) {
-        currentStroke?.samples.append(sample)
+        strokeCoordinator.appendStroke(sample: sample)
     }
 
     func endStroke() -> DocumentMutationResult {
@@ -1400,21 +1366,21 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func cancelStroke() {
-        currentStroke = nil
+        strokeCoordinator.cancelStroke()
     }
 
     func cancelBlurStroke() {
-        guard let baseline = currentBlurStroke?.baseline else {
-            currentBlurStroke = nil
+        guard let baseline = strokeCoordinator.blurStrokeState?.baseline else {
+            strokeCoordinator.clearBlurStroke()
             return
         }
         let currentRevision = store.snapshot.revision
         releaseLayerBufferHandles()
         store.restore(baseline)
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        presentationBuilder.clearThumbnailSurfaces()
         store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
         captureDirtyUpdate()
-        currentBlurStroke = nil
+        strokeCoordinator.clearBlurStroke()
     }
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
@@ -1430,7 +1396,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func endBlurStroke() -> DocumentMutationResult {
-        guard let currentBlurStroke,
+        guard let currentBlurStroke = strokeCoordinator.blurStrokeState,
               let baseline = currentBlurStroke.baseline
         else {
             return .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline"))
@@ -1452,7 +1418,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             ),
             in: store
         )
-        self.currentBlurStroke = nil
+        strokeCoordinator.clearBlurStroke()
         return .success(())
     }
 
@@ -1496,15 +1462,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         forMaterializedSnapshot snapshot: SwiftDocumentStoreSnapshot,
         gpuServices: DocumentRuntimeGpuServices
     ) -> DocumentCompositeSurface {
-        let metalSnapshot = materializedMetalSnapshot(for: snapshot)
-        if let gpuComposite = gpuServices.compositeDocumentSurface(snapshot: metalSnapshot) {
-            return gpuComposite
-        }
-        logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
-        return DocumentCompositeSurface(
-            unsafeUncheckedWidth: snapshot.canvasWidth,
-            height: snapshot.canvasHeight,
-            pixelData: Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
+        DocumentSnapshotMaterializer.compositeSurface(
+            forMaterializedSnapshot: snapshot,
+            gpuServices: gpuServices,
+            logger: logger
         )
     }
 
@@ -1513,19 +1474,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         paperStyle: CanvasPaperStyle,
         gpuServices: DocumentRuntimeGpuServices
     ) -> DocumentCompositeSurface? {
-        let surface = compositeSurface(forMaterializedSnapshot: snapshot, gpuServices: gpuServices)
-        guard let pixelData = gpuServices.compositedPaperPreviewRGBA(
-            pixelData: surface.pixelData,
-            width: surface.width,
-            height: surface.height,
-            paperStyle: paperStyle
-        ) else {
-            return nil
-        }
-        return DocumentCompositeSurface(
-            unsafeUncheckedWidth: surface.width,
-            height: surface.height,
-            pixelData: pixelData
+        DocumentSnapshotMaterializer.compositeExportSurface(
+            forMaterializedSnapshot: snapshot,
+            paperStyle: paperStyle,
+            gpuServices: gpuServices,
+            logger: logger
         )
     }
 
@@ -1534,35 +1487,18 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         paperStyle: CanvasPaperStyle,
         gpuServices: DocumentRuntimeGpuServices
     ) -> Data? {
-        compositeExportSurface(
+        DocumentSnapshotMaterializer.compositePNGData(
             forMaterializedSnapshot: snapshot,
             paperStyle: paperStyle,
-            gpuServices: gpuServices
-        ).flatMap(DocumentRasterImageService.pngData(from:))
+            gpuServices: gpuServices,
+            logger: logger
+        )
     }
 
     private static func materializedMetalSnapshot(
         for snapshot: SwiftDocumentStoreSnapshot
     ) -> MetalDocumentSnapshot {
-        MetalDocumentSnapshot.unsafeUnchecked(
-            width: snapshot.canvasWidth,
-            height: snapshot.canvasHeight,
-            revision: snapshot.revision,
-            compositePixelData: Data(),
-            layers: snapshot.layers.enumerated().map { index, layer in
-                MetalLayerSnapshot.unsafeUnchecked(
-                    index: index,
-                    opacity: Float(layer.opacity),
-                    visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
-                    isClipped: layer.clipped,
-                    blendMode: layer.blendMode,
-                    thumbnailSurface: nil,
-                    thumbnailData: nil,
-                    gpuBufferHandle: nil,
-                    pixelData: layer.pixelData
-                )
-            }
-        )
+        DocumentSnapshotMaterializer.materializedMetalSnapshot(for: snapshot)
     }
 }
 
@@ -1790,7 +1726,7 @@ extension SwiftDocumentRuntime {
               runtime.store.restore(loadedSnapshot) else {
             throw PrimoDocumentError.invalidDocument
         }
-        runtime.thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        runtime.presentationBuilder.clearThumbnailSurfaces()
         return runtime
     }
 
@@ -1810,10 +1746,10 @@ extension SwiftDocumentRuntime {
             gpuServices: gpuServices
         )
         store.restore(newRuntime.store.snapshot)
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        undoPolicy.clear()
-        currentStroke = nil
-        currentBlurStroke = nil
+        presentationBuilder.clearThumbnailSurfaces()
+        undoHistory.clear()
+        strokeCoordinator.clearCurrentStroke()
+        strokeCoordinator.clearBlurStroke()
         captureDirtyUpdate()
     }
 
@@ -1841,24 +1777,11 @@ extension SwiftDocumentRuntime {
     func timelapseCapture() -> TimelapseCapture? {
         let previewSurface = makeTimelapseThumbnailSurface()
         let preview = previewSurface.flatMap { DocumentRasterImageService.jpegData(from: $0) }
-        if store.snapshot.timelapseUsesOperationPersistence, !store.snapshot.timelapseEvents.isEmpty {
-            return TimelapseCapture(
-                canvasSize: canvasSize,
-                paperStyle: store.snapshot.paperStyle,
-                previewSurface: previewSurface,
-                previewImageData: preview,
-                source: .operations(store.snapshot.timelapseEvents),
-                framesPerSecond: 24
-            )
-        }
-        guard store.snapshot.timelapseFrames.count >= 2 else { return nil }
-        return TimelapseCapture(
+        return timelapseRecorder.captureResult(
+            store: store,
             canvasSize: canvasSize,
-            paperStyle: store.snapshot.paperStyle,
             previewSurface: previewSurface,
-            previewImageData: preview,
-            source: .frames(store.snapshot.timelapseFrames),
-            framesPerSecond: 24
+            previewImageData: preview
         )
     }
 
@@ -2126,7 +2049,7 @@ extension SwiftDocumentRuntime {
     }
 
     private func setLayerPixelState(index: Int, pixelData: Data, gpuBufferHandle: MetalBufferHandle?) {
-        gpuLayerStorage.setLayerPixelState(
+        gpuLayerRepository.setLayerPixelState(
             index: index,
             pixelData: pixelData,
             gpuBufferHandle: gpuBufferHandle,
@@ -2136,11 +2059,11 @@ extension SwiftDocumentRuntime {
     }
 
     private func releaseLayerBufferHandles() {
-        gpuLayerStorage.releaseLayerBufferHandles(services: gpuServices)
+        gpuLayerRepository.releaseLayerBufferHandles(services: gpuServices)
     }
 
     private func currentPixelData(for index: Int) -> Data {
-        gpuLayerStorage.currentPixelData(
+        gpuLayerRepository.currentPixelData(
             for: index,
             in: store.snapshot,
             rgbaByteCount: rgbaByteCount,
@@ -2153,7 +2076,7 @@ extension SwiftDocumentRuntime {
         bufferHandle: MetalBufferHandle?,
         retainedResource: GpuResourceLease?
     ) {
-        gpuLayerStorage.layerSourceForGpuPlan(
+        gpuLayerRepository.layerSourceForGpuPlan(
             index: index,
             snapshot: store.snapshot,
             services: gpuServices
@@ -2167,7 +2090,7 @@ extension SwiftDocumentRuntime {
         dirtyRect: LayerPixelRect? = nil
     ) {
         let after = changedLayerIndex != nil && dirtyRect != nil ? undoSnapshot() : before
-        let stats = undoPolicy.recordMutation(
+        let stats = undoHistory.recordMutation(
             before: before,
             after: after,
             changedLayerIndex: changedLayerIndex,
@@ -2196,33 +2119,26 @@ extension SwiftDocumentRuntime {
     }
 
     private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {
-        let rect = rect ?? LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
-        let snapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
-        if let dirtyUpdate = gpuServices.compositedIncrementalUpdate(
-            snapshot: snapshot,
-            dirtyRect: (rect.originX, rect.originY, rect.width, rect.height)
-        ) {
-            setPendingDirtyUpdate(dirtyUpdate)
-            return
-        }
-        let composite = compositePixelDataForSnapshot(store.snapshot)
-        let pixelData = crop(pixelData: composite, width: store.snapshot.canvasWidth, rect: rect)
-        setPendingDirtyUpdate(IncrementalLayerUpdate.unsafeUnchecked(
-            layerIndex: -1,
-            originX: rect.originX,
-            originY: rect.originY,
-            width: rect.width,
-            height: rect.height,
-            pixelData: pixelData
-        ))
-    }
-
-    private func setPendingDirtyUpdate(_ update: IncrementalLayerUpdate) {
-        if let previous = pendingDirtyUpdate?.gpuBufferHandle,
-           previous != update.gpuBufferHandle {
-            gpuServices.release(previous)
-        }
-        pendingDirtyUpdate = update
+        dirtyUpdatePublisher.captureDirtyUpdate(
+            snapshot: store.snapshot,
+            rect: rect,
+            gpuServices: gpuServices,
+            makeMetalSnapshot: { [weak self] (snapshot: SwiftDocumentStoreSnapshot, includeCompositePixelData: Bool) in
+                guard let self else {
+                    return MetalDocumentSnapshot.unsafeUnchecked(
+                        width: snapshot.canvasWidth,
+                        height: snapshot.canvasHeight,
+                        revision: snapshot.revision,
+                        compositePixelData: Data(),
+                        layers: []
+                    )
+                }
+                return self.makeMetalSnapshot(for: snapshot, includeCompositePixelData: includeCompositePixelData)
+            },
+            compositePixelData: { [weak self] snapshot in
+                self?.compositePixelDataForSnapshot(snapshot) ?? Data()
+            }
+        )
     }
 
     private func compositeSurfaceForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> DocumentCompositeSurface {
@@ -2264,25 +2180,11 @@ extension SwiftDocumentRuntime {
         let baseSnapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
         let compositeHandle = gpuServices.compositeDocumentBufferHandle(snapshot: baseSnapshot)
         let composite = compositeHandle == nil ? compositeSurface() : nil
-        return MetalDocumentSnapshot.unsafeUnchecked(
-            width: baseSnapshot.width,
-            height: baseSnapshot.height,
-            revision: baseSnapshot.revision,
-            compositeBufferHandle: compositeHandle,
-            compositePixelData: composite?.pixelData ?? Data(),
-            layers: baseSnapshot.layers.enumerated().map { index, layer in
-                MetalLayerSnapshot.unsafeUnchecked(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: layer.visible,
-                    isClipped: layer.isClipped,
-                    blendMode: layer.blendMode,
-                    thumbnailSurface: cachedLayerThumbnailSurface(index: index),
-                    thumbnailData: nil,
-                    gpuBufferHandle: layer.gpuBufferHandle,
-                    pixelData: layer.pixelData
-                )
-            }
+        return presentationBuilder.makeRenderSnapshot(
+            baseSnapshot: baseSnapshot,
+            compositeHandle: compositeHandle,
+            fallbackComposite: composite,
+            thumbnailSurface: cachedLayerThumbnailSurface(index:)
         )
     }
 
@@ -2304,7 +2206,7 @@ extension SwiftDocumentRuntime {
                     blendMode: layer.blendMode,
                     thumbnailSurface: nil,
                     thumbnailData: nil,
-                    gpuBufferHandle: gpuLayerStorage.handle(for: index),
+                    gpuBufferHandle: gpuLayerRepository.handle(for: index),
                     pixelData: layer.pixelData
                 )
             }
@@ -2312,120 +2214,41 @@ extension SwiftDocumentRuntime {
     }
 
     private func buildLayerRows() -> [LayerRowModel] {
-        buildLayerRows(from: store.validatedSnapshot())
+        presentationBuilder.lightweightPresentation(snapshot: store.validatedSnapshot(), canvasSize: canvasSize).layerRows
     }
 
     private func buildLayerRows(from snapshot: SwiftDocumentStoreSnapshot) -> [LayerRowModel] {
-        snapshot.layers.enumerated().map { index, layer in
-            guard let opacity = layer.validatedOpacity()?.value else {
-                preconditionFailure("SwiftDocumentStore produced an invalid layer opacity")
-            }
-            return LayerRowModel(
-                unsafeUncheckedIndex: index,
-                name: layer.name,
-                visible: layer.visible,
-                opacity: opacity,
-                isLocked: layer.locked,
-                isAlphaLocked: layer.alphaLocked,
-                isClipped: layer.clipped,
-                blendMode: layer.blendMode,
-                folderID: layer.folderID,
-                hasMask: layer.maskData != nil,
-                isTextLayer: layer.textLayer != nil,
-                textLayer: layer.textLayer
-            )
-        }.reversed()
+        presentationBuilder.lightweightPresentation(snapshot: snapshot, canvasSize: canvasSize).layerRows
     }
 
     private func buildSidebarRows() -> [LayerSidebarRowModel] {
-        buildSidebarRows(from: store.validatedSnapshot())
+        presentationBuilder.lightweightPresentation(snapshot: store.validatedSnapshot(), canvasSize: canvasSize).layerSidebarRows
     }
 
     private func buildSidebarRows(from snapshot: SwiftDocumentStoreSnapshot) -> [LayerSidebarRowModel] {
-        let layerRows = buildLayerRows(from: snapshot)
-        let layerRowsByIndex = Dictionary(uniqueKeysWithValues: layerRows.map { ($0.index, $0) })
-        let orderedFolders = snapshot.folders.map { folder in
-            LayerFolderModel(
-                id: folder.id,
-                name: folder.name,
-                visible: folder.visible,
-                isExpanded: folder.expanded,
-                anchorLayerIndex: folder.anchorLayerIndex,
-                childLayerIndices: snapshot.layers.enumerated().compactMap { index, layer in
-                    layer.folderID == folder.id ? index : nil
-                }.sorted(by: >)
-            )
-        }
-        var emittedFolderIDs = Set<Int>()
-        var rows: [LayerSidebarRowModel] = []
-        for layer in layerRows {
-            for folder in orderedFolders where folder.anchorLayerIndex == layer.index && !emittedFolderIDs.contains(folder.id) {
-                rows.append(.folder(folder))
-                emittedFolderIDs.insert(folder.id)
-                if folder.isExpanded {
-                    for childIndex in folder.childLayerIndices {
-                        if let child = layerRowsByIndex[childIndex] {
-                            rows.append(.layer(child, depth: 1))
-                        }
-                    }
-                }
-            }
-            if let folderID = layer.folderID {
-                if !orderedFolders.contains(where: { $0.id == folderID }) {
-                    rows.append(.layer(layer, depth: 0))
-                }
-            } else {
-                rows.append(.layer(layer, depth: 0))
-            }
-        }
-        for folder in orderedFolders where !emittedFolderIDs.contains(folder.id) {
-            rows.append(.folder(folder))
-        }
-        return rows
+        presentationBuilder.lightweightPresentation(snapshot: snapshot, canvasSize: canvasSize).layerSidebarRows
     }
 
     private func cachedLayerThumbnailSurface(index: Int) -> DocumentCompositeSurface? {
-        if let cached = thumbnailSurfaceCache[index] {
-            return cached
-        }
-        guard store.snapshot.layers.indices.contains(index) else { return nil }
-        let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 96)
-        let targetWidth = max(Int(targetSize.width.rounded()), 1)
-        let targetHeight = max(Int(targetSize.height.rounded()), 1)
-        guard let scaled = gpuServices.scaledPixelData(
-            currentPixelData(for: index),
-            sourceWidth: store.snapshot.canvasWidth,
-            sourceHeight: store.snapshot.canvasHeight,
-            targetWidth: targetWidth,
-            targetHeight: targetHeight
-        ) else {
-            return nil
-        }
-        let surface = DocumentCompositeSurface(
-            unsafeUncheckedWidth: targetWidth,
-            height: targetHeight,
-            pixelData: scaled
+        presentationBuilder.cachedLayerThumbnailSurface(
+            index: index,
+            snapshot: store.snapshot,
+            canvasSize: canvasSize,
+            gpuServices: gpuServices,
+            currentPixelData: currentPixelData(for:)
         )
-        thumbnailSurfaceCache[index] = surface
-        return surface
     }
 
     private func invalidateThumbnail(for index: Int) {
-        store.snapshot.thumbnailCache[index] = nil
-        thumbnailSurfaceCache[index] = nil
+        presentationBuilder.invalidateThumbnail(for: index, in: store)
     }
 
     private func invalidateAllThumbnails() {
-        store.snapshot.thumbnailCache.removeAll(keepingCapacity: true)
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
+        presentationBuilder.invalidateAllThumbnails(in: store)
     }
 
     private func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
-        guard canvasSize.width > 0, canvasSize.height > 0 else {
-            return CGSize(width: maxDimension, height: maxDimension)
-        }
-        let scale = min(maxDimension / canvasSize.width, maxDimension / canvasSize.height, 1.0)
-        return CGSize(width: max(2, Int((canvasSize.width * scale).rounded())), height: max(2, Int((canvasSize.height * scale).rounded())))
+        presentationBuilder.timelapseFrameSize(for: canvasSize, maxDimension: maxDimension)
     }
 
     private func makeTimelapseThumbnailSurface() -> DocumentCompositeSurface? {
@@ -2448,19 +2271,17 @@ extension SwiftDocumentRuntime {
     }
 
     private func captureTimelapseFrame() {
-        guard let source = makeTimelapseThumbnailSurface(),
-              let jpegData = DocumentRasterImageService.jpegData(from: source) else { return }
-        let frameURL = services.timelapse.frameStore.makeFrameURL(
-            in: services.timelapse.frameStore.makeDirectoryURL(),
-            frameID: store.snapshot.timelapseFrames.count
+        timelapseRecorder.capture(
+            store: store,
+            services: services,
+            source: timelapseCompositeSurface(),
+            canvasSize: canvasSize,
+            gpuServices: gpuServices,
+            frameSize: { [weak self] canvasSize, maxDimension in
+                self?.timelapseFrameSize(for: canvasSize, maxDimension: maxDimension) ?? CGSize(width: maxDimension, height: maxDimension)
+            },
+            logger: Self.logger
         )
-        do {
-            try services.timelapse.frameStore.persistFrameData(jpegData, to: frameURL)
-            store.snapshot.timelapseFrames.append(TimelapseFrame(imageURL: frameURL, size: CGSize(width: source.width, height: source.height)))
-            store.snapshot.timelapseUsesOperationPersistence = false
-        } catch {
-            Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
-        }
     }
 
     // Legacy helper retained for deprecated replay/export conveniences.
@@ -2484,40 +2305,19 @@ extension SwiftDocumentRuntime {
     }
 
     private func remapFoldersAfterInsertion(at insertedIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            if let anchor = store.snapshot.folders[index].anchorLayerIndex, anchor >= insertedIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
-            }
-        }
+        LayerMutationEngine.remapFoldersAfterInsertion(in: store, at: insertedIndex)
     }
 
     private func remapFoldersAfterDeletion(of deletedIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            if let anchor = store.snapshot.folders[index].anchorLayerIndex {
-                if anchor == deletedIndex {
-                    store.snapshot.folders[index].anchorLayerIndex = nil
-                } else if anchor > deletedIndex {
-                    store.snapshot.folders[index].anchorLayerIndex = anchor - 1
-                }
-            }
-        }
+        LayerMutationEngine.remapFoldersAfterDeletion(in: store, of: deletedIndex)
     }
 
     private func remapFoldersAfterMove(from sourceIndex: Int, to destinationIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            guard let anchor = store.snapshot.folders[index].anchorLayerIndex else { continue }
-            if anchor == sourceIndex {
-                store.snapshot.folders[index].anchorLayerIndex = destinationIndex
-            } else if sourceIndex < destinationIndex, anchor > sourceIndex, anchor <= destinationIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor - 1
-            } else if sourceIndex > destinationIndex, anchor >= destinationIndex, anchor < sourceIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
-            }
-        }
+        LayerMutationEngine.remapFoldersAfterMove(in: store, from: sourceIndex, to: destinationIndex)
     }
 
     private func preserveExistingAlphaIfNeeded(_ source: Data, existing: Data, isAlphaLocked: Bool) -> Data {
-        isAlphaLocked ? preserveExistingAlpha(source: source, existing: existing) : source
+        LayerMutationEngine.preserveExistingAlphaIfNeeded(source, existing: existing, isAlphaLocked: isAlphaLocked)
     }
 
     private func preserveExistingAlpha(source: Data, existing: Data) -> Data {

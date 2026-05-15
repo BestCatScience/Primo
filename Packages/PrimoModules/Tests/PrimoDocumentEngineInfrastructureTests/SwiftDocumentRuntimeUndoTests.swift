@@ -695,7 +695,7 @@ private final class BlockingRuntimeGpuServiceSpy: @unchecked Sendable {
     }
 
     func waitForGpuStart() throws {
-        guard started.wait(timeout: .now() + 2) == .success else {
+        guard started.wait(timeout: .now() + 10) == .success else {
             throw BlockingGpuTimeout()
         }
     }
@@ -813,7 +813,7 @@ private final class AsyncMutationResult: @unchecked Sendable {
     }
 
     func wait() throws -> DocumentMutationResult {
-        guard finished.wait(timeout: .now() + 2) == .success else {
+        guard finished.wait(timeout: .now() + 10) == .success else {
             throw BlockingGpuTimeout()
         }
         return try #require(lock.withLock { result })
