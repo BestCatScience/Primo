@@ -36,7 +36,7 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 - **App validation は preflight、runtime validation は本契約**
   `DocumentWorkflowCommandValidator` は UI state から fast feedback 用の事前チェックを行いますが、その state は stale になり得ます。`DocumentEditorUseCase` と live gateway は revision-aware な `ExistingLayerIndex` / `EditableLayerIndex` を実行直前に再検証し、access control を伴う authoritative validation として扱います。
 - **App 側 dependency は一か所で展開する**
-  `App/Features/Document/PaintDocumentClient.swift` が `DocumentRuntime` を TCA dependency として登録し、runtime から個別の gateway / service / renderer / processor を `DependencyValues` へ展開します。テストではこの境界を差し替えます。
+  `App/Features/Document/DocumentApplicationEnvironment.swift` が `DocumentApplicationRuntime` の workflow runtime を app-facing capability / port 群へ分解し、`DocumentDependencyKeys.swift` がそれを TCA dependency として `DependencyValues` へ登録します。`DocumentRuntimeAdapters.swift` は runtime façade を app 側 protocol に適合させる薄い adapter 群です。テストではこの environment / port 境界を差し替えます。
 - **domain / contracts / application / runtime / infrastructure を分ける**
   値やルールは domain、境界の型は contracts、操作の意味は application、app-facing façade は runtime、Metal / file I/O / network などの副作用は infrastructure に置きます。
 - **狭い contract import を優先する**
@@ -240,8 +240,14 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
   root reducer です。application / workspace / document / import-export / AI image feature を scope します。
 - [App/Features/Document/CrossFeatureIntegrationReducer.swift](App/Features/Document/CrossFeatureIntegrationReducer.swift)
   feature 間の delegate action を接続する integration reducer です。
+- [App/Features/Document/DocumentApplicationEnvironment.swift](App/Features/Document/DocumentApplicationEnvironment.swift)
+  app 側 document runtime wiring の集約点です。runtime workflows を presentation、mutation、stroke、layer、selection、transform、persistence、export、preview の capability / port 群へ分解します。
+- [App/Features/Document/DocumentDependencyKeys.swift](App/Features/Document/DocumentDependencyKeys.swift)
+  `DocumentApplicationEnvironment` と workspace workflow service を TCA の `DependencyValues` に登録します。
+- [App/Features/Document/DocumentRuntimeAdapters.swift](App/Features/Document/DocumentRuntimeAdapters.swift)
+  runtime façade を app 側 protocol / capability に適合させる adapter 群です。
 - [App/Features/Document/PaintDocumentClient.swift](App/Features/Document/PaintDocumentClient.swift)
-  app 側 document dependency wiring です。`DocumentRuntime` から各 command service / gateway / renderer / processor を `DependencyValues` へ展開します。
+  旧 `PaintDocumentClient` 境界の名残を示す互換メモだけを残したファイルです。実際の wiring は上記 environment / dependency keys / adapters に分割されています。
 - [App/Features/Document/DocumentFeature.swift](App/Features/Document/DocumentFeature.swift)
   document editor の TCA reducer 本体です。canvas interaction、document mutation、import / export、AI 画像編集 workflow を束ねます。
 - [App/Features/Canvas/CanvasView.swift](App/Features/Canvas/CanvasView.swift)
