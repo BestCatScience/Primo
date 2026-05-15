@@ -13,10 +13,12 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case invalidLayerIndex(Int)
     case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case invalidFolderID(Int)
+    case staleFolderID(folderID: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case layerLocked(Int)
     case alphaLocked(Int)
     case invalidCanvasSize(width: Int, height: Int)
     case invalidOpacity(Double)
+    case invalidLayerProcessingRequest(String)
     case emptyInput
     case noUndoState
     case noRedoState
@@ -55,7 +57,7 @@ public struct DocumentLayerMutationContext: Sendable {
 
     public func existingFolderID(_ rawValue: Int) -> ExistingFolderID? {
         guard folderIDs.contains(rawValue) else { return nil }
-        return ExistingFolderID(rawValue)
+        return ExistingFolderID(rawValue, revision: revision)
     }
 
     public func anchorLayerIndex(_ rawValue: Int) -> LayerAnchorIndex? {
@@ -76,9 +78,11 @@ public struct ExistingLayerIndex: Hashable, Sendable {
 
 public struct ExistingFolderID: Hashable, Sendable {
     public let rawValue: Int
+    public let revision: DocumentRevision
 
-    package init(_ rawValue: Int) {
+    package init(_ rawValue: Int, revision: DocumentRevision) {
         self.rawValue = rawValue
+        self.revision = revision
     }
 }
 

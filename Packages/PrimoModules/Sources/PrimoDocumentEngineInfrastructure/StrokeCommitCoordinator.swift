@@ -4,30 +4,47 @@ import PrimoDocumentApplication
 import PrimoDocumentPresentationContracts
 
 struct StrokeCommitCoordinator: Sendable {
-    struct BlurSessionReservation: Sendable {
-        fileprivate let previousState: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+    struct StrokeSession: Sendable {
+        let id: UUID
+        var layerIndex: Int
+        var brush: BrushRuntimeSettings
+        var samples: [StylusSample]
     }
 
-    private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
-    private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+    struct BlurSession: Sendable {
+        let id: UUID
+        var baseline: SwiftDocumentStoreSnapshot?
+        var layerIndex: Int
+        var brush: BrushRuntimeSettings
+        var samples: [StylusSample]
+    }
 
-    var blurStrokeState: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])? {
+    struct BlurSessionReservation: Sendable {
+        fileprivate let sessionID: UUID
+        fileprivate let previousState: BlurSession?
+    }
+
+    private var currentStroke: StrokeSession?
+    private var currentBlurStroke: BlurSession?
+
+    var blurStrokeState: BlurSession? {
         currentBlurStroke
     }
 
     mutating func beginStroke(layerIndex: Int, sample: StylusSample, brush: BrushRuntimeSettings) {
-        currentStroke = (layerIndex: layerIndex, brush: brush, samples: [sample])
+        currentStroke = StrokeSession(id: UUID(), layerIndex: layerIndex, brush: brush, samples: [sample])
     }
 
     mutating func appendStroke(sample: StylusSample) {
         currentStroke?.samples.append(sample)
     }
 
-    mutating func currentStrokePlanInput() -> (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])? {
+    mutating func currentStrokePlanInput() -> StrokeSession? {
         currentStroke
     }
 
-    mutating func clearCurrentStroke() {
+    mutating func clearCurrentStroke(id: UUID? = nil) {
+        if let id, currentStroke?.id != id { return }
         currentStroke = nil
     }
 
@@ -41,17 +58,21 @@ struct StrokeCommitCoordinator: Sendable {
         brush: BrushRuntimeSettings,
         samples: [StylusSample]
     ) -> BlurSessionReservation {
-        let reservation = BlurSessionReservation(previousState: currentBlurStroke)
-        currentBlurStroke = (
-            baseline: currentBlurStroke?.baseline ?? baseline,
+        let previousState = currentBlurStroke
+        let sessionID = previousState?.id ?? UUID()
+        let reservation = BlurSessionReservation(sessionID: sessionID, previousState: previousState)
+        currentBlurStroke = BlurSession(
+            id: sessionID,
+            baseline: previousState?.baseline ?? baseline,
             layerIndex: layerIndex,
             brush: brush,
-            samples: (currentBlurStroke?.samples ?? []) + samples
+            samples: (previousState?.samples ?? []) + samples
         )
         return reservation
     }
 
     mutating func rollbackBlurReservation(_ reservation: BlurSessionReservation) {
+        guard currentBlurStroke?.id == reservation.sessionID else { return }
         currentBlurStroke = reservation.previousState
     }
 

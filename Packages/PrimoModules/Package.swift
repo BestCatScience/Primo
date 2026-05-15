@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
+        .library(name: "PrimoSystemClients", targets: ["PrimoSystemClients"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoCanvasInputDomain", targets: ["PrimoCanvasInputDomain"]),
@@ -42,6 +43,10 @@ let package = Package(
     targets: [
         .target(
             name: "PrimoCoreTypes"
+        ),
+        .target(
+            name: "PrimoSystemClients",
+            dependencies: ["PrimoCoreTypes"]
         ),
         .target(
             name: "PrimoLocalization"
@@ -194,6 +199,7 @@ let package = Package(
             name: "PrimoDocumentPersistenceInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoSystemClients",
                 "PrimoBrushRuntimeContracts",
                 "PrimoDocumentDomain",
                 "PrimoDocumentPersistenceContracts",
@@ -216,6 +222,7 @@ let package = Package(
             name: "PrimoDocumentTimelapseInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoSystemClients",
                 "PrimoDocumentDomain",
                 "PrimoDocumentPersistenceContracts",
                 "PrimoDocumentPersistenceInfrastructure",
@@ -227,6 +234,7 @@ let package = Package(
             dependencies: [
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
+                "PrimoSystemClients",
                 "PrimoDocumentDomain",
                 "PrimoDocumentApplication",
                 "PrimoDocumentInfrastructure",
@@ -264,6 +272,7 @@ let package = Package(
         .target(
             name: "PrimoDocumentRuntimeLive",
             dependencies: [
+                "PrimoSystemClients",
                 "PrimoDocumentRuntime",
                 "PrimoDocumentEngineInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
@@ -457,6 +466,7 @@ let package = Package(
             name: "PrimoBrushFileFormats",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoSystemClients",
                 "PrimoDocumentDomain",
             ]
         ),
@@ -498,7 +508,11 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoWorkspaceInfrastructureTests",
-            dependencies: ["PrimoWorkspaceApplication", "PrimoWorkspaceInfrastructure"]
+            dependencies: [
+                "PrimoSystemClients",
+                "PrimoWorkspaceApplication",
+                "PrimoWorkspaceInfrastructure",
+            ]
         ),
         .testTarget(
             name: "PrimoBrushDomainTests",
@@ -553,6 +567,7 @@ let package = Package(
             name: "PrimoDocumentPersistenceInfrastructureTests",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoSystemClients",
                 "PrimoDocumentDomain",
                 "PrimoDocumentPersistenceInfrastructure",
             ]

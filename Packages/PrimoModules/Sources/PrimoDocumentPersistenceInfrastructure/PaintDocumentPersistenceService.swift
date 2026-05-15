@@ -1,6 +1,7 @@
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentDomain
+import PrimoSystemClients
 
 public struct PaintDocumentPersistenceService {
     private static let maxPackageByteCount = 2 * 1024 * 1024 * 1024

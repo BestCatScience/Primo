@@ -241,44 +241,64 @@ struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
     var activeLayerIndex: Int {
         get { layerStackStorage.activeLayer.rawValue }
         set {
-            guard let stack = NonEmptyLayerStack(
-                layers: layerStackStorage.layers,
-                activeLayerIndex: newValue
-            ) else {
-                return
-            }
-            layerStackStorage = stack
+            _ = setActiveLayerIndex(newValue)
         }
     }
 
     var revision: Int {
         get { revisionStorage }
         set {
-            guard newValue >= 0 else { return }
-            revisionStorage = newValue
+            _ = setRevision(newValue)
         }
     }
 
     var nextFolderID: Int {
         get { nextFolderIDStorage }
         set {
-            guard newValue >= 0 else { return }
-            nextFolderIDStorage = newValue
+            _ = setNextFolderID(newValue)
         }
     }
 
     var layers: [SwiftDocumentLayerRecord] {
         get { layerStackStorage.layers }
         set {
-            guard newValue.allSatisfy({ $0.isValid(for: geometryStorage) }),
-                  let stack = NonEmptyLayerStack(
-                    clampingActiveLayer: newValue,
-                    activeLayerIndex: layerStackStorage.activeLayer.rawValue
-                  ) else {
-                return
-            }
-            layerStackStorage = stack
+            _ = replaceLayers(newValue)
         }
+    }
+
+    mutating func setActiveLayerIndex(_ newValue: Int) -> Bool {
+        guard let stack = NonEmptyLayerStack(
+            layers: layerStackStorage.layers,
+            activeLayerIndex: newValue
+        ) else {
+            return false
+        }
+        layerStackStorage = stack
+        return true
+    }
+
+    mutating func setRevision(_ newValue: Int) -> Bool {
+        guard newValue >= 0 else { return false }
+        revisionStorage = newValue
+        return true
+    }
+
+    mutating func setNextFolderID(_ newValue: Int) -> Bool {
+        guard newValue >= 0 else { return false }
+        nextFolderIDStorage = newValue
+        return true
+    }
+
+    mutating func replaceLayers(_ newValue: [SwiftDocumentLayerRecord]) -> Bool {
+        guard newValue.allSatisfy({ $0.isValid(for: geometryStorage) }),
+              let stack = NonEmptyLayerStack(
+                clampingActiveLayer: newValue,
+                activeLayerIndex: layerStackStorage.activeLayer.rawValue
+              ) else {
+            return false
+        }
+        layerStackStorage = stack
+        return true
     }
 
     init?(

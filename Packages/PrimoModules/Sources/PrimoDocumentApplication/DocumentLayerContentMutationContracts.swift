@@ -47,8 +47,22 @@ public struct LayerMaskData: Equatable, Sendable {
 public struct ValidatedLayerProcessingRequest: Equatable, Sendable {
     public let rawValue: LayerProcessingRequest
 
-    package init(_ rawValue: LayerProcessingRequest) {
+    package init?(_ rawValue: LayerProcessingRequest) {
+        guard Self.isValid(rawValue) else { return nil }
         self.rawValue = rawValue
+    }
+
+    private static func isValid(_ request: LayerProcessingRequest) -> Bool {
+        switch request {
+        case let .transform(translation, scale, rotationDegrees, _):
+            return translation.width.isFinite &&
+                translation.height.isFinite &&
+                scale.isFinite &&
+                scale > 0 &&
+                rotationDegrees.isFinite
+        default:
+            return true
+        }
     }
 }
 
@@ -104,8 +118,11 @@ public struct LayerContentMutationCommandValidator: Sendable {
         case let .clear(index):
             return editableLayer(index, in: context).map { .clear(index: $0) }
         case let .applyProcessing(index, request):
-            return editableLayer(index, in: context).map {
-                .applyProcessing(index: $0, request: ValidatedLayerProcessingRequest(request))
+            return editableLayer(index, in: context).flatMap { index in
+                guard let request = ValidatedLayerProcessingRequest(request) else {
+                    return .failure(.invalidLayerProcessingRequest("transform"))
+                }
+                return .success(.applyProcessing(index: index, request: request))
             }
         case let .replaceMask(index, mask):
             return editableLayer(index, in: context).map { .replaceMask(index: $0, mask: mask) }

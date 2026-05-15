@@ -3,6 +3,7 @@ import PrimoCoreTypes
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentDomain
 import PrimoDocumentPersistenceInfrastructure
+import PrimoSystemClients
 
 extension TimelapseOperation {
     public func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live) throws -> StoredTimelapseOperation {

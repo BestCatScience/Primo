@@ -65,14 +65,24 @@ struct SwiftDocumentStoreInvariantTests {
         let onePixelGeometry = try #require(PixelGeometry(width: 1, height: 1))
         let mismatchedLayer = try #require(makeLayer(geometry: onePixelGeometry))
 
+        let rejectedActiveLayerIndex = snapshot.setActiveLayerIndex(4)
+        #expect(!rejectedActiveLayerIndex)
         snapshot.activeLayerIndex = 4
         #expect(snapshot.activeLayerIndex == 0)
+        let rejectedEmptyLayers = snapshot.replaceLayers([])
+        #expect(!rejectedEmptyLayers)
         snapshot.layers = []
         #expect(snapshot.layers.count == 1)
+        let rejectedMismatchedLayers = snapshot.replaceLayers([mismatchedLayer])
+        #expect(!rejectedMismatchedLayers)
         snapshot.layers = [mismatchedLayer]
         #expect(snapshot.layers.count == 1)
+        let rejectedRevision = snapshot.setRevision(-1)
+        #expect(!rejectedRevision)
         snapshot.revision = -1
         #expect(snapshot.revision == 0)
+        let rejectedNextFolderID = snapshot.setNextFolderID(-1)
+        #expect(!rejectedNextFolderID)
         snapshot.nextFolderID = -1
         #expect(snapshot.nextFolderID == 1)
     }

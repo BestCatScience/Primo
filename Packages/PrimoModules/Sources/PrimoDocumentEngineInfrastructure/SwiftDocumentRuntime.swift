@@ -11,6 +11,7 @@ import PrimoDocumentDomain
 import PrimoDocumentPersistenceInfrastructure
 import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentTimelapseInfrastructure
+import PrimoSystemClients
 
 struct RuntimeLayerProcessingPlan: Sendable {
     let index: Int
@@ -38,6 +39,7 @@ struct RuntimeFillPlan: Sendable {
 }
 
 struct RuntimeStrokeCommitPlan: Sendable {
+    let sessionID: UUID?
     let layerIndex: Int
     let documentGeneration: UUID
     let revision: Int
@@ -52,6 +54,7 @@ struct RuntimeStrokeCommitPlan: Sendable {
 }
 
 struct RuntimeBlurPlan: Sendable {
+    let sessionID: UUID?
     let layerIndex: Int
     let documentGeneration: UUID
     let revision: Int
@@ -739,13 +742,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func makeStrokeCommitPlan(
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
-        layerIndex: Int
+        layerIndex: Int,
+        sessionID: UUID? = nil
     ) -> Result<RuntimeStrokeCommitPlan, DocumentMutationFailure> {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
         let source = layerSourceForGpuPlan(index: layerIndex)
         return .success(
             RuntimeStrokeCommitPlan(
+                sessionID: sessionID,
                 layerIndex: layerIndex,
                 documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
@@ -872,6 +877,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let source = layerSourceForGpuPlan(index: layerIndex)
         return .success(
             RuntimeBlurPlan(
+                sessionID: strokeCoordinator.blurStrokeState?.id,
                 layerIndex: layerIndex,
                 documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
@@ -932,6 +938,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
               store.snapshot.canvasHeight == plan.canvasHeight else {
             return .failure(.gpu(.staleSnapshot(operation: "blurStroke")))
         }
+        if let sessionID = plan.sessionID, strokeCoordinator.blurStrokeState?.id != sessionID {
+            return .failure(.gpu(.staleSnapshot(operation: "blurStroke")))
+        }
         if let failure = validateEditableLayer(plan.layerIndex) {
             return .failure(failure)
         }
@@ -975,12 +984,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return makeStrokeCommitPlan(
             samples: currentStroke.samples,
             brush: currentStroke.brush,
-            layerIndex: currentStroke.layerIndex
+            layerIndex: currentStroke.layerIndex,
+            sessionID: currentStroke.id
         ).map(Optional.some)
     }
 
-    func clearCurrentStroke() {
-        strokeCoordinator.clearCurrentStroke()
+    func clearCurrentStroke(sessionID: UUID? = nil) {
+        strokeCoordinator.clearCurrentStroke(id: sessionID)
     }
 
     func release(_ handle: MetalBufferHandle?) {

@@ -8,6 +8,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
+import PrimoSystemClients
 
 package struct DocumentRuntimeComposition: Sendable {
     package let queryGateway: DocumentQueryGateway
@@ -227,6 +228,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult {
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
         switch runtime.deleteFolder(folderID.rawValue) {
         case .success:
             return .success(())
@@ -237,6 +239,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
 
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult {
         if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        if let folderID, let failure = validateFreshFolderID(folderID) { return .failure(failure) }
         switch runtime.assignLayerToFolder(index, folderID) {
         case .success:
             return .success(())
@@ -288,17 +291,20 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func setFolderExpanded(_ isExpanded: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
-        runtime.setFolderExpanded(folderID.rawValue, isExpanded)
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderExpanded(folderID.rawValue, isExpanded)
             .mapError(mapRuntimeFailure)
     }
 
     func setFolderVisible(_ isVisible: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
-        runtime.setFolderVisibility(folderID.rawValue, isVisible)
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderVisibility(folderID.rawValue, isVisible)
             .mapError(mapRuntimeFailure)
     }
 
     func setFolderName(_ name: String, folderID: ExistingFolderID) -> DocumentLayerMutationResult {
-        runtime.setFolderName(folderID.rawValue, name)
+        if let failure = validateFreshFolderID(folderID) { return .failure(failure) }
+        return runtime.setFolderName(folderID.rawValue, name)
             .mapError(mapRuntimeFailure)
     }
 
@@ -351,11 +357,13 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     // mutation so UI preflight results cannot grant stale access.
     private func validateFreshLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
         let currentRevision: DocumentRevision
+        let currentLayerRows: [LayerRowModel]
         switch runtime.queryGateway.lightweightPresentation() {
         case let .failure(failure):
             return mapRuntimeFailure(failure)
         case let .success(presentation):
             currentRevision = presentation.revision
+            currentLayerRows = presentation.layerRows
         }
         guard index.revision == currentRevision else {
             return .staleLayerIndex(
@@ -363,17 +371,22 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
                 validationRevision: index.revision,
                 currentRevision: currentRevision
             )
+        }
+        guard currentLayerRows.contains(where: { $0.index == index.rawValue }) else {
+            return .invalidLayerIndex(index.rawValue)
         }
         return nil
     }
 
     private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentLayerMutationFailure? {
         let currentRevision: DocumentRevision
+        let currentLayerRows: [LayerRowModel]
         switch runtime.queryGateway.lightweightPresentation() {
         case let .failure(failure):
             return mapRuntimeFailure(failure)
         case let .success(presentation):
             currentRevision = presentation.revision
+            currentLayerRows = presentation.layerRows
         }
         guard index.revision == currentRevision else {
             return .staleLayerIndex(
@@ -381,6 +394,38 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
                 validationRevision: index.revision,
                 currentRevision: currentRevision
             )
+        }
+        guard let layer = currentLayerRows.first(where: { $0.index == index.rawValue }) else {
+            return .invalidLayerIndex(index.rawValue)
+        }
+        guard !layer.isLocked else {
+            return .layerLocked(index.rawValue)
+        }
+        return nil
+    }
+
+    private func validateFreshFolderID(_ folderID: ExistingFolderID) -> DocumentLayerMutationFailure? {
+        let currentRevision: DocumentRevision
+        let currentFolderIDs: Set<Int>
+        switch runtime.queryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return mapRuntimeFailure(failure)
+        case let .success(presentation):
+            currentRevision = presentation.revision
+            currentFolderIDs = Set(presentation.layerSidebarRows.compactMap { row in
+                guard case let .folder(folder) = row else { return nil }
+                return folder.id
+            })
+        }
+        guard folderID.revision == currentRevision else {
+            return .staleFolderID(
+                folderID: folderID.rawValue,
+                validationRevision: folderID.revision,
+                currentRevision: currentRevision
+            )
+        }
+        guard currentFolderIDs.contains(folderID.rawValue) else {
+            return .invalidFolderID(folderID.rawValue)
         }
         return nil
     }
@@ -398,6 +443,12 @@ private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> Docum
         )
     case let .invalidFolderID(folderID):
         return .invalidFolderID(folderID)
+    case let .staleFolderID(folderID, validationRevision, currentRevision):
+        return .staleFolderID(
+            folderID: folderID,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .layerLocked(index):
         return .layerLocked(index)
     case let .alphaLocked(index):
@@ -406,6 +457,8 @@ private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> Docum
         return .invalidCanvasSize(width: width, height: height)
     case let .invalidOpacity(opacity):
         return .invalidOpacity(opacity)
+    case let .invalidLayerProcessingRequest(reason):
+        return .invalidLayerProcessingRequest(reason)
     case .emptyInput:
         return .emptyInput
     case .noUndoState:
@@ -438,6 +491,12 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
         )
     case let .invalidFolderID(folderID):
         return .invalidFolderID(folderID)
+    case let .staleFolderID(folderID, validationRevision, currentRevision):
+        return .staleFolderID(
+            folderID: folderID,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .layerLocked(index):
         return .layerLocked(index)
     case let .alphaLocked(index):
@@ -446,6 +505,8 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
         return .invalidCanvasSize(width: width, height: height)
     case let .invalidOpacity(opacity):
         return .invalidOpacity(opacity)
+    case let .invalidLayerProcessingRequest(reason):
+        return .invalidLayerProcessingRequest(reason)
     case .emptyInput:
         return .emptyInput
     case .noUndoState:

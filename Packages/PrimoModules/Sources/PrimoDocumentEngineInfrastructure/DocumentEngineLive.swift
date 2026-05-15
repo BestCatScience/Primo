@@ -10,6 +10,7 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
+import PrimoSystemClients
 
 package struct DocumentEngineLive: Sendable {
     package let queryGateway: DocumentQueryGateway
@@ -557,7 +558,7 @@ package enum DocumentEngineFactory {
             switch mutationResult {
             case .success:
                 _ = runtimeExecutor.performMutation(operation: "clearCurrentStroke") {
-                    $0.clearCurrentStroke()
+                    $0.clearCurrentStroke(sessionID: plan.sessionID)
                 }
             case let .failure(failure):
                 Self.logger.error("Current stroke apply failed: \(String(describing: failure), privacy: .public)")

@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentPresentationContracts
+import PrimoSystemClients
 
 public struct DocumentProjectPreview: Equatable, Sendable {
     public let canvasSize: CGSize

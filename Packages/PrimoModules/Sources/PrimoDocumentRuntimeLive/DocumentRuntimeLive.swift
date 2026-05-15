@@ -14,6 +14,7 @@ import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentRenderingInfrastructure
+import PrimoSystemClients
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoDocumentStrokeInfrastructure
@@ -31,14 +32,14 @@ private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable 
     func stream() -> AsyncStream<PaintDocumentPresentation> {
         AsyncStream { continuation in
             let id = UUID()
+            continuation.onTermination = { [weak self] _ in
+                self?.removeContinuation(id)
+            }
             lock.lock()
             continuations[id] = continuation
             lock.unlock()
             if case let .success(presentation) = currentPresentation() {
                 continuation.yield(presentation)
-            }
-            continuation.onTermination = { [weak self] _ in
-                self?.removeContinuation(id)
             }
         }
     }

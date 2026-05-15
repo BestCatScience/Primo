@@ -203,6 +203,25 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func liveEditingGatewayRejectsStaleValidatedFolderIDs() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let compositionURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        )
+        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+
+        #expect(body.contains("private func validateFreshFolderID(_ folderID: ExistingFolderID)"))
+        #expect(body.contains("return .staleFolderID("))
+        #expect(body.contains("validationRevision: folderID.revision"))
+        #expect(body.contains("currentFolderIDs.contains(folderID.rawValue)"))
+    }
+
+    @Test
     func liveGatewayKeepsHeavyPersistenceAndExportWorkOutsideRuntimeLock() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -294,18 +313,93 @@ struct DocumentRuntimeCompositionTests {
     @Test
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessFromPerform() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+        var innerResult: DocumentMutationResult?
 
-        let result: DocumentMutationResult = executor.performResult(operation: "outer") { _ in
-            executor.performResult(operation: "inner") { _ in
-                .success(())
+        let result: DocumentMutationResult = executor.performMutation(operation: "outer") { _ in
+            innerResult = executor.performResult(operation: "inner") { _ in
+                Result<Void, DocumentMutationFailure>.success(())
             }
         }
 
-        guard case let .failure(failure) = result else {
-            Issue.record("Expected reentrant access failure")
+        guard case .success = result else {
+            Issue.record("Expected outer mutation to succeed")
             return
         }
-        #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+        if case let .failure(failure) = innerResult {
+            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+        } else {
+            Issue.record("Expected inner result access to fail")
+        }
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(0))
+    }
+
+    @Test
+    func lockedRuntimeExecutorValueBoundaryRejectsNestedMutationAccess() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+
+        let result = executor.performValue(operation: "outer") { _ in
+            executor.performMutation(operation: "inner") { runtime in
+                runtime.value = 99
+            }
+        }
+
+        if case let .success(.failure(failure)) = result {
+            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+        } else {
+            Issue.record("Expected nested mutation access to fail")
+        }
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(0))
+    }
+
+    @Test
+    func lockedRuntimeExecutorRejectsReentrantReplacementWithoutSwappingRuntime() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+
+        let result = executor.performValue(operation: "outer") { _ in
+            executor.replaceRuntimeResult(with: RuntimeCounter(value: 99), operation: "replace")
+        }
+
+        if case let .success(.failure(failure)) = result {
+            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: replace"))
+        } else {
+            Issue.record("Expected nested replacement to fail")
+        }
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(1))
+    }
+
+    @Test
+    func lockedRuntimeExecutorThrowingBoundaryRejectsReentrantAccess() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+
+        do {
+            try executor.performThrowing(operation: "outer") { _ in
+                _ = try executor.performThrowing(operation: "inner") { runtime in
+                    runtime.value
+                }
+                Issue.record("Expected nested throwing access to fail")
+            }
+        } catch let failure as DocumentMutationFailure {
+            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test
+    func lockedRuntimeExecutorThrowingBoundaryRestoresAccessAfterBodyThrows() {
+        struct ExpectedFailure: Error {}
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 3))
+
+        do {
+            try executor.performThrowing(operation: "throw") { _ in
+                throw ExpectedFailure()
+            }
+            Issue.record("Expected body error to propagate")
+        } catch is ExpectedFailure {
+            #expect(executor.performValue(operation: "read") { $0.value } == .success(3))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
     }
 
     @Test
@@ -403,6 +497,24 @@ struct DocumentRuntimeCompositionTests {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         #expect(presentations.count == countAfterCancellation)
+    }
+
+    @Test
+    func presentationBroadcasterInstallsTerminationHandlerBeforeInitialRead() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift"
+        )
+        let body = try String(contentsOf: sourceURL, encoding: .utf8)
+        let terminationRange = try #require(body.range(of: "continuation.onTermination ="))
+        let firstReadRange = try #require(body.range(of: "currentPresentation()"))
+
+        #expect(terminationRange.lowerBound < firstReadRange.lowerBound)
     }
 
     @Test

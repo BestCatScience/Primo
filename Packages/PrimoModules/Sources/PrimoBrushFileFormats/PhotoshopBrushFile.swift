@@ -1,6 +1,7 @@
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentDomain
+import PrimoSystemClients
 
 public struct ImportedPhotoshopBrushSample: Equatable, Sendable {
     public let name: String

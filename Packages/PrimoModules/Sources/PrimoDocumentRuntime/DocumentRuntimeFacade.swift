@@ -202,18 +202,24 @@ public struct DocumentPresentationReader: Sendable {
 }
 
 public struct DocumentTextLayerService: Sendable {
-    private let textLayerDataHandler: @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>
-    private let setTextLayerHandler: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    private let clearTextLayerDataHandler: @Sendable (Int) -> DocumentMutationResult
+    private let textLayerDataHandler: @Sendable (ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure>
+    private let setTextLayerHandler: @Sendable (EditableLayerIndex, TextLayerData) -> DocumentMutationResult
+    private let clearTextLayerDataHandler: @Sendable (EditableLayerIndex) -> DocumentMutationResult
+    private let rawTextLayerDataHandler: @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>
+    private let rawSetTextLayerHandler: @Sendable (Int, TextLayerData) -> DocumentMutationResult
+    private let rawClearTextLayerDataHandler: @Sendable (Int) -> DocumentMutationResult
 
     public init(
         textLayerData: @escaping @Sendable (ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure>,
         setTextLayer: @escaping @Sendable (EditableLayerIndex, TextLayerData) -> DocumentMutationResult,
         clearTextLayerData: @escaping @Sendable (EditableLayerIndex) -> DocumentMutationResult
     ) {
-        self.textLayerDataHandler = { textLayerData(ExistingLayerIndex($0, revision: .initial)) }
-        self.setTextLayerHandler = { setTextLayer(EditableLayerIndex($0), $1) }
-        self.clearTextLayerDataHandler = { clearTextLayerData(EditableLayerIndex($0)) }
+        self.textLayerDataHandler = textLayerData
+        self.setTextLayerHandler = setTextLayer
+        self.clearTextLayerDataHandler = clearTextLayerData
+        self.rawTextLayerDataHandler = { _ in .failure(.bridgeMutationFailed("rawTextLayerDataUnavailable")) }
+        self.rawSetTextLayerHandler = { _, _ in .failure(.bridgeMutationFailed("rawSetTextLayerUnavailable")) }
+        self.rawClearTextLayerDataHandler = { _ in .failure(.bridgeMutationFailed("rawClearTextLayerDataUnavailable")) }
     }
 
     package init(
@@ -221,33 +227,36 @@ public struct DocumentTextLayerService: Sendable {
         rawSetTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
         rawClearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
     ) {
-        self.textLayerDataHandler = rawTextLayerData
-        self.setTextLayerHandler = rawSetTextLayer
-        self.clearTextLayerDataHandler = rawClearTextLayerData
+        self.textLayerDataHandler = { rawTextLayerData($0.rawValue) }
+        self.setTextLayerHandler = { rawSetTextLayer($0.rawValue, $1) }
+        self.clearTextLayerDataHandler = { rawClearTextLayerData($0.rawValue) }
+        self.rawTextLayerDataHandler = rawTextLayerData
+        self.rawSetTextLayerHandler = rawSetTextLayer
+        self.rawClearTextLayerDataHandler = rawClearTextLayerData
     }
 
     public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> {
-        textLayerDataHandler(index.rawValue)
-    }
-
-    public func setTextLayer(_ index: EditableLayerIndex, _ textLayer: TextLayerData) -> DocumentMutationResult {
-        setTextLayerHandler(index.rawValue, textLayer)
-    }
-
-    public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult {
-        clearTextLayerDataHandler(index.rawValue)
-    }
-
-    package func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> {
         textLayerDataHandler(index)
     }
 
-    package func setTextLayer(_ index: Int, _ textLayer: TextLayerData) -> DocumentMutationResult {
+    public func setTextLayer(_ index: EditableLayerIndex, _ textLayer: TextLayerData) -> DocumentMutationResult {
         setTextLayerHandler(index, textLayer)
     }
 
-    package func clearTextLayerData(_ index: Int) -> DocumentMutationResult {
+    public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult {
         clearTextLayerDataHandler(index)
+    }
+
+    package func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> {
+        rawTextLayerDataHandler(index)
+    }
+
+    package func setTextLayer(_ index: Int, _ textLayer: TextLayerData) -> DocumentMutationResult {
+        rawSetTextLayerHandler(index, textLayer)
+    }
+
+    package func clearTextLayerData(_ index: Int) -> DocumentMutationResult {
+        rawClearTextLayerDataHandler(index)
     }
 }
 

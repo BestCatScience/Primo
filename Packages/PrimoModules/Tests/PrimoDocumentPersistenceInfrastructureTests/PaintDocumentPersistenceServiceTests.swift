@@ -2,6 +2,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoDocumentPersistenceInfrastructure
+import PrimoSystemClients
 import Testing
 
 struct PaintDocumentPersistenceServiceTests {

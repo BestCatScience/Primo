@@ -42,7 +42,7 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 - **狭い contract import を優先する**
   App files は必要な Primo contract module を明示的に import します。互換 target の `PrimoModuleExports` は広い re-export を行わない方針です。
 - **副作用は dependency と gateway に閉じ込める**
-  ファイル I/O、日時、UUID、保存、読み込み、エクスポート、AI 編集、GPU backend は reducer の外側に置きます。`FileClient`、`DateClient`、`UUIDClient`、`HTTPClient`、`KeyValueStoreClient`、`SecretStoreClient`、`SecurityScopedResourceClient` などは `PrimoCoreTypes` の client として扱います。
+  ファイル I/O、日時、UUID、保存、読み込み、エクスポート、AI 編集、GPU backend は reducer の外側に置きます。`FileClient`、`DateClient`、`UUIDClient`、`HTTPClient`、`KeyValueStoreClient`、`SecretStoreClient`、`SecurityScopedResourceClient` などの contract は `PrimoCoreTypes`、live 実装は `PrimoSystemClients` の client として扱います。
 - **描画は snapshot と incremental update で扱う**
   runtime は document snapshot、dirty update、GPU-backed layer buffer handle を管理します。表示側は render snapshot / incremental update / preview surface を受け取り、Metal 表示へ反映します。
 - **workspace は catalog / load / persistence を分ける**
@@ -144,7 +144,9 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 ### Core、domain
 
 - `PrimoCoreTypes`
-  file、date、UUID、HTTP、key-value store、secret store、security-scoped resource、main queue などの共通 client と operation contract
+  file、date、UUID、HTTP、key-value store、secret store、security-scoped resource、main queue などの共通 client contract と operation contract
+- `PrimoSystemClients`
+  `PrimoCoreTypes` の system client contract に対する Foundation / Security backed live 実装
 - `PrimoLocalization`
   共通ローカライズ型
 - `PrimoDocumentDomain`
@@ -347,5 +349,6 @@ README は実装の入口として扱うため、設計説明を更新すると�
 - README 内で参照しているファイルが存在すること
 - `Packages/PrimoModules/Package.swift` の target / product 分割と説明がずれていないこと
 - `project.yml` の app target dependencies と README の runtime / package 説明が矛盾していないこと
+- `PrimoCoreTypes` は contract-only、`PrimoSystemClients` は live system client wiring という分離が崩れていないこと
 - `PrimoRootFeature`、`PaintDocumentClient`、`DocumentRuntimeFacade`、`DocumentRuntimeComposition`、`DocumentEngineLive`、`SwiftDocumentRuntime` の責務説明が現状と合っていること
 - Markdown の見出し階層、コードブロック、相対リンクが崩れていないこと

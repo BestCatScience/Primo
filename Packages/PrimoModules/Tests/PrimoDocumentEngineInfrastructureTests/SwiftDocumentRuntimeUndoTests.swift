@@ -612,6 +612,56 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func strokeCoordinatorDoesNotClearNewStrokeWithOldSessionID() {
+        var coordinator = StrokeCommitCoordinator()
+        let firstSample = sample()
+        let secondSample = StylusSample(
+            point: CGPoint(x: 1.5, y: 1.5),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 1
+        )
+
+        coordinator.beginStroke(layerIndex: 0, sample: firstSample, brush: brush())
+        let oldSessionID = coordinator.currentStrokePlanInput()?.id
+        coordinator.beginStroke(layerIndex: 0, sample: secondSample, brush: brush())
+        coordinator.clearCurrentStroke(id: oldSessionID)
+
+        #expect(coordinator.currentStrokePlanInput()?.samples == [secondSample])
+    }
+
+    @Test
+    func blurReservationRollbackDoesNotRestoreOverNewSession() throws {
+        var coordinator = StrokeCommitCoordinator()
+        let baseline = SwiftDocumentStore(width: 2, height: 2).snapshot
+        let firstReservation = coordinator.beginOrAppendBlur(
+            baseline: baseline,
+            layerIndex: 0,
+            brush: brush(),
+            samples: [sample()]
+        )
+        coordinator.clearBlurStroke()
+        let secondSample = StylusSample(
+            point: CGPoint(x: 1.5, y: 1.5),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 1
+        )
+        _ = coordinator.beginOrAppendBlur(
+            baseline: baseline,
+            layerIndex: 0,
+            brush: brush(),
+            samples: [secondSample]
+        )
+
+        coordinator.rollbackBlurReservation(firstReservation)
+
+        #expect(coordinator.blurStrokeState?.samples == [secondSample])
+    }
+
+    @Test
     func staleLayerProcessingGpuResultAfterNewCanvasDoesNotApplyAcrossGenerationReset() throws {
         let stalePixels = Data(repeating: 0xBB, count: 16)
         let gpu = BlockingRuntimeGpuServiceSpy(operation: .layerProcessing, stalePixelData: stalePixels)

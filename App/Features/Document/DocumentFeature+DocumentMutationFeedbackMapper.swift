@@ -20,6 +20,8 @@ extension DocumentFeature {
             return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
         case .invalidFolderID:
             return ApplicationFeature.Feedback.folderUnavailable.message(for: language)
+        case .staleFolderID:
+            return ApplicationFeature.Feedback.folderUnavailable.message(for: language)
         case .layerLocked:
             return ApplicationFeature.Feedback.layerEditLocked.message(for: language)
         case .alphaLocked:
@@ -34,6 +36,8 @@ extension DocumentFeature {
             return ApplicationFeature.Feedback.documentMutationBridgeFailed(message).message(for: language)
         case .incompatibleLayerType:
             return ApplicationFeature.Feedback.unsupportedLayerType.message(for: language)
+        case .invalidLayerProcessingRequest:
+            return ApplicationFeature.Feedback.documentMutationBridgeFailed(nil).message(for: language)
         case let .transactionFailure(primary, rollback):
             return ApplicationFeature.Feedback.documentMutationTransactionFailed(
                 primary,
@@ -64,6 +68,8 @@ extension DocumentFeature {
                 return .layerUnavailable
             case .invalidFolderID:
                 return .folderUnavailable
+            case .staleFolderID:
+                return .folderUnavailable
             case .layerLocked:
                 return .layerEditLocked
             case .alphaLocked:
@@ -78,6 +84,8 @@ extension DocumentFeature {
                 return .documentMutationBridgeFailed(message)
             case .incompatibleLayerType:
                 return .unsupportedLayerType
+            case .invalidLayerProcessingRequest:
+                return .documentMutationBridgeFailed(nil)
             case let .transactionFailure(primary, rollback):
                 return .documentMutationTransactionFailed(primary, rollback)
             }

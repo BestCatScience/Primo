@@ -79,10 +79,12 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     case invalidLayerIndex(Int)
     case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case invalidFolderID(Int)
+    case staleFolderID(folderID: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case layerLocked(Int)
     case alphaLocked(Int)
     case invalidCanvasSize(width: Int, height: Int)
     case invalidOpacity(Double)
+    case invalidLayerProcessingRequest(String)
     case emptyInput
     case noUndoState
     case noRedoState
@@ -666,11 +668,15 @@ public struct TextLayerGateway: Sendable {
 }
 
 public struct DocumentLayerEffectsGateway: Sendable {
-    package let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    private let mergeLayerDownImpl: @Sendable (Int) -> DocumentMutationResult
 
     public init(
         mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult
     ) {
-        self.mergeLayerDown = mergeLayerDown
+        self.mergeLayerDownImpl = mergeLayerDown
+    }
+
+    package func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
+        mergeLayerDownImpl(index)
     }
 }

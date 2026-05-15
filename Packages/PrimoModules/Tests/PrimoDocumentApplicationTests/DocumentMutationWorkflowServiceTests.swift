@@ -63,6 +63,29 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
+    func layerContentCommandsRejectInvalidProcessingTransformBeforeMutationGateways() {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1),
+            documentEditingGateway: .failing,
+            documentLayerEffectsGateway: .unused
+        )
+
+        let result = service.applyLayerProcessing(
+            0,
+            request: .transform(
+                translation: .zero,
+                scale: 0,
+                rotationDegrees: 0,
+                selection: nil
+            )
+        )
+
+        expectFailure(result, .invalidLayerProcessingRequest("transform"))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
     func layerContentCommandsRejectInvalidPixelPayloadBeforeMutationGateways() {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(

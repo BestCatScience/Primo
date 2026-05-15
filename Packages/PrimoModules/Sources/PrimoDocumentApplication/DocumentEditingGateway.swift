@@ -5,11 +5,15 @@ public typealias DocumentEditingRequest = DocumentEditorRequest
 public typealias DocumentEditingResult = DocumentEditorResult
 
 public struct DocumentEditingGateway: Sendable {
-    public let execute: @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
+    private let executeImpl: @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
 
     public init(
         execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
     ) {
-        self.execute = execute
+        self.executeImpl = execute
+    }
+
+    public func execute(_ request: DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> {
+        executeImpl(request)
     }
 }

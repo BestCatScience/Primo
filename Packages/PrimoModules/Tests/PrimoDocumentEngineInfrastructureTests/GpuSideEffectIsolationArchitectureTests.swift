@@ -1966,7 +1966,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             (
                 "DocumentLayerEffectsGateway",
                 mutationContracts,
-                ["mergeLayerDown"]
+                []
             )
         ]
 
@@ -1988,6 +1988,50 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!surfaceReleaserBody.contains("public init(releaseSurfaceHandle"), "Raw surface-handle release authority should be constructed inside the package")
         #expect(Self.functionSignatures(accessLevel: "public", in: surfaceReleaserBody).contains("public func releaseSurfaceLease(_ lease: StrokePreviewLease)"))
         #expect(renderingContracts.contains("public protocol SurfaceHandleReleasing"))
+    }
+
+    @Test
+    func rawMutationGatewayAuthorityStaysInLiveCompositionAndFocusedTests() throws {
+        let repoRoot = try Self.repoRoot()
+        let roots = [
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources", isDirectory: true),
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Tests", isDirectory: true),
+            repoRoot.appendingPathComponent("App", isDirectory: true),
+            repoRoot.appendingPathComponent("PrimoTests", isDirectory: true),
+        ].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let allowedGatewayConstructionFiles: Set<String> = [
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentContentServiceTests.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentInteractionServiceTests.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentMutationWorkflowServiceTests.swift",
+        ]
+        let allowedMutationGatewayUseFiles: Set<String> = [
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/DocumentProjectPreviewLoaderTests.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/PaintDocumentMutationContractTests.swift",
+            "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentRuntimeUndoTests.swift",
+        ]
+
+        for root in roots {
+            for source in try Self.swiftSources(under: root) {
+                let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+                let body = Self.swiftCodeWithCommentsAndStringsBlanked(
+                    in: try String(contentsOf: source, encoding: .utf8)
+                )
+                if body.contains("DocumentMutationGateway(") {
+                    #expect(
+                        allowedGatewayConstructionFiles.contains(relativePath),
+                        "\(relativePath) should not construct raw DocumentMutationGateway authority"
+                    )
+                }
+                if body.contains(".mutationGateway.") {
+                    #expect(
+                        allowedMutationGatewayUseFiles.contains(relativePath),
+                        "\(relativePath) should not bypass typed application/runtime mutation facades"
+                    )
+                }
+            }
+        }
     }
 
     @Test
@@ -2254,6 +2298,59 @@ struct GpuSideEffectIsolationArchitectureTests {
                     "\(target) must not depend on concrete infrastructure target \(dependency)"
                 )
             }
+        }
+    }
+
+    @Test
+    func coreTypesStayFreeOfLiveSystemSideEffects() throws {
+        let repoRoot = try Self.repoRoot()
+        let graph = try Self.packageTargetGraph()
+        #expect(graph["PrimoCoreTypes"]?.contains("PrimoSystemClients") != true)
+        #expect(graph["PrimoSystemClients"] == ["PrimoCoreTypes"] as Set<String>)
+
+        let coreRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoCoreTypes",
+            isDirectory: true
+        )
+        let liveRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoSystemClients",
+            isDirectory: true
+        )
+        let coreSources = try Self.swiftSources(under: coreRoot)
+        let liveSources = try Self.swiftSources(under: liveRoot)
+        let coreBody = try coreSources
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
+        let liveBody = try liveSources
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
+        let semanticCoreBody = Self.swiftCodeWithCommentsAndStringsBlanked(in: coreBody)
+
+        let bannedCoreTokens = [
+            "import Security",
+            "FileManager.default",
+            "URLSession.shared",
+            "UserDefaults.standard",
+            "SecItem",
+            "ProcessInfo.processInfo",
+            "DispatchQueue.main",
+            "Date()",
+            "UUID()",
+            "static let live",
+            "static var live"
+        ]
+        for token in bannedCoreTokens {
+            #expect(
+                !semanticCoreBody.contains(token),
+                "PrimoCoreTypes should define system client contracts without live side-effect token \(token)"
+            )
+        }
+
+        for token in ["FileManager.default", "URLSession.shared", "UserDefaults.standard", "SecItem", "ProcessInfo.processInfo", "DispatchQueue.main"] {
+            #expect(
+                liveBody.contains(token),
+                "PrimoSystemClients should own live system-client implementation token \(token)"
+            )
         }
     }
 
