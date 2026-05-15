@@ -990,14 +990,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     ) -> Result<RuntimeBlurPlan, DocumentMutationFailure> {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        let baseline = strokeCoordinator.blurStrokeState?.baseline ?? undoSnapshot()
         let source = layerSourceForGpuPlan(index: layerIndex)
-        strokeCoordinator.beginOrAppendBlur(
-            baseline: baseline,
-            layerIndex: layerIndex,
-            brush: brush,
-            samples: samples
-        )
         return .success(
             RuntimeBlurPlan(
                 layerIndex: layerIndex,
@@ -1014,6 +1007,28 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 gpuServices: gpuServices
             )
         )
+    }
+
+    func reserveBlurSession(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int
+    ) -> Result<StrokeCommitCoordinator.BlurSessionReservation, DocumentMutationFailure> {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        let baseline = strokeCoordinator.blurStrokeState?.baseline ?? undoSnapshot()
+        return .success(
+            strokeCoordinator.beginOrAppendBlur(
+                baseline: baseline,
+                layerIndex: layerIndex,
+                brush: brush,
+                samples: samples
+            )
+        )
+    }
+
+    func rollbackBlurSessionReservation(_ reservation: StrokeCommitCoordinator.BlurSessionReservation) {
+        strokeCoordinator.rollbackBlurReservation(reservation)
     }
 
     func blurPayload(for plan: RuntimeBlurPlan) -> DocumentLayerMutationPayload? {
@@ -1384,14 +1399,27 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
+        let reservation: StrokeCommitCoordinator.BlurSessionReservation
+        switch reserveBlurSession(samples: samples, brush: brush, layerIndex: layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(success):
+            reservation = success
+        }
         switch makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse) {
         case let .failure(failure):
+            rollbackBlurSessionReservation(reservation)
             return .failure(failure)
         case let .success(plan):
             guard let payload = blurPayload(for: plan) else {
+                rollbackBlurSessionReservation(reservation)
                 return .failure(.bridgeMutationFailed("blurStroke"))
             }
-            return applyBlurPlan(plan, payload: payload)
+            let result = applyBlurPlan(plan, payload: payload)
+            if case .failure = result {
+                rollbackBlurSessionReservation(reservation)
+            }
+            return result
         }
     }
 

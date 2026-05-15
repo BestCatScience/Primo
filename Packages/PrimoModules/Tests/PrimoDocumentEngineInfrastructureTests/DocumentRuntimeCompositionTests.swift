@@ -452,8 +452,10 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyFillPlan\"))"))
         #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeStrokeCommitPlan\"))"))
         #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyStrokeCommitPlan\"))"))
+        #expect(body.contains("let reservationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"reserveBlurSession\"))"))
         #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeBlurPlan\"))"))
-        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyBlurPlan\"))"))
+        #expect(body.contains("let mutationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyBlurPlan\"))"))
+        #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
     }
 
     @Test

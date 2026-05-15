@@ -58,7 +58,7 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
     }
 
     func applyLayerProcessing(index: EditableLayerIndex, request: ValidatedLayerProcessingRequest) -> DocumentLayerMutationResult {
-        contentEvents.append("process:\(index.rawValue):\(request == .luminanceToAlpha)")
+        contentEvents.append("process:\(index.rawValue):\(request.rawValue == .luminanceToAlpha)")
         return .success(())
     }
 
@@ -147,6 +147,26 @@ struct DocumentEditorUseCaseTests {
 
         #expect(try result.get() == .content(LayerContentMutationPlan()))
         #expect(gateway.contentEvents == ["replacePixels:2:4"])
+    }
+
+    @Test
+    func processingContentRequestUsesValidatedRequestWrapper() throws {
+        let useCase = DocumentEditorUseCase()
+        let gateway = DocumentEditorGatewaySpy()
+        let context = DocumentLayerMutationContext(
+            layerCount: 2,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        )
+
+        let result = useCase.execute(
+            .content(.applyProcessing(index: 1, request: .luminanceToAlpha)),
+            in: context,
+            gateway: gateway
+        )
+
+        #expect(try result.get() == .content(LayerContentMutationPlan()))
+        #expect(gateway.contentEvents == ["process:1:true"])
     }
 
     @Test

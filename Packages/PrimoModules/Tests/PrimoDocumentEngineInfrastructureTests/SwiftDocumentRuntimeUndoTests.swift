@@ -322,6 +322,60 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func makeBlurPlanDoesNotReserveBlurSession() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.makeBlurPlan(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0,
+            captureTimelapse: false
+        ).get()
+
+        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) = runtime.endBlurStroke() else {
+            Issue.record("Expected pure blur planning to leave no blur session reserved")
+            return
+        }
+    }
+
+    @Test
+    func failedBlurPayloadRollsBackReservedBlurSession() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [], blurReturnsNil: true)
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        guard case .failure(.bridgeMutationFailed("blurStroke")) =
+            runtime.blur(samples: [sample()], brush: brush(), layerIndex: 0, captureTimelapse: false)
+        else {
+            Issue.record("Expected nil blur payload to fail")
+            return
+        }
+        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) = runtime.endBlurStroke() else {
+            Issue.record("Expected failed blur payload to roll back the blur session reservation")
+            return
+        }
+    }
+
+    @Test
+    func liveBlurKernelFailureRollsBackReservedBlurSession() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [], blurReturnsNil: true)
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+
+        guard case .failure(.gpu(.kernelFailed(operation: "blurStroke"))) =
+            runtime.strokeGateway.blurStroke([sample()], brush(), 0, false)
+        else {
+            Issue.record("Expected live nil blur payload to map to a blur kernel failure")
+            return
+        }
+        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) =
+            runtime.strokeGateway.endBlurStroke()
+        else {
+            Issue.record("Expected live blur failure to roll back the blur session reservation")
+            return
+        }
+    }
+
+    @Test
     func gpuBackedStrokeFillAndBlurPlansPassRetainedSourceHandles() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x55, count: 16)])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
@@ -825,6 +879,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private let lock = NSLock()
     private var strokeOutputs: [Data]
     private var blurOutputs: [Data]
+    private let blurReturnsNil: Bool
     private var pixelDataByHandle: [MetalBufferHandle: Data] = [:]
     private var referenceCountByHandle: [MetalBufferHandle: Int] = [:]
     private var retainedHandles: [MetalBufferHandle] = []
@@ -834,9 +889,10 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private var materializedHandles: [MetalBufferHandle] = []
     private var retainSucceeds = true
 
-    init(strokeOutputs: [Data], blurOutputs: [Data] = []) {
+    init(strokeOutputs: [Data], blurOutputs: [Data] = [], blurReturnsNil: Bool = false) {
         self.strokeOutputs = strokeOutputs
         self.blurOutputs = blurOutputs
+        self.blurReturnsNil = blurReturnsNil
     }
 
     func makeHandle(width: Int, height: Int, pixelData: Data) -> MetalBufferHandle {
@@ -952,6 +1008,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 self.lock.withLock {
                     self.blurSourceBufferHandles.append(sourceBufferHandle)
                 }
+                guard !self.blurReturnsNil else { return nil }
                 let output = self.nextBlurPixelData() ?? pixelData
                 return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,

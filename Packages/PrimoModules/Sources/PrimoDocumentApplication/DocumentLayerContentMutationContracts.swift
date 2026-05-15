@@ -44,7 +44,13 @@ public struct LayerMaskData: Equatable, Sendable {
     }
 }
 
-public typealias ValidatedLayerProcessingRequest = LayerProcessingRequest
+public struct ValidatedLayerProcessingRequest: Equatable, Sendable {
+    public let rawValue: LayerProcessingRequest
+
+    package init(_ rawValue: LayerProcessingRequest) {
+        self.rawValue = rawValue
+    }
+}
 
 // Content commands join the same authoritative validation path as structure
 // and attribute commands: the use case emits revision-aware EditableLayerIndex
@@ -98,7 +104,9 @@ public struct LayerContentMutationCommandValidator: Sendable {
         case let .clear(index):
             return editableLayer(index, in: context).map { .clear(index: $0) }
         case let .applyProcessing(index, request):
-            return editableLayer(index, in: context).map { .applyProcessing(index: $0, request: request) }
+            return editableLayer(index, in: context).map {
+                .applyProcessing(index: $0, request: ValidatedLayerProcessingRequest(request))
+            }
         case let .replaceMask(index, mask):
             return editableLayer(index, in: context).map { .replaceMask(index: $0, mask: mask) }
         case let .clearMask(index):

@@ -9,11 +9,31 @@ struct ArchitectureSourceInspector {
         let accessLevel: String
     }
 
+    struct Import: Equatable {
+        let moduleName: String
+        let attributes: Set<String>
+    }
+
     struct Property: Equatable {
         let name: String
         let accessLevel: String
         let type: String?
         let isStored: Bool
+    }
+
+    struct Callable: Equatable {
+        struct Parameter: Equatable {
+            let firstName: String?
+            let secondName: String?
+            let type: String
+        }
+
+        let kind: String
+        let name: String
+        let accessLevel: String
+        let attributes: Set<String>
+        let signature: String
+        let parameters: [Parameter]
     }
 
     private let source: String
@@ -27,7 +47,13 @@ struct ArchitectureSourceInspector {
     var importedModules: Set<String> {
         let visitor = ImportVisitor(viewMode: .sourceAccurate)
         visitor.walk(tree)
-        return visitor.modules
+        return Set(visitor.imports.map(\.moduleName))
+    }
+
+    var imports: [Import] {
+        let visitor = ImportVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.imports
     }
 
     var topLevelDeclarations: [Declaration] {
@@ -51,7 +77,19 @@ struct ArchitectureSourceInspector {
     var functionSignatures: [String] {
         let visitor = FunctionVisitor(source: source, viewMode: .sourceAccurate)
         visitor.walk(tree)
-        return visitor.signatures
+        return visitor.callables.map(\.signature)
+    }
+
+    var callables: [Callable] {
+        let visitor = FunctionVisitor(source: source, viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.callables
+    }
+
+    var dependencyAttributeKeys: Set<String> {
+        let visitor = DependencyAttributeVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.keys
     }
 
     func declarationSource(named name: String) -> String? {
@@ -133,12 +171,17 @@ private final class TopLevelDeclarationVisitor: SyntaxVisitor {
 }
 
 private final class ImportVisitor: SyntaxVisitor {
-    var modules: Set<String> = []
+    var imports: [ArchitectureSourceInspector.Import] = []
 
     override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
         let path = node.path.trimmedDescription
         if let module = path.split(separator: ".").first {
-            modules.insert(String(module))
+            imports.append(
+                ArchitectureSourceInspector.Import(
+                    moduleName: String(module),
+                    attributes: attributeNames(in: node.attributes)
+                )
+            )
         }
         return .skipChildren
     }
@@ -180,7 +223,7 @@ private final class InitializerVisitor: SyntaxVisitor {
 }
 
 private final class FunctionVisitor: SyntaxVisitor {
-    var signatures: [String] = []
+    var callables: [ArchitectureSourceInspector.Callable] = []
     private let source: String
 
     init(source: String, viewMode: SyntaxTreeViewMode) {
@@ -189,8 +232,46 @@ private final class FunctionVisitor: SyntaxVisitor {
     }
 
     override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
-        signatures.append(signaturePrefix(for: Syntax(node), in: source))
+        callables.append(
+            ArchitectureSourceInspector.Callable(
+                kind: "func",
+                name: node.name.text,
+                accessLevel: accessLevel(in: node.modifiers),
+                attributes: attributeNames(in: node.attributes),
+                signature: signaturePrefix(for: Syntax(node), in: source),
+                parameters: parameters(in: node.signature.parameterClause.parameters)
+            )
+        )
         return .skipChildren
+    }
+}
+
+private final class DependencyAttributeVisitor: SyntaxVisitor {
+    var keys: Set<String> = []
+
+    override func visit(_ node: AttributeSyntax) -> SyntaxVisitorContinueKind {
+        guard node.attributeName.trimmedDescription == "Dependency" else {
+            return .visitChildren
+        }
+        guard let arguments = node.arguments?.trimmedDescription else {
+            keys.insert("")
+            return .skipChildren
+        }
+        if let key = dependencyKey(in: arguments) {
+            keys.insert(key)
+        } else {
+            keys.insert(arguments)
+        }
+        return .skipChildren
+    }
+
+    private func dependencyKey(in arguments: String) -> String? {
+        guard let marker = arguments.range(of: "\\.") else { return nil }
+        let remainder = arguments[marker.upperBound...]
+        let key = remainder.prefix { character in
+            character.isLetter || character.isNumber || character == "_"
+        }
+        return key.isEmpty ? nil : String(key)
     }
 }
 
@@ -229,6 +310,24 @@ private func accessLevel(in modifiers: DeclModifierListSyntax) -> String {
         }
     }
     return "internal"
+}
+
+private func attributeNames(in attributes: AttributeListSyntax) -> Set<String> {
+    Set(attributes.compactMap { element in
+        element.as(AttributeSyntax.self)?.attributeName.trimmedDescription
+    })
+}
+
+private func parameters(
+    in parameters: FunctionParameterListSyntax
+) -> [ArchitectureSourceInspector.Callable.Parameter] {
+    parameters.map { parameter in
+        ArchitectureSourceInspector.Callable.Parameter(
+            firstName: parameter.firstName.text == "_" ? "_" : parameter.firstName.text,
+            secondName: parameter.secondName?.text,
+            type: parameter.type.trimmedDescription
+        )
+    }
 }
 
 private func signaturePrefix(for node: Syntax, in source: String) -> String {

@@ -325,7 +325,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
         request: ValidatedLayerProcessingRequest
     ) -> DocumentLayerMutationResult {
         if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-        return runtime.mutationGateway.applyLayerProcessing(index.rawValue, request)
+        return runtime.mutationGateway.applyLayerProcessing(index.rawValue, request.rawValue)
             .mapError(mapRuntimeFailure)
     }
 

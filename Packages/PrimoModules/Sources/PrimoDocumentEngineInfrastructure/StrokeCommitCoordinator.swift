@@ -4,6 +4,10 @@ import PrimoDocumentApplication
 import PrimoDocumentPresentationContracts
 
 struct StrokeCommitCoordinator: Sendable {
+    struct BlurSessionReservation: Sendable {
+        fileprivate let previousState: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+    }
+
     private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
     private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
 
@@ -36,13 +40,19 @@ struct StrokeCommitCoordinator: Sendable {
         layerIndex: Int,
         brush: BrushRuntimeSettings,
         samples: [StylusSample]
-    ) {
+    ) -> BlurSessionReservation {
+        let reservation = BlurSessionReservation(previousState: currentBlurStroke)
         currentBlurStroke = (
             baseline: currentBlurStroke?.baseline ?? baseline,
             layerIndex: layerIndex,
             brush: brush,
             samples: (currentBlurStroke?.samples ?? []) + samples
         )
+        return reservation
+    }
+
+    mutating func rollbackBlurReservation(_ reservation: BlurSessionReservation) {
+        currentBlurStroke = reservation.previousState
     }
 
     mutating func clearBlurStroke() {

@@ -111,7 +111,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         for sourcePath in integrationSources {
             let source = repoRoot.appendingPathComponent(sourcePath, isDirectory: false)
             let body = try String(contentsOf: source, encoding: .utf8)
-            #expect(!body.contains("@Dependency"), "\(sourcePath) should be dependency-free")
+            #expect(Self.dependencyKeys(in: body).isEmpty, "\(sourcePath) should be dependency-free")
             #expect(!body.contains("state."), "\(sourcePath) should relay feature actions without direct root state access")
             #expect(!body.contains(rootWorkflowReducerName), "\(sourcePath) should not delegate to root workflow execution")
             #expect(!body.contains("func handle"), "\(sourcePath) should not own workflow handlers")
@@ -250,7 +250,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "AIImageWorkflowReducer should remain the only parent-state workflow while it owns job identity"
         )
 
-        #expect(!body.contains("@Dependency"), "DocumentFeature.swift should not own workflow dependencies")
+        #expect(Self.dependencyKeys(in: body).isEmpty, "DocumentFeature.swift should not own workflow dependencies")
         #expect(!body.contains("DocumentFeature()"), "DocumentFeature.swift should not instantiate itself as a workflow shell")
         #expect(!body.contains("DocumentWorkflowExecutor"), "DocumentFeature.swift should not reference a shared workflow shell")
         #expect(!body.contains("func handle"), "DocumentFeature.swift should not own workflow handlers")
@@ -565,6 +565,12 @@ struct GpuSideEffectIsolationArchitectureTests {
                     actual == expected,
                     "\(moduleName) public symbol graph drifted. Run scripts/update-symbol-snapshots.sh if the API change is intentional."
                 )
+                let publicInfrastructureSymbols = SymbolSnapshotRecord.records(in: actual)
+                    .filter(\.referencesInfrastructureTypeName)
+                #expect(
+                    publicInfrastructureSymbols.isEmpty,
+                    "\(moduleName) public symbol graph should not expose infrastructure type names: \(publicInfrastructureSymbols.map(\.line))"
+                )
             }
         }
     #endif
@@ -603,7 +609,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         for source in try Self.swiftSources(under: appRoot) {
             let body = try String(contentsOf: source, encoding: .utf8)
             #expect(
-                !body.contains("@Dependency(\\.documentMutationGateway)"),
+                !Self.dependencyKeys(in: body).contains("documentMutationGateway"),
                 "\(source.path) reachability guard: App should use validated command/workflow services instead of raw DocumentMutationGateway"
             )
         }
@@ -675,8 +681,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             isDirectory: false
         )
         let body = try String(contentsOf: facade, encoding: .utf8)
-        #expect(!body.contains("@_exported import"), "PrimoDocumentRuntime should expose explicit App-facing wrappers instead of reexporting infrastructure modules")
-        #expect(!body.contains("public typealias"), "PrimoDocumentRuntime should wrap App-facing infrastructure APIs instead of typealiasing them")
+        #expect(Self.exportedImports(in: body).isEmpty, "PrimoDocumentRuntime should expose explicit App-facing wrappers instead of reexporting infrastructure modules")
+        #expect(Self.publicTopLevelTypealiases(in: body).isEmpty, "PrimoDocumentRuntime should wrap App-facing infrastructure APIs instead of typealiasing them")
         let publicStoredProperties = Set(Self.storedPropertyNames(accessLevel: "public", in: body))
         let bannedPublicStoredProperties: Set<String> = [
             "queryGateway",
@@ -706,8 +712,15 @@ struct GpuSideEffectIsolationArchitectureTests {
             body.contains("public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult"),
             "LayerEditingRuntime should expose typed pixel replacement"
         )
-        #expect(!body.contains("public func replaceLayerPixels(_ index: Int, pixelData: Data)"))
-        #expect(!body.contains("public func replaceLayerPixels(_ index: Int, _ pixelData: Data)"))
+        let publicFunctionCallables = Self.callables(accessLevel: "public", in: body)
+            .filter { $0.kind == "func" }
+        #expect(
+            !publicFunctionCallables.contains { callable in
+                callable.name == "replaceLayerPixels" &&
+                    callable.hasParameter(named: "index", type: "Int") &&
+                    callable.hasParameter(named: "pixelData", type: "Data")
+            }
+        )
 
         let renderingWorkflowBody = try #require(Self.typeBody(named: "DocumentRenderingWorkflow", in: body))
         let publicRenderingInitializers = Self.initializerSignatures(accessLevel: "public", in: renderingWorkflowBody)
@@ -763,7 +776,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             isDirectory: false
         )
         let body = try String(contentsOf: facade, encoding: .utf8)
-        let signatures = Set(Self.functionSignatures(accessLevel: "public", in: body).map(Self.normalizedSignature))
+        let publicCallables = Self.callables(accessLevel: "public", in: body)
+        let signatures = Set(publicCallables.map(\.signature).map(Self.normalizedSignature))
 
         let typedSignatures: Set<String> = [
             "public func createCanvas(_ size: ValidCanvasSize)",
@@ -803,6 +817,25 @@ struct GpuSideEffectIsolationArchitectureTests {
         for replacement in deprecatedRawReplacements {
             #expect(body.contains("@available(*, deprecated, message: \"\(replacement)\")"))
         }
+
+        let deprecatedRawSurfaceFunctionNames: Set<String> = [
+            "processedLayerPixelData",
+            "alphaMask",
+            "croppedSelectionMask",
+            "scaledPixelData",
+            "translatedPixelData"
+        ]
+        let publicRawSurfaceCompatibilityFunctions = publicCallables.filter { callable in
+            callable.kind == "func" &&
+                deprecatedRawSurfaceFunctionNames.contains(callable.name) &&
+                callable.hasParameter(type: "Data") &&
+                callable.hasParameter(named: "width", type: "Int") &&
+                callable.hasParameter(named: "height", type: "Int")
+        }
+        #expect(
+            publicRawSurfaceCompatibilityFunctions.allSatisfy { $0.attributes.contains("available") },
+            "Public raw Data + width + height surface compatibility APIs should be explicitly deprecated: \(publicRawSurfaceCompatibilityFunctions.map(\.signature))"
+        )
     }
 
     @Test
@@ -839,36 +872,36 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func applyLayerMutation(",
             "public func applyTextLayerMutation("
         ]
-        let bannedRawIndexFragments = [
-            "_ index: Int",
-            "layerIndex: Int",
-            "activeLayerIndex: Int",
-            "destinationIndex: Int",
-            "folderID: Int"
+        let bannedRawIndexParameterNames: Set<String> = [
+            "index",
+            "layerIndex",
+            "activeLayerIndex",
+            "destinationIndex",
+            "folderID"
         ]
-        let bannedRawPayloadFragments = [
-            "pixelData: Data",
-            "_ pixelData: Data",
-            "maskData: Data"
+        let bannedRawPayloadParameterNames: Set<String> = [
+            "pixelData",
+            "maskData"
         ]
 
-        for signature in Self.functionSignatures(accessLevel: "public", in: layerEditingBody).map(Self.normalizedSignature)
-            where layerMutationPrefixes.contains(where: signature.hasPrefix)
+        for callable in Self.callables(accessLevel: "public", in: layerEditingBody)
+            where layerMutationPrefixes.contains(where: callable.signature.hasPrefix)
         {
-            for fragment in bannedRawIndexFragments {
-                #expect(!signature.contains(fragment), "\(signature) should use typed layer/folder value objects")
+            let rawIndexParameter = callable.parameters.first { parameter in
+                bannedRawIndexParameterNames.contains(parameter.semanticName) && parameter.type == "Int"
             }
-            for fragment in bannedRawPayloadFragments {
-                #expect(!signature.contains(fragment), "\(signature) should use typed layer pixel/mask payloads")
+            #expect(rawIndexParameter == nil, "\(callable.signature) should use typed layer/folder value objects")
+            let rawPayloadParameter = callable.parameters.first { parameter in
+                bannedRawPayloadParameterNames.contains(parameter.semanticName) && parameter.type == "Data"
             }
+            #expect(rawPayloadParameter == nil, "\(callable.signature) should use typed layer pixel/mask payloads")
         }
 
-        for signature in Self.functionSignatures(accessLevel: "public", in: strokeEditingBody).map(Self.normalizedSignature)
-            where signature.hasPrefix("public func applyGpuStrokeSurface(") || signature.hasPrefix("public func blurStroke(")
+        for callable in Self.callables(accessLevel: "public", in: strokeEditingBody)
+            where callable.signature.hasPrefix("public func applyGpuStrokeSurface(") || callable.signature.hasPrefix("public func blurStroke(")
         {
-            #expect(!signature.contains("layerIndex: Int"))
-            #expect(!signature.contains("_ layerIndex: Int"))
-            #expect(signature.contains("EditableLayerIndex"))
+            #expect(!callable.hasParameter(named: "layerIndex", type: "Int"))
+            #expect(callable.hasParameter(named: "layerIndex", type: "EditableLayerIndex"))
         }
     }
 
@@ -1226,7 +1259,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             let body = try String(contentsOf: source, encoding: .utf8)
             for key in bannedDependencyKeys {
                 #expect(
-                    !body.contains("@Dependency(\\.\(key))"),
+                    !Self.dependencyKeys(in: body).contains(key),
                     "\(sourcePath) should depend on document runtime capabilities instead of \\.\(key)"
                 )
             }
@@ -1247,11 +1280,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             let source = repoRoot.appendingPathComponent(sourcePath, isDirectory: false)
             let body = try String(contentsOf: source, encoding: .utf8)
             #expect(
-                !body.contains("@Dependency(\\.fileClient)"),
+                !Self.dependencyKeys(in: body).contains("fileClient"),
                 "\(sourcePath) should use narrow capabilities instead of raw FileClient"
             )
             #expect(
-                !body.contains("@Dependency(\\.documentWorkspaceClient)"),
+                !Self.dependencyKeys(in: body).contains("documentWorkspaceClient"),
                 "\(sourcePath) should use narrow workspace capabilities instead of DocumentWorkspaceClient"
             )
         }
@@ -1362,10 +1395,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
 
         #expect(lineCount < 100, "DocumentRuntimeContracts.swift should stay a thin compatibility umbrella")
-        #expect(
-            !body.contains("@_exported import"),
-            "DocumentRuntimeContracts.swift should not hide dependency boundaries through re-exported imports"
-        )
+        #expect(Self.exportedImports(in: body).isEmpty, "DocumentRuntimeContracts.swift should not hide dependency boundaries through re-exported imports")
         for token in banned {
             #expect(!body.contains(token), "Runtime contract type \(token) should live in a narrow contract target")
         }
@@ -1383,7 +1413,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             let body = try String(contentsOf: url, encoding: .utf8)
 
             #expect(
-                !body.contains("@_exported import"),
+                Self.exportedImports(in: body).isEmpty,
                 "App files should import narrow Primo modules explicitly instead of relying on App-wide re-exports"
             )
         }
@@ -1446,10 +1476,24 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(structureSignatures == expectedStructureSignatures)
         #expect(attributeSignatures == expectedAttributeSignatures)
         #expect(contentSignatures == expectedContentSignatures)
-        for signature in structureSignatures.union(attributeSignatures).union(contentSignatures) {
-            #expect(!signature.contains("index: Int"), "Layer mutation gateways should accept validated layer indexes: \(signature)")
-            #expect(!signature.contains("folderID: Int"), "Layer mutation gateways should accept validated folder identifiers: \(signature)")
-            #expect(!signature.contains("opacity: Double"), "Layer mutation gateways should accept validated opacity: \(signature)")
+        let gatewayCallables = [
+            structureGateway,
+            attributeGateway,
+            contentGateway
+        ].flatMap { Self.callables(in: $0) }
+        for callable in gatewayCallables {
+            let rawLayerParameter = callable.parameters.first { parameter in
+                parameter.semanticName == "index" && parameter.type == "Int"
+            }
+            #expect(rawLayerParameter == nil, "Layer mutation gateways should accept validated layer indexes: \(callable.signature)")
+            let rawFolderParameter = callable.parameters.first { parameter in
+                parameter.semanticName == "folderID" && parameter.type == "Int"
+            }
+            #expect(rawFolderParameter == nil, "Layer mutation gateways should accept validated folder identifiers: \(callable.signature)")
+            let rawOpacityParameter = callable.parameters.first { parameter in
+                parameter.semanticName == "opacity" && parameter.type == "Double"
+            }
+            #expect(rawOpacityParameter == nil, "Layer mutation gateways should accept validated opacity: \(callable.signature)")
         }
         #expect(!body.contains("rawValueOrSentinel"), "LayerAnchorIndex should not expose a public sentinel conversion")
     }
@@ -2083,6 +2127,15 @@ struct GpuSideEffectIsolationArchitectureTests {
         ArchitectureSourceInspector(source: source).importedModules
     }
 
+    private static func exportedImports(in source: String) -> [ArchitectureSourceInspector.Import] {
+        ArchitectureSourceInspector(source: source).imports
+            .filter { $0.attributes.contains("_exported") }
+    }
+
+    private static func dependencyKeys(in source: String) -> Set<String> {
+        ArchitectureSourceInspector(source: source).dependencyAttributeKeys
+    }
+
     private static func swiftCodeWithCommentsAndStringsBlanked(in source: String) -> String {
         var output = ""
         var cursor = source.startIndex
@@ -2163,6 +2216,12 @@ struct GpuSideEffectIsolationArchitectureTests {
             .map(\.name)
     }
 
+    private static func publicTopLevelTypealiases(in source: String) -> [String] {
+        ArchitectureSourceInspector(source: source).topLevelDeclarations
+            .filter { $0.accessLevel == "public" && $0.kind == "typealias" }
+            .map(\.name)
+    }
+
     private static func infrastructureProductNames(in source: String) -> [String] {
         PackageManifestProductParser.libraryProductNames(in: source)
             .filter { $0.hasSuffix("Infrastructure") }
@@ -2194,6 +2253,17 @@ struct GpuSideEffectIsolationArchitectureTests {
                 return signature.hasPrefix("\(accessLevel) ") ||
                     signature.hasPrefix("\(accessLevel) static ") ||
                     signature.hasPrefix("\(accessLevel) class ")
+            }
+    }
+
+    private static func callables(
+        accessLevel: String? = nil,
+        in source: String
+    ) -> [ArchitectureSourceInspector.Callable] {
+        ArchitectureSourceInspector(source: source).callables
+            .filter { callable in
+                guard let accessLevel else { return true }
+                return callable.accessLevel == accessLevel
             }
     }
 
@@ -2451,6 +2521,22 @@ private enum PackageDumpTargetGraph {
     }
 }
 
+private extension ArchitectureSourceInspector.Callable {
+    func hasParameter(named name: String, type: String) -> Bool {
+        parameters.contains { $0.semanticName == name && $0.type == type }
+    }
+
+    func hasParameter(type: String) -> Bool {
+        parameters.contains { $0.type == type }
+    }
+}
+
+private extension ArchitectureSourceInspector.Callable.Parameter {
+    var semanticName: String {
+        secondName ?? firstName ?? ""
+    }
+}
+
 private struct SymbolSnapshotRecord: Comparable {
     let kind: String
     let preciseIdentifier: String
@@ -2477,6 +2563,20 @@ private struct SymbolSnapshotRecord: Comparable {
             .joined() ?? ""
     }
 
+    init?(line: String) {
+        let columns = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+        guard columns.count == 5 else { return nil }
+        self.kind = columns[0]
+        self.preciseIdentifier = columns[1]
+        self.path = columns[2]
+        self.title = columns[3]
+        self.declaration = columns[4]
+    }
+
+    static func records(in snapshot: String) -> [SymbolSnapshotRecord] {
+        snapshot.split(separator: "\n").compactMap { SymbolSnapshotRecord(line: String($0)) }
+    }
+
     static func < (lhs: SymbolSnapshotRecord, rhs: SymbolSnapshotRecord) -> Bool {
         lhs.line < rhs.line
     }
@@ -2489,6 +2589,13 @@ private struct SymbolSnapshotRecord: Comparable {
             title,
             declaration
         ].joined(separator: "\t")
+    }
+
+    var referencesInfrastructureTypeName: Bool {
+        [path, title, declaration].contains { field in
+            field.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "_" })
+                .contains { $0.hasSuffix("Infrastructure") }
+        }
     }
 }
 

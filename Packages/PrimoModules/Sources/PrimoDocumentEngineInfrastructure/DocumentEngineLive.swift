@@ -557,11 +557,23 @@ package enum DocumentEngineFactory {
         captureTimelapse: Bool,
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
     ) -> DocumentMutationResult {
+        let reservationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("reserveBlurSession")) {
+            $0.reserveBlurSession(samples: samples, brush: brush, layerIndex: layerIndex)
+        }
+        let reservation: StrokeCommitCoordinator.BlurSessionReservation
+        switch reservationResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(success):
+            reservation = success
+        }
+
         let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("makeBlurPlan")) {
             $0.makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
         }
         switch planResult {
         case let .failure(failure):
+            rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)
             return .failure(failure)
         case let .success(plan):
             guard let payload = plan.gpuServices.blurPixels(
@@ -572,11 +584,25 @@ package enum DocumentEngineFactory {
                 samples: plan.samples,
                 brush: plan.brush
             ) else {
+                rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)
                 return .failure(.gpu(.kernelFailed(operation: "blurStroke")))
             }
-            return runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyBlurPlan")) {
+            let mutationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure("applyBlurPlan")) {
                 $0.applyBlurPlan(plan, payload: payload)
             }
+            if case .failure = mutationResult {
+                rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)
+            }
+            return mutationResult
+        }
+    }
+
+    private static func rollbackBlurSessionReservation(
+        _ reservation: StrokeCommitCoordinator.BlurSessionReservation,
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
+    ) {
+        _ = runtimeExecutor.performMutation(failure: reentrantRuntimeFailure("rollbackBlurSessionReservation")) {
+            $0.rollbackBlurSessionReservation(reservation)
         }
     }
 }
