@@ -39,19 +39,14 @@ struct DocumentApplicationEnvironment: Sendable {
             presentationRuntime: runtime.presentation,
             strokeRuntime: runtime.strokeEditing
         )
-        let canvasEditingAccess = DocumentCanvasEditingAccess(
-            strokeRuntime: runtime.strokeEditing,
-            layerEditingRuntime: runtime.layerEditing,
-            presentationAccess: presentationWorkflowAccess
-        )
-        self.strokePreviewPort = canvasEditingAccess
-        self.strokeCommitPort = canvasEditingAccess
-        self.layerVisibilityPort = canvasEditingAccess
-        self.layerContentPort = canvasEditingAccess
-        self.selectionProcessingPort = canvasEditingAccess
-        self.canvasTransformPort = canvasEditingAccess
-        self.canvasEditingPresentationPort = canvasEditingAccess
-        self.paperStylePort = canvasEditingAccess
+        self.strokePreviewPort = DocumentStrokePreviewAdapter(runtime: runtime.strokeEditing)
+        self.strokeCommitPort = DocumentStrokeCommitAdapter(runtime: runtime.strokeEditing)
+        self.layerVisibilityPort = DocumentLayerVisibilityAdapter(runtime: runtime.layerEditing)
+        self.layerContentPort = DocumentLayerContentAdapter(runtime: runtime.layerEditing)
+        self.selectionProcessingPort = DocumentSelectionProcessingAdapter(runtime: runtime.layerEditing)
+        self.canvasTransformPort = DocumentCanvasTransformAdapter(runtime: runtime.layerEditing)
+        self.canvasEditingPresentationPort = DocumentCanvasEditingPresentationAdapter(runtime: runtime.presentation)
+        self.paperStylePort = DocumentPaperStyleAdapter(runtime: runtime.persistence)
         self.exportCapability = DocumentExportCapability(exportRuntime: runtime.export)
         self.persistenceCapability = DocumentPersistenceCapability(persistenceRuntime: runtime.persistence)
         self.previewRenderingCapability = DocumentPreviewRenderingCapability(previewRuntime: runtime.preview)

@@ -516,15 +516,13 @@ private struct DocumentRuntimeServices: Sendable {
         self.mutationWorkflow = DocumentMutationWorkflowService(
             documentQueryGateway: composition.queryGateway,
             documentEditingGateway: composition.editingGateway,
-            documentLayerEffectsGateway: composition.layerEffectsGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
+            documentLayerEffectsGateway: composition.layerEffectsGateway
         )
         self.contentService = DocumentContentService(
             documentQueryGateway: composition.queryGateway,
             documentRenderGateway: composition.renderGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
+            documentEditingGateway: composition.editingGateway,
+            documentMutationGateway: composition.mutationGateway
         )
         self.canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
         self.layerTransformProcessor = GpuLayerTransformProcessor(
@@ -549,7 +547,10 @@ private struct DocumentRuntimeServices: Sendable {
         self.renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
         self.textLayerService = DocumentTextLayerService(
             textLayerData: composition.textLayerGateway.textLayerData,
-            setTextLayer: composition.textLayerGateway.setTextLayer,
+            setTextLayer: { index, textLayer in
+                composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
+                    .map { _ in () }
+            },
             clearTextLayerData: composition.textLayerGateway.clearTextLayerData
         )
         self.persistenceClient = DocumentPersistenceClient(
@@ -1336,9 +1337,15 @@ public struct DocumentRuntime: Sendable {
                 case let .mergeLayerDown(index):
                     return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index).map { .completed })
                 case let .setTextLayer(index, textLayer):
-                    return mutationOutcome(composition.textLayerGateway.setTextLayer(index, textLayer).map { .completed })
+                    return mutationOutcome(
+                        composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
+                            .map { _ in .completed }
+                    )
                 case let .applyProcessing(index, request):
-                    return mutationOutcome(composition.mutationGateway.applyLayerProcessing(index, request).map { .completed })
+                    return mutationOutcome(
+                        composition.editingGateway.execute(.content(.applyProcessing(index: index, request: request)))
+                            .map { _ in .completed }
+                    )
                 }
             case let .stroke(command):
                 switch command {

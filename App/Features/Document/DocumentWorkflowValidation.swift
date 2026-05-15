@@ -5,6 +5,9 @@ import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
+// App workflow validation is a preflight / fast feedback layer built from
+// DocumentEditingState. The UI snapshot can be stale, so this capability is
+// not the final contract; application and runtime validation must re-check it.
 struct ValidatedDocumentLayerMutationCommand: Equatable, Sendable {
     let command: DocumentMutationCommand
     let layerIndex: EditableLayerIndex

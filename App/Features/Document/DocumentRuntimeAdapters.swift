@@ -51,28 +51,67 @@ struct DocumentPresentationWorkflowAccess: PresentationWorkflowAccess {
         presentationRuntime.renderingWorkflow
     }
 }
-struct DocumentCanvasEditingAccess:
-    StrokePreviewPort,
-    StrokeCommitPort,
-    LayerVisibilityPort,
-    LayerContentPort,
-    SelectionProcessingPort,
-    CanvasTransformPort,
-    CanvasEditingPresentationPort,
-    PaperStylePort
-{
-    private let strokeRuntime: StrokeEditingRuntime
-    private let layerEditingRuntime: LayerEditingRuntime
-    private let presentationAccess: DocumentPresentationWorkflowAccess
+struct DocumentStrokePreviewAdapter: StrokePreviewPort {
+    private let runtime: StrokeEditingRuntime
 
-    init(
-        strokeRuntime: StrokeEditingRuntime,
-        layerEditingRuntime: LayerEditingRuntime,
-        presentationAccess: DocumentPresentationWorkflowAccess
-    ) {
-        self.strokeRuntime = strokeRuntime
-        self.layerEditingRuntime = layerEditingRuntime
-        self.presentationAccess = presentationAccess
+    init(runtime: StrokeEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentStrokeCommitAdapter: StrokeCommitPort {
+    private let runtime: StrokeEditingRuntime
+
+    init(runtime: StrokeEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentLayerVisibilityAdapter: LayerVisibilityPort {
+    private let runtime: LayerEditingRuntime
+
+    init(runtime: LayerEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentLayerContentAdapter: LayerContentPort {
+    private let runtime: LayerEditingRuntime
+
+    init(runtime: LayerEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentSelectionProcessingAdapter: SelectionProcessingPort {
+    private let runtime: LayerEditingRuntime
+
+    init(runtime: LayerEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentCanvasTransformAdapter: CanvasTransformPort {
+    private let runtime: LayerEditingRuntime
+
+    init(runtime: LayerEditingRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentCanvasEditingPresentationAdapter: CanvasEditingPresentationPort {
+    private let runtime: DocumentPresentationRuntime
+
+    init(runtime: DocumentPresentationRuntime) {
+        self.runtime = runtime
+    }
+}
+
+struct DocumentPaperStyleAdapter: PaperStylePort {
+    private let runtime: DocumentPersistenceRuntime
+
+    init(runtime: DocumentPersistenceRuntime) {
+        self.runtime = runtime
     }
 }
 
@@ -278,45 +317,36 @@ extension LayerWorkflowEnvironment {
     }
 }
 
-extension DocumentCanvasEditingAccess {
-    func lightweightPresentation() -> PaintDocumentPresentation {
-        presentationAccess.lightweightPresentation()
-    }
-
-    func presentation() -> PaintDocumentPresentation {
-        presentationAccess.presentation()
-    }
-
-    func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
-        presentationAccess.setPaperStyle(paperStyle)
-    }
-
-    func prewarmDrawingResources() {
-        presentationAccess.prewarmDrawingResources()
-    }
-
-    var exportGateway: DocumentExportGateway {
-        presentationAccess.exportGateway
-    }
-
+extension DocumentCanvasEditingPresentationAdapter {
     var renderingWorkflow: DocumentRenderingWorkflow {
-        presentationAccess.renderingWorkflow
+        runtime.renderingWorkflow
     }
 
     var presentationReader: DocumentPresentationReader {
-        presentationAccess.presentationReader
+        DocumentPresentationReader(
+            lightweightPresentation: runtime.lightweightPresentation,
+            presentation: runtime.presentation
+        )
     }
+}
 
+extension DocumentPaperStyleAdapter {
+    func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+        runtime.setPaperStyle(paperStyle)
+    }
+}
+
+extension DocumentStrokePreviewAdapter {
     func cancel() -> GpuStrokeSessionOutcome {
-        strokeRuntime.cancel()
+        runtime.cancel()
     }
 
     func discardPreviewLease(_ lease: StrokePreviewLease) {
-        strokeRuntime.discardPreviewLease(lease)
+        runtime.discardPreviewLease(lease)
     }
 
     func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease {
-        strokeRuntime.previewLease(for: mutation)
+        runtime.previewLease(for: mutation)
     }
 
     func beginPreview(
@@ -325,7 +355,7 @@ extension DocumentCanvasEditingAccess {
         context: DocumentStrokeContext,
         usesResponsivePreview: Bool
     ) -> GpuStrokeSessionOutcome {
-        strokeRuntime.beginPreview(
+        runtime.beginPreview(
             sample: sample,
             baseSnapshot: baseSnapshot,
             context: context,
@@ -342,7 +372,7 @@ extension DocumentCanvasEditingAccess {
         context: DocumentStrokeContext,
         usesResponsivePreview: Bool
     ) -> GpuStrokeSessionOutcome {
-        strokeRuntime.appendPreview(
+        runtime.appendPreview(
             baseSnapshot: baseSnapshot,
             renderSnapshot: renderSnapshot,
             renderState: renderState,
@@ -362,7 +392,7 @@ extension DocumentCanvasEditingAccess {
         allowsApproximatePreviewCommit: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> GpuStrokeSessionOutcome {
-        strokeRuntime.finish(
+        runtime.finish(
             renderState: renderState,
             baseSnapshot: baseSnapshot,
             renderSnapshot: renderSnapshot,
@@ -372,109 +402,65 @@ extension DocumentCanvasEditingAccess {
             refreshViaDirtyPresentation: refreshViaDirtyPresentation
         )
     }
+}
 
+extension DocumentStrokeCommitAdapter {
     func cancelStroke() {
-        strokeRuntime.cancelStroke()
+        runtime.cancelStroke()
     }
 
     func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
-        strokeRuntime.blurStroke(command)
+        runtime.blurStroke(command)
     }
 
     func endBlurStroke() -> DocumentMutationResult {
-        strokeRuntime.endBlurStroke()
+        runtime.endBlurStroke()
     }
 
     func cancelBlurStroke() {
-        strokeRuntime.cancelBlurStroke()
+        runtime.cancelBlurStroke()
     }
 
     func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult {
-        strokeRuntime.fill(command)
+        runtime.fill(command)
     }
+}
 
+extension DocumentLayerVisibilityAdapter {
     func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
-        layerEditingRuntime.revealLayerForEditing(index)
+        runtime.revealLayerForEditing(index)
     }
 
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
-        layerEditingRuntime.revealLayerForEditing(command)
+        runtime.revealLayerForEditing(command)
     }
 
     func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
-        layerEditingRuntime.ensureLayerVisible(index)
+        runtime.ensureLayerVisible(index)
     }
 
     func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
-        layerEditingRuntime.ensureLayerVisible(command)
+        runtime.ensureLayerVisible(command)
     }
 
     func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        layerEditingRuntime.applyLayerSurfaceMutation(index, payload)
+        runtime.applyLayerSurfaceMutation(index, payload)
     }
+}
 
+extension DocumentLayerContentAdapter {
     func pixelDataForLayer(_ index: Int) -> Data {
-        layerEditingRuntime.pixelDataForLayer(index)
+        runtime.pixelDataForLayer(index)
     }
 
     func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult {
-        layerEditingRuntime.replaceLayerPixels(index, pixelData)
+        runtime.replaceLayerPixels(index, pixelData)
     }
+}
 
+extension DocumentCanvasTransformAdapter {
     func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome {
-        layerEditingRuntime.execute(command, state: context)
-    }
-
-    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? {
-        layerEditingRuntime.invertedSelection(selection, canvasSize: canvasSize, mode: mode)
-    }
-
-    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? {
-        layerEditingRuntime.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted)
-    }
-
-    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? {
-        layerEditingRuntime.featheredSelection(selection, canvasSize: canvasSize, radius: radius)
-    }
-
-    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? {
-        layerEditingRuntime.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode)
-    }
-
-    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? {
-        layerEditingRuntime.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize)
-    }
-
-    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? {
-        layerEditingRuntime.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize)
-    }
-
-    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
-        layerEditingRuntime.makeLassoSelection(from: points, canvasSize: canvasSize)
-    }
-
-    func makeAutoSelection(
-        at point: CGPoint,
-        snapshot: MetalDocumentSnapshot?,
-        layerIndex: Int,
-        thresholdMode: FillThresholdMode,
-        opacityTolerance: Double,
-        colorTolerance: Double,
-        expansion: Int
-    ) -> CanvasSelection? {
-        layerEditingRuntime.makeAutoSelection(
-            at: point,
-            snapshot: snapshot,
-            layerIndex: layerIndex,
-            thresholdMode: thresholdMode,
-            opacityTolerance: opacityTolerance,
-            colorTolerance: colorTolerance,
-            expansion: expansion
-        )
-    }
-
-    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
-        layerEditingRuntime.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        runtime.execute(command, state: context)
     }
 
     func transformedLayerPixels(
@@ -490,7 +476,7 @@ extension DocumentCanvasEditingAccess {
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets
     ) -> Data? {
-        layerEditingRuntime.transformedLayerPixels(
+        runtime.transformedLayerPixels(
             source: source,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -516,7 +502,7 @@ extension DocumentCanvasEditingAccess {
         quadOffsets: TransformQuadOffsets,
         canvasSize: CGSize
     ) -> CanvasSelection? {
-        layerEditingRuntime.transformedSelection(
+        runtime.transformedSelection(
             selection,
             translation: translation,
             scaleX: scaleX,
@@ -535,12 +521,66 @@ extension DocumentCanvasEditingAccess {
         canvasWidth: Int,
         canvasHeight: Int
     ) -> CGRect? {
-        layerEditingRuntime.transformationBounds(
+        runtime.transformationBounds(
             selection: selection,
             pixelData: pixelData,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight
         )
+    }
+}
+
+extension DocumentSelectionProcessingAdapter {
+    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? {
+        runtime.invertedSelection(selection, canvasSize: canvasSize, mode: mode)
+    }
+
+    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? {
+        runtime.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted)
+    }
+
+    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? {
+        runtime.featheredSelection(selection, canvasSize: canvasSize, radius: radius)
+    }
+
+    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? {
+        runtime.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode)
+    }
+
+    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? {
+        runtime.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize)
+    }
+
+    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? {
+        runtime.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize)
+    }
+
+    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
+        runtime.makeLassoSelection(from: points, canvasSize: canvasSize)
+    }
+
+    func makeAutoSelection(
+        at point: CGPoint,
+        snapshot: MetalDocumentSnapshot?,
+        layerIndex: Int,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> CanvasSelection? {
+        runtime.makeAutoSelection(
+            at: point,
+            snapshot: snapshot,
+            layerIndex: layerIndex,
+            thresholdMode: thresholdMode,
+            opacityTolerance: opacityTolerance,
+            colorTolerance: colorTolerance,
+            expansion: expansion
+        )
+    }
+
+    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+        runtime.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
     }
 }
 

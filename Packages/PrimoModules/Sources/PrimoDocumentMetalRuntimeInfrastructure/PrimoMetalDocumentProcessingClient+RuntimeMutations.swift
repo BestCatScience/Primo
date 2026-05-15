@@ -1896,15 +1896,3 @@ extension PrimoMetalDocumentProcessingClient {
         return bits
     }
 }
-
-private extension GradientMapStopSettings {
-    func withPosition(_ position: Double) -> GradientMapStopSettings {
-        GradientMapStopSettings(
-            id: id,
-            position: position,
-            red: red,
-            green: green,
-            blue: blue
-        )
-    }
-}

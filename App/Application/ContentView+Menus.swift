@@ -1662,9 +1662,13 @@ extension ContentView {
         var green: CGFloat = 0
         var blue: CGFloat = 0
         resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
-        stop.wrappedValue.red = UInt8(min(max((red * 255.0).rounded(), 0), 255))
-        stop.wrappedValue.green = UInt8(min(max((green * 255.0).rounded(), 0), 255))
-        stop.wrappedValue.blue = UInt8(min(max((blue * 255.0).rounded(), 0), 255))
+        guard let color = CanvasColor(
+            red: min(max(Double(red), 0), 1),
+            green: min(max(Double(green), 0), 1),
+            blue: min(max(Double(blue), 0), 1),
+            alpha: 1
+        ) else { return }
+        stop.wrappedValue = stop.wrappedValue.withColor(color)
     }
 
     func parsedCanvasDimension(from text: String) -> Int? {

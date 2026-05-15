@@ -24,9 +24,7 @@ struct DocumentMutationWorkflowServiceTests {
                     return .failure(.bridgeMutationFailed("unexpected"))
                 }
             },
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: .unused,
-            textLayerGateway: .unused
+            documentLayerEffectsGateway: .unused
         )
 
         let index = try service.duplicateLayer(1, named: "Copy").get()
@@ -39,19 +37,8 @@ struct DocumentMutationWorkflowServiceTests {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                clearLayer: {
-                    recorder.clearedLayerIndex = $0
-                    return .success(())
-                },
-                applyLayerMask: {
-                    recorder.appliedMaskIndex = $0
-                    return .success(())
-                }
-            ),
-            textLayerGateway: .unused
+            documentEditingGateway: .failing(with: .invalidLayerIndex(2)),
+            documentLayerEffectsGateway: .unused
         )
 
         let result = service.clearLayer(2)
@@ -65,15 +52,8 @@ struct DocumentMutationWorkflowServiceTests {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1, lockedLayerIndexes: [0]),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                applyLayerMask: {
-                    recorder.record("applyMask:\($0)")
-                    return .success(())
-                }
-            ),
-            textLayerGateway: .unused
+            documentEditingGateway: .failing(with: .layerLocked(0)),
+            documentLayerEffectsGateway: .unused
         )
 
         let result = service.applyLayerMask(0)
@@ -88,14 +68,7 @@ struct DocumentMutationWorkflowServiceTests {
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
             documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                replaceLayerPixels: { index, _ in
-                    recorder.record("replacePixels:\(index)")
-                    return .success(())
-                }
-            ),
-            textLayerGateway: .unused
+            documentLayerEffectsGateway: .unused
         )
 
         let result = service.replaceLayerPixels(0, pixelData: Data(repeating: 0xff, count: 3))
@@ -113,14 +86,7 @@ struct DocumentMutationWorkflowServiceTests {
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
             documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                replaceLayerMask: { index, _ in
-                    recorder.record("replaceMask:\(index)")
-                    return .success(())
-                }
-            ),
-            textLayerGateway: .unused
+            documentLayerEffectsGateway: .unused
         )
 
         let result = service.replaceLayerMask(0, maskData: Data(repeating: 0xff, count: 2))
@@ -138,15 +104,14 @@ struct DocumentMutationWorkflowServiceTests {
         let revision = RevisionSequence([DocumentRevision(1), DocumentRevision(2)])
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1, revision: { revision.next() }),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                clearLayer: {
-                    recorder.record("clear:\($0)")
-                    return .success(())
-                }
+            documentEditingGateway: .failing(
+                with: .staleLayerIndex(
+                    index: 0,
+                    validationRevision: DocumentRevision(1),
+                    currentRevision: DocumentRevision(2)
+                )
             ),
-            textLayerGateway: .unused
+            documentLayerEffectsGateway: .unused
         )
 
         let result = service.clearLayer(0)
@@ -176,42 +141,8 @@ struct DocumentMutationWorkflowServiceTests {
         ))
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 7),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: DocumentMutationGateway.stub(
-                replaceLayerPixels: { index, _ in
-                    recorder.record("replacePixels:\(index)")
-                    return .success(())
-                },
-                replaceLayerMask: { index, _ in
-                    recorder.record("replaceMask:\(index)")
-                    return .success(())
-                },
-                clearLayerMask: {
-                    recorder.record("clearMask:\($0)")
-                    return .success(())
-                },
-                clearLayer: {
-                    recorder.record("clear:\($0)")
-                    return .success(())
-                },
-                applyLayerMask: {
-                    recorder.record("applyMask:\($0)")
-                    return .success(())
-                },
-                applyLayerProcessing: { index, request in
-                    recorder.record("process:\(index):\(request == .luminanceToAlpha)")
-                    return .success(())
-                }
-            ),
-            textLayerGateway: TextLayerGateway(
-                textLayerData: { _ in nil },
-                setTextLayer: { index, textLayer in
-                    recorder.record("text:\(index):\(textLayer.text)")
-                    return .success(())
-                },
-                clearTextLayerData: { _ in }
-            )
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentLayerEffectsGateway: .unused
         )
 
         try service.replaceLayerPixels(0, pixelData: Data(repeating: 1, count: 4)).get()
@@ -240,9 +171,7 @@ struct DocumentMutationWorkflowServiceTests {
             documentEditingGateway: DocumentEditingGateway { _ in
                 .failure(.layerLocked(7))
             },
-            documentLayerEffectsGateway: .unused,
-            documentMutationGateway: .unused,
-            textLayerGateway: .unused
+            documentLayerEffectsGateway: .unused
         )
 
         let result: DocumentMutationResult = service.setLayerVisibility(7, visible: true)
@@ -288,6 +217,44 @@ private func expectFailure(_ result: DocumentMutationResult, _ expected: Documen
 private extension DocumentEditingGateway {
     static let failing = DocumentEditingGateway { _ in
         .failure(.bridgeMutationFailed("unused"))
+    }
+
+    static func failing(with failure: DocumentMutationFailure) -> DocumentEditingGateway {
+        DocumentEditingGateway { _ in .failure(failure) }
+    }
+
+    static func recordingContent(
+        _ recorder: MutationRecorder,
+        result: @escaping @Sendable (LayerContentMutationCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
+    ) -> DocumentEditingGateway {
+        DocumentEditingGateway { request in
+            guard case let .content(command) = request else {
+                return .failure(.bridgeMutationFailed("unexpected"))
+            }
+            recorder.record(command.eventDescription)
+            return result(command)
+        }
+    }
+}
+
+private extension LayerContentMutationCommand {
+    var eventDescription: String {
+        switch self {
+        case let .replacePixels(index, _):
+            return "replacePixels:\(index)"
+        case let .setTextLayer(index, textLayer):
+            return "text:\(index):\(textLayer.text)"
+        case let .clear(index):
+            return "clear:\(index)"
+        case let .applyProcessing(index, request):
+            return "process:\(index):\(request == .luminanceToAlpha)"
+        case let .replaceMask(index, _):
+            return "replaceMask:\(index)"
+        case let .clearMask(index):
+            return "clearMask:\(index)"
+        case let .applyMask(index):
+            return "applyMask:\(index)"
+        }
     }
 }
 

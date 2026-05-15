@@ -16,6 +16,7 @@ public struct DocumentReadGateway: Sendable {
         self.lightweightPresentation = lightweightPresentation
         self.presentation = presentation
     }
+
 }
 
 public typealias DocumentQueryGateway = DocumentReadGateway

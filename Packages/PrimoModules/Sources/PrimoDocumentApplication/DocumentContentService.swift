@@ -33,31 +33,26 @@ public struct SelectionTransformCommit: Equatable, Sendable {
 public struct DocumentContentService: Sendable {
     package let documentQueryGateway: DocumentQueryGateway
     package let documentRenderGateway: DocumentRenderGateway
+    package let documentEditingGateway: DocumentEditingGateway
     package let documentMutationGateway: DocumentMutationGateway
-    package let textLayerGateway: TextLayerGateway
 
     public init(
         documentQueryGateway: DocumentQueryGateway,
         documentRenderGateway: DocumentRenderGateway,
-        documentMutationGateway: DocumentMutationGateway,
-        textLayerGateway: TextLayerGateway
+        documentEditingGateway: DocumentEditingGateway,
+        documentMutationGateway: DocumentMutationGateway
     ) {
         self.documentQueryGateway = documentQueryGateway
         self.documentRenderGateway = documentRenderGateway
+        self.documentEditingGateway = documentEditingGateway
         self.documentMutationGateway = documentMutationGateway
-        self.textLayerGateway = textLayerGateway
     }
 
     public func setTextLayer(
         _ layerIndex: Int,
         _ textLayer: TextLayerData
     ) -> DocumentMutationResult {
-        switch editableLayerIndex(layerIndex) {
-        case let .failure(failure):
-            return .failure(failure)
-        case let .success(index):
-            return textLayerGateway.setTextLayer(index.rawValue, textLayer)
-        }
+        executeContent(.setTextLayer(index: layerIndex, textLayer: textLayer))
     }
 
     public func pixelDataForLayer(_ layerIndex: Int) -> Data {
@@ -84,7 +79,7 @@ public struct DocumentContentService: Sendable {
                     )
                 )
             }
-            return documentMutationGateway.replaceLayerPixels(index.rawValue, payload.rgba)
+            return executeContent(.replacePixels(index: index.rawValue, pixelData: payload))
         }
     }
 
@@ -127,7 +122,7 @@ public struct DocumentContentService: Sendable {
             )
         }
 
-        switch documentMutationGateway.replaceLayerPixels(resolvedTarget.index, payload.rgba) {
+        switch executeContent(.replacePixels(index: resolvedTarget.index, pixelData: payload)) {
         case let .failure(failure):
             if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
                 return .failure(
@@ -161,7 +156,7 @@ public struct DocumentContentService: Sendable {
         to target: LayerContentMutationTarget
     ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
         apply(target: target) { targetLayerIndex in
-            switch textLayerGateway.setTextLayer(targetLayerIndex, textLayer) {
+            switch executeContent(.setTextLayer(index: targetLayerIndex, textLayer: textLayer)) {
             case let .failure(failure):
                 return .failure(failure)
             case .success:
@@ -199,6 +194,10 @@ public struct DocumentContentService: Sendable {
                 )
             )
         }
+    }
+
+    private func executeContent(_ command: LayerContentMutationCommand) -> DocumentMutationResult {
+        documentEditingGateway.execute(.content(command)).map { _ in () }
     }
 
     private func resolve(

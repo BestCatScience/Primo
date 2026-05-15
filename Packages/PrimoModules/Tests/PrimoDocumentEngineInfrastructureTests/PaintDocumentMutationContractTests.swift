@@ -29,6 +29,22 @@ struct PaintDocumentMutationContractTests {
         #expect(GradientStopPosition(.infinity) == nil)
         #expect(GradientMapStopSettings(position: .nan, red: 1, green: 2, blue: 3).position == 0)
         #expect(GradientMapStopSettings(position: 2, red: 1, green: 2, blue: 3).position == 1)
+        #expect(GradientMapStopSettings(position: 0.25, red: 1, green: 2, blue: 3).red == 1)
+        #expect(GradientMapStopSettings(position: 0.25, red: 1, green: 2, blue: 3).green == 2)
+        #expect(GradientMapStopSettings(position: 0.25, red: 1, green: 2, blue: 3).blue == 3)
+        let typedStop = GradientMapStopSettings(
+            position: 0.25,
+            color: CanvasColor(
+                red: UnitInterval(0.25)!,
+                green: UnitInterval(0.5)!,
+                blue: UnitInterval(0.75)!,
+                alpha: UnitInterval(0.25)!
+            )
+        )
+        #expect(typedStop.colorValue.red.rawValue == 0.25)
+        #expect(typedStop.colorValue.green.rawValue == 0.5)
+        #expect(typedStop.colorValue.blue.rawValue == 0.75)
+        #expect(typedStop.colorValue.alpha.rawValue == 1)
 
         #expect(ToneCurveSettings(shadows: -2, midtones: .nan, highlights: 2).shadows == -1)
         #expect(ToneCurveSettings(shadows: -2, midtones: .nan, highlights: 2).midtones == 0)

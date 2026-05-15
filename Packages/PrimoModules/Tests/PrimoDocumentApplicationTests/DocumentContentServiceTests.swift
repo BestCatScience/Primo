@@ -29,8 +29,8 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
             documentRenderGateway: renderGateway(),
-            documentMutationGateway: mutationGateway(recorder: recorder),
-            textLayerGateway: textLayerGateway()
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
         )
 
         let result = service.applyPixels(
@@ -48,8 +48,8 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
             documentRenderGateway: renderGateway(),
-            documentMutationGateway: mutationGateway(recorder: recorder),
-            textLayerGateway: textLayerGateway()
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
         )
 
         let result = service.replaceLayerPixels(0, Data(repeating: 0xff, count: 16))
@@ -70,8 +70,8 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
             documentRenderGateway: renderGateway(),
-            documentMutationGateway: mutationGateway(recorder: recorder),
-            textLayerGateway: textLayerGateway()
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
         )
 
         let result = service.replaceLayerPixels(2, Data(repeating: 0xff, count: 16))
@@ -91,8 +91,8 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1, lockedLayerIndexes: [0]),
             documentRenderGateway: renderGateway(),
-            documentMutationGateway: mutationGateway(recorder: recorder),
-            textLayerGateway: textLayerGateway()
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
         )
 
         let result = service.replaceLayerPixels(0, Data(repeating: 0xff, count: 16))
@@ -112,6 +112,7 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 7),
             documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder, contentResult: .failure(.emptyInput)),
             documentMutationGateway: DocumentMutationGateway(
                 resizeCanvas: { _, _ in .success(()) },
                 resizeCanvasExtent: { _, _ in .success(()) },
@@ -143,8 +144,7 @@ struct DocumentContentServiceTests {
                 applyLayerMask: { _ in .success(()) },
                 clearLayer: { _ in .success(()) },
                 applyLayerProcessing: { _, _ in .success(()) }
-            ),
-            textLayerGateway: textLayerGateway()
+            )
         )
 
         let result = service.applyPixels(
@@ -169,6 +169,7 @@ struct DocumentContentServiceTests {
         let service = DocumentContentService(
             documentQueryGateway: queryGateway(activeLayerIndex: 1),
             documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
             documentMutationGateway: DocumentMutationGateway(
                 resizeCanvas: { _, _ in .success(()) },
                 resizeCanvasExtent: { _, _ in .success(()) },
@@ -191,14 +192,6 @@ struct DocumentContentServiceTests {
                 applyLayerMask: { _ in .success(()) },
                 clearLayer: { _ in .success(()) },
                 applyLayerProcessing: { _, _ in .success(()) }
-            ),
-            textLayerGateway: TextLayerGateway(
-                textLayerData: { _ in nil },
-                setTextLayer: { index, textLayer in
-                    recorder.record("setTextLayer:\(index):\(textLayer.text)")
-                    return .success(())
-                },
-                clearTextLayerData: { _ in }
             )
         )
 
@@ -325,10 +318,32 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
     )
 }
 
-private func textLayerGateway() -> TextLayerGateway {
-    TextLayerGateway(
-        textLayerData: { _ in nil },
-        setTextLayer: { _, _ in .success(()) },
-        clearTextLayerData: { _ in }
-    )
+private func editingGateway(
+    recorder: CallRecorder,
+    contentResult: DocumentMutationResult = .success(())
+) -> DocumentEditingGateway {
+    DocumentEditingGateway { request in
+        switch request {
+        case let .content(command):
+            switch command {
+            case let .replacePixels(index, _):
+                recorder.record("replaceLayerPixels:\(index)")
+            case let .setTextLayer(index, textLayer):
+                recorder.record("setTextLayer:\(index):\(textLayer.text)")
+            case let .clear(index):
+                recorder.record("clearLayer:\(index)")
+            case let .applyProcessing(index, _):
+                recorder.record("applyLayerProcessing:\(index)")
+            case let .replaceMask(index, _):
+                recorder.record("replaceLayerMask:\(index)")
+            case let .clearMask(index):
+                recorder.record("clearLayerMask:\(index)")
+            case let .applyMask(index):
+                recorder.record("applyLayerMask:\(index)")
+            }
+            return contentResult.map { .content(LayerContentMutationPlan()) }
+        case .structure, .attribute:
+            return .failure(.bridgeMutationFailed("unexpected"))
+        }
+    }
 }

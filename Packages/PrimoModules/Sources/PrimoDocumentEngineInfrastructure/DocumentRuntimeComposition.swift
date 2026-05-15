@@ -295,7 +295,66 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
             .mapError(mapRuntimeFailure)
     }
 
+    func replaceLayerPixels(index: EditableLayerIndex, pixelData: LayerPixelData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.replaceLayerPixels(index.rawValue, pixelData.rgba)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func setTextLayer(index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.textLayerGateway.setTextLayer(index.rawValue, textLayer)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func clearLayer(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.clearLayer(index.rawValue)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func applyLayerProcessing(
+        index: EditableLayerIndex,
+        request: ValidatedLayerProcessingRequest
+    ) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.applyLayerProcessing(index.rawValue, request)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func replaceLayerMask(index: EditableLayerIndex, mask: LayerMaskData) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.replaceLayerMask(index.rawValue, mask.bytes)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func clearLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.clearLayerMask(index.rawValue)
+            .mapError(mapRuntimeFailure)
+    }
+
+    func applyLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.applyLayerMask(index.rawValue)
+            .mapError(mapRuntimeFailure)
+    }
+
+    // Authoritative stale validation happens immediately before raw runtime
+    // mutation so UI preflight results cannot grant stale access.
     private func validateFreshLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
+        let currentRevision = runtime.queryGateway.lightweightPresentation().revision
+        guard index.revision == currentRevision else {
+            return .staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: currentRevision
+            )
+        }
+        return nil
+    }
+
+    private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentLayerMutationFailure? {
         let currentRevision = runtime.queryGateway.lightweightPresentation().revision
         guard index.revision == currentRevision else {
             return .staleLayerIndex(
@@ -334,6 +393,8 @@ private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> Docum
         return .noUndoState
     case .noRedoState:
         return .noRedoState
+    case let .gpu(failure):
+        return .gpu(failure)
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
     case let .incompatibleLayerType(index):
@@ -373,7 +434,7 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
     case .noRedoState:
         return .noRedoState
     case let .gpu(failure):
-        return .bridgeMutationFailed(failure.displayMessage)
+        return .gpu(failure)
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
     case let .incompatibleLayerType(index):

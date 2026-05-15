@@ -1,10 +1,14 @@
 import Foundation
+import PrimoDocumentMutationContracts
 import PrimoDocumentDomain
 
 public typealias DocumentLayerMutationResult = Result<Void, DocumentLayerMutationFailure>
 public typealias DocumentLayerIndexedMutationResult = Result<Int, DocumentLayerMutationFailure>
 public typealias DocumentLayerAddSelectionResult = Result<AddedAndSelectedLayer, DocumentLayerMutationFailure>
 
+// Application mutation validation is an authoritative contract boundary:
+// validated indexes carry the document revision and live gateways re-check that
+// revision immediately before invoking raw runtime mutation.
 public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case invalidLayerIndex(Int)
     case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
@@ -16,6 +20,7 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case emptyInput
     case noUndoState
     case noRedoState
+    case gpu(DocumentGpuMutationFailure)
     case bridgeMutationFailed(String)
     case incompatibleLayerType(Int)
     indirect case transactionFailure(primary: DocumentLayerMutationFailure, rollback: DocumentLayerMutationFailure)

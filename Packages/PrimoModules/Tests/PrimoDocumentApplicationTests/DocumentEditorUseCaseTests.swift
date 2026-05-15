@@ -1,11 +1,14 @@
+import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
 import Testing
 
 private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEditorGateway {
     var addedLayerNames: [String] = []
     var activeLayerIndices: [Int] = []
     var lastLayerNameUpdate: (name: String, index: Int)?
+    var contentEvents: [String] = []
 
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         addedLayerNames.append(name)
@@ -38,6 +41,41 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
     func setFolderExpanded(_ isExpanded: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
     func setFolderVisible(_ isVisible: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
     func setFolderName(_ name: String, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
+
+    func replaceLayerPixels(index: EditableLayerIndex, pixelData: LayerPixelData) -> DocumentLayerMutationResult {
+        contentEvents.append("replacePixels:\(index.rawValue):\(pixelData.rgba.count)")
+        return .success(())
+    }
+
+    func setTextLayer(index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentLayerMutationResult {
+        contentEvents.append("text:\(index.rawValue):\(textLayer.text)")
+        return .success(())
+    }
+
+    func clearLayer(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        contentEvents.append("clear:\(index.rawValue)")
+        return .success(())
+    }
+
+    func applyLayerProcessing(index: EditableLayerIndex, request: ValidatedLayerProcessingRequest) -> DocumentLayerMutationResult {
+        contentEvents.append("process:\(index.rawValue):\(request == .luminanceToAlpha)")
+        return .success(())
+    }
+
+    func replaceLayerMask(index: EditableLayerIndex, mask: LayerMaskData) -> DocumentLayerMutationResult {
+        contentEvents.append("replaceMask:\(index.rawValue):\(mask.bytes.count)")
+        return .success(())
+    }
+
+    func clearLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        contentEvents.append("clearMask:\(index.rawValue)")
+        return .success(())
+    }
+
+    func applyLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult {
+        contentEvents.append("applyMask:\(index.rawValue)")
+        return .success(())
+    }
 }
 
 struct DocumentEditorUseCaseTests {
@@ -88,5 +126,50 @@ struct DocumentEditorUseCaseTests {
         #expect(plan == .attribute(LayerAttributeMutationPlan()))
         #expect(gateway.lastLayerNameUpdate?.name == "Foreground")
         #expect(gateway.lastLayerNameUpdate?.index == 1)
+    }
+
+    @Test
+    func contentRequestUsesLayerContentGateway() throws {
+        let useCase = DocumentEditorUseCase()
+        let gateway = DocumentEditorGatewaySpy()
+        let context = DocumentLayerMutationContext(
+            layerCount: 3,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        )
+        let payload = try #require(LayerPixelData(width: 1, height: 1, rgba: Data(repeating: 1, count: 4)))
+
+        let result = useCase.execute(
+            .content(.replacePixels(index: 2, pixelData: payload)),
+            in: context,
+            gateway: gateway
+        )
+
+        #expect(try result.get() == .content(LayerContentMutationPlan()))
+        #expect(gateway.contentEvents == ["replacePixels:2:4"])
+    }
+
+    @Test
+    func contentRequestRejectsLockedLayerBeforeGateway() throws {
+        let useCase = DocumentEditorUseCase()
+        let gateway = DocumentEditorGatewaySpy()
+        let context = DocumentLayerMutationContext(
+            layerCount: 1,
+            folderIDs: [],
+            isLayerLocked: { $0 == 0 }
+        )
+
+        let result = useCase.execute(
+            .content(.clear(index: 0)),
+            in: context,
+            gateway: gateway
+        )
+
+        guard case let .failure(failure) = result else {
+            Issue.record("Expected locked layer failure")
+            return
+        }
+        #expect(failure == .layerLocked(0))
+        #expect(gateway.contentEvents.isEmpty)
     }
 }

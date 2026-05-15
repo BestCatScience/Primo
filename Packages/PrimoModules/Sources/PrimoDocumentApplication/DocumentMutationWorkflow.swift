@@ -61,22 +61,15 @@ public struct DocumentMutationWorkflowService: Sendable {
     package let documentQueryGateway: DocumentQueryGateway
     public let documentEditingGateway: DocumentEditingGateway
     public let documentLayerEffectsGateway: DocumentLayerEffectsGateway
-    package let documentMutationGateway: DocumentMutationGateway
-    package let textLayerGateway: TextLayerGateway
-    private let contentMutationValidator = LayerContentMutationCommandValidator()
 
     public init(
         documentQueryGateway: DocumentQueryGateway,
         documentEditingGateway: DocumentEditingGateway,
-        documentLayerEffectsGateway: DocumentLayerEffectsGateway,
-        documentMutationGateway: DocumentMutationGateway,
-        textLayerGateway: TextLayerGateway
+        documentLayerEffectsGateway: DocumentLayerEffectsGateway
     ) {
         self.documentQueryGateway = documentQueryGateway
         self.documentEditingGateway = documentEditingGateway
         self.documentLayerEffectsGateway = documentLayerEffectsGateway
-        self.documentMutationGateway = documentMutationGateway
-        self.textLayerGateway = textLayerGateway
     }
 
     public func addLayer(named name: String) -> DocumentIndexedMutationResult {
@@ -221,106 +214,6 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     private func executeContent(_ command: LayerContentMutationCommand) -> DocumentMutationResult {
-        switch contentMutationValidator.validated(command, in: layerMutationContext()) {
-        case let .failure(failure):
-            return .failure(failure.documentMutationFailure)
-        case let .success(validatedCommand):
-            return executeContent(validatedCommand)
-        }
-    }
-
-    private func executeContent(_ command: ValidatedLayerContentMutationCommand) -> DocumentMutationResult {
-        switch command {
-        case let .replacePixels(index, pixelData):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.replaceLayerPixels(index.rawValue, pixelData.rgba)
-        case let .setTextLayer(index, textLayer):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return textLayerGateway.setTextLayer(index.rawValue, textLayer)
-        case let .clear(index):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.clearLayer(index.rawValue)
-        case let .applyProcessing(index, request):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.applyLayerProcessing(index.rawValue, request)
-        case let .replaceMask(index, mask):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.replaceLayerMask(index.rawValue, mask.bytes)
-        case let .clearMask(index):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.clearLayerMask(index.rawValue)
-        case let .applyMask(index):
-            if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
-            return documentMutationGateway.applyLayerMask(index.rawValue)
-        }
-    }
-
-    private func validateFreshLayerIndex(_ index: EditableLayerIndex) -> DocumentMutationFailure? {
-        let currentRevision = documentQueryGateway.lightweightPresentation().revision
-        guard index.revision == currentRevision else {
-            return .staleLayerIndex(
-                index: index.rawValue,
-                validationRevision: index.revision,
-                currentRevision: currentRevision
-            )
-        }
-        return nil
-    }
-
-    private func layerMutationContext() -> DocumentLayerMutationContext {
-        let presentation = documentQueryGateway.lightweightPresentation()
-        return DocumentLayerMutationContext(
-            revision: presentation.revision,
-            layerCount: presentation.layerRows.count,
-            folderIDs: Set(
-                presentation.layerSidebarRows.compactMap { row in
-                    guard case let .folder(folder) = row else { return nil }
-                    return folder.id
-                }
-            ),
-            isLayerLocked: { index in
-                presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
-            }
-        )
-    }
-}
-
-private extension DocumentLayerMutationFailure {
-    var documentMutationFailure: DocumentMutationFailure {
-        switch self {
-        case let .invalidLayerIndex(index):
-            return .invalidLayerIndex(index)
-        case let .staleLayerIndex(index, validationRevision, currentRevision):
-            return .staleLayerIndex(
-                index: index,
-                validationRevision: validationRevision,
-                currentRevision: currentRevision
-            )
-        case let .invalidFolderID(folderID):
-            return .invalidFolderID(folderID)
-        case let .layerLocked(index):
-            return .layerLocked(index)
-        case let .alphaLocked(index):
-            return .alphaLocked(index)
-        case let .invalidCanvasSize(width, height):
-            return .invalidCanvasSize(width: width, height: height)
-        case let .invalidOpacity(opacity):
-            return .invalidOpacity(opacity)
-        case .emptyInput:
-            return .emptyInput
-        case .noUndoState:
-            return .noUndoState
-        case .noRedoState:
-            return .noRedoState
-        case let .bridgeMutationFailed(message):
-            return .bridgeMutationFailed(message)
-        case let .incompatibleLayerType(index):
-            return .incompatibleLayerType(index)
-        case let .transactionFailure(primary, rollback):
-            return .transactionFailure(
-                primary: primary.documentMutationFailure,
-                rollback: rollback.documentMutationFailure
-            )
-        }
+        execute(.content(command))
     }
 }

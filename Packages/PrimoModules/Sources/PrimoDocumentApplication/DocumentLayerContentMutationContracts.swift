@@ -36,6 +36,9 @@ public struct LayerMaskData: Equatable, Sendable {
 
 public typealias ValidatedLayerProcessingRequest = LayerProcessingRequest
 
+// Content commands join the same authoritative validation path as structure
+// and attribute commands: the use case emits revision-aware EditableLayerIndex
+// values, and the live gateway rejects stale indexes before raw mutation.
 public enum LayerContentMutationCommand: Equatable, Sendable {
     case replacePixels(index: Int, pixelData: LayerPixelData)
     case setTextLayer(index: Int, textLayer: TextLayerData)
@@ -54,6 +57,20 @@ public enum ValidatedLayerContentMutationCommand: Equatable, Sendable {
     case replaceMask(index: EditableLayerIndex, mask: LayerMaskData)
     case clearMask(index: EditableLayerIndex)
     case applyMask(index: EditableLayerIndex)
+}
+
+public struct LayerContentMutationPlan: Equatable, Sendable {
+    public init() {}
+}
+
+public protocol LayerContentGateway: Sendable {
+    func replaceLayerPixels(index: EditableLayerIndex, pixelData: LayerPixelData) -> DocumentLayerMutationResult
+    func setTextLayer(index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentLayerMutationResult
+    func clearLayer(index: EditableLayerIndex) -> DocumentLayerMutationResult
+    func applyLayerProcessing(index: EditableLayerIndex, request: ValidatedLayerProcessingRequest) -> DocumentLayerMutationResult
+    func replaceLayerMask(index: EditableLayerIndex, mask: LayerMaskData) -> DocumentLayerMutationResult
+    func clearLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult
+    func applyLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult
 }
 
 public struct LayerContentMutationCommandValidator: Sendable {
@@ -97,5 +114,44 @@ public struct LayerContentMutationCommandValidator: Sendable {
             return .failure(.invalidLayerIndex(rawValue))
         }
         return .success(index)
+    }
+}
+
+public struct LayerContentMutationUseCase: Sendable {
+    private let validator: LayerContentMutationCommandValidator
+
+    public init(validator: LayerContentMutationCommandValidator = .init()) {
+        self.validator = validator
+    }
+
+    public func execute(
+        _ command: LayerContentMutationCommand,
+        in context: DocumentLayerMutationContext,
+        gateway: any LayerContentGateway
+    ) -> Result<LayerContentMutationPlan, DocumentLayerMutationFailure> {
+        let validatedCommand: ValidatedLayerContentMutationCommand
+        switch validator.validated(command, in: context) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(validated):
+            validatedCommand = validated
+        }
+
+        switch validatedCommand {
+        case let .replacePixels(index, pixelData):
+            return gateway.replaceLayerPixels(index: index, pixelData: pixelData).map { LayerContentMutationPlan() }
+        case let .setTextLayer(index, textLayer):
+            return gateway.setTextLayer(index: index, textLayer: textLayer).map { LayerContentMutationPlan() }
+        case let .clear(index):
+            return gateway.clearLayer(index: index).map { LayerContentMutationPlan() }
+        case let .applyProcessing(index, request):
+            return gateway.applyLayerProcessing(index: index, request: request).map { LayerContentMutationPlan() }
+        case let .replaceMask(index, mask):
+            return gateway.replaceLayerMask(index: index, mask: mask).map { LayerContentMutationPlan() }
+        case let .clearMask(index):
+            return gateway.clearLayerMask(index: index).map { LayerContentMutationPlan() }
+        case let .applyMask(index):
+            return gateway.applyLayerMask(index: index).map { LayerContentMutationPlan() }
+        }
     }
 }

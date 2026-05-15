@@ -1375,9 +1375,18 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         let service = DocumentContentService(
             documentQueryGateway: .stub(
-                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 3)
+                presentation: PaintDocumentPresentation.testValue(
+                    canvasSize: CGSize(width: 1, height: 1),
+                    activeLayerIndex: 3
+                )
             ),
             documentRenderGateway: .stub(),
+            documentEditingGateway: .stub { request in
+                guard case .content = request else {
+                    return .failure(.bridgeMutationFailed("unexpected"))
+                }
+                return .failure(.bridgeMutationFailed("replace failed"))
+            },
             documentMutationGateway: .stub(
                 addLayer: { name in
                     addLayerCalls.record(name)
@@ -1390,15 +1399,11 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 setActiveLayer: { index in
                     setActiveLayerCalls.record(index)
                     return .success(())
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("replace failed"))
                 }
-            ),
-            textLayerGateway: .stub()
+            )
         )
         let result = service.applyPixels(
-            Data([0x00]),
+            Data(repeating: 0x00, count: 4),
             to: .newLayer(name: "Imported")
         )
 
@@ -1411,9 +1416,18 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testLayerContentTransactionSurfacesRollbackFailure() {
         let service = DocumentContentService(
             documentQueryGateway: .stub(
-                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 3)
+                presentation: PaintDocumentPresentation.testValue(
+                    canvasSize: CGSize(width: 1, height: 1),
+                    activeLayerIndex: 3
+                )
             ),
             documentRenderGateway: .stub(),
+            documentEditingGateway: .stub { request in
+                guard case .content = request else {
+                    return .failure(.bridgeMutationFailed("unexpected"))
+                }
+                return .failure(.bridgeMutationFailed("replace failed"))
+            },
             documentMutationGateway: .stub(
                 addLayer: { _ in .success(7) },
                 deleteLayer: { _ in
@@ -1421,15 +1435,11 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 },
                 setActiveLayer: { _ in
                     .failure(.bridgeMutationFailed("active layer rollback failed"))
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("replace failed"))
                 }
-            ),
-            textLayerGateway: .stub()
+            )
         )
         let result = service.applyPixels(
-            Data([0x00]),
+            Data(repeating: 0x00, count: 4),
             to: .newLayer(name: "Imported")
         )
 
@@ -1457,6 +1467,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 2)
             ),
             documentRenderGateway: .stub(),
+            documentEditingGateway: .stub { request in
+                guard case .content = request else {
+                    return .failure(.bridgeMutationFailed("unexpected"))
+                }
+                return .failure(.bridgeMutationFailed("apply failed"))
+            },
             documentMutationGateway: .stub(
                 addLayer: { name in
                     addLayerCalls.record(name)
@@ -1469,12 +1485,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 setActiveLayer: { index in
                     setActiveLayerCalls.record(index)
                     return .success(())
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("apply failed"))
                 }
-            ),
-            textLayerGateway: .stub()
+            )
         )
         _ = service.applyPixels(
             Data([0x00, 0x00, 0x00, 0x00]),
@@ -1630,8 +1642,8 @@ private struct DerivedGpuDependencyProbe {
     }
 }
 
-private func markedGateway(_ marker: UInt8) -> DocumentGpuOperationGateway {
-    DocumentGpuOperationGateway.stub(
+private func markedGateway(_ marker: UInt8) -> TestGpuOperationGateway {
+    TestGpuOperationGateway.stub(
         compositedPreviewPixelData: { _, _, _ in Data([marker]) },
         selectionOverlayRGBA: { _, width, height in
             Data(repeating: marker, count: width * height * 4)

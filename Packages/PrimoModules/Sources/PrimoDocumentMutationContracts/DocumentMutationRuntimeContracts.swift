@@ -394,9 +394,7 @@ public enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identi
 public struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
     public let id: UUID
     public let positionValue: GradientStopPosition
-    public var red: UInt8
-    public var green: UInt8
-    public var blue: UInt8
+    public let colorValue: CanvasColor
 
     public init(
         id: UUID = UUID(),
@@ -408,9 +406,12 @@ public struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
         self.init(
             id: id,
             position: GradientStopPosition(clamping: position),
-            red: red,
-            green: green,
-            blue: blue
+            color: CanvasColor(
+                red: Self.unitInterval(from: red),
+                green: Self.unitInterval(from: green),
+                blue: Self.unitInterval(from: blue),
+                alpha: UnitInterval(1)!
+            )
         )
     }
 
@@ -421,14 +422,83 @@ public struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
         green: UInt8,
         blue: UInt8
     ) {
+        self.init(
+            id: id,
+            position: position,
+            color: CanvasColor(
+                red: Self.unitInterval(from: red),
+                green: Self.unitInterval(from: green),
+                blue: Self.unitInterval(from: blue),
+                alpha: UnitInterval(1)!
+            )
+        )
+    }
+
+    public init(
+        id: UUID = UUID(),
+        position: Double,
+        color: CanvasColor
+    ) {
+        self.init(
+            id: id,
+            position: GradientStopPosition(clamping: position),
+            color: color
+        )
+    }
+
+    public init(
+        id: UUID = UUID(),
+        position: Double,
+        red: UnitInterval,
+        green: UnitInterval,
+        blue: UnitInterval
+    ) {
+        self.init(
+            id: id,
+            position: position,
+            color: CanvasColor(red: red, green: green, blue: blue, alpha: UnitInterval(1)!)
+        )
+    }
+
+    public init(
+        id: UUID = UUID(),
+        position: GradientStopPosition,
+        color: CanvasColor
+    ) {
         self.id = id
         self.positionValue = position
-        self.red = red
-        self.green = green
-        self.blue = blue
+        self.colorValue = CanvasColor(
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            alpha: UnitInterval(1)!
+        )
     }
 
     public var position: Double { positionValue.rawValue }
+    public var red: UInt8 { Self.byte(from: colorValue.red) }
+    public var green: UInt8 { Self.byte(from: colorValue.green) }
+    public var blue: UInt8 { Self.byte(from: colorValue.blue) }
+
+    public func withPosition(_ position: Double) -> Self {
+        Self(id: id, position: position, color: colorValue)
+    }
+
+    public func withPosition(_ position: GradientStopPosition) -> Self {
+        Self(id: id, position: position, color: colorValue)
+    }
+
+    public func withColor(_ color: CanvasColor) -> Self {
+        Self(id: id, position: positionValue, color: color)
+    }
+
+    private static func unitInterval(from component: UInt8) -> UnitInterval {
+        UnitInterval(Double(component) / 255.0)!
+    }
+
+    private static func byte(from component: UnitInterval) -> UInt8 {
+        UInt8(min(max((component.rawValue * 255.0).rounded(), 0), 255))
+    }
 }
 
 public struct GradientMapSettings: Equatable, Sendable {
@@ -592,6 +662,7 @@ public struct TextLayerGateway: Sendable {
         self.setTextLayer = setTextLayer
         self.clearTextLayerData = clearTextLayerData
     }
+
 }
 
 public struct DocumentLayerEffectsGateway: Sendable {

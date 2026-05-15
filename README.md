@@ -33,6 +33,8 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
   `PrimoRootFeature` は各 feature を scope し、`CrossFeatureIntegrationReducer` が application、workspace、document、import/export、AI image の delegate action を翻訳します。たとえば home catalog load は application delegate から workspace action へ、loaded project apply は workspace delegate から document presentation action へ渡ります。
 - **document runtime は façade と contract の後ろに隠す**
   App は `DocumentRuntime` façade から `DocumentCanvasCommandService`、`DocumentLayerCommandService`、`DocumentStrokeCommandService`、`DocumentHistoryCommandService`、`DocumentMutationWorkflowService`、`DocumentContentService`、`CanvasEditingWorkflowService`、`SelectionWorkflowService` などを受け取ります。query、mutation、stroke、history、persistence、export、text layer、GPU operation は contract module の gateway として表現し、app から live runtime 実装へ直接依存しない形にしています。
+- **App validation は preflight、runtime validation は本契約**
+  `DocumentWorkflowCommandValidator` は UI state から fast feedback 用の事前チェックを行いますが、その state は stale になり得ます。`DocumentEditorUseCase` と live gateway は revision-aware な `ExistingLayerIndex` / `EditableLayerIndex` を実行直前に再検証し、access control を伴う authoritative validation として扱います。
 - **App 側 dependency は一か所で展開する**
   `App/Features/Document/PaintDocumentClient.swift` が `DocumentRuntime` を TCA dependency として登録し、runtime から個別の gateway / service / renderer / processor を `DependencyValues` へ展開します。テストではこの境界を差し替えます。
 - **domain / contracts / application / runtime / infrastructure を分ける**

@@ -423,6 +423,8 @@ extension DocumentEditingGateway {
                 return .success(.structure(LayerStructureMutationPlan()))
             case .attribute:
                 return .success(.attribute(LayerAttributeMutationPlan()))
+            case .content:
+                return .success(.content(LayerContentMutationPlan()))
             }
         }
     ) -> Self {
@@ -459,8 +461,32 @@ extension DocumentExportGateway {
     }
 }
 
+struct TestGpuOperationGateway: Sendable {
+    var compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
+    var compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?
+    var selectionOverlayRGBA: @Sendable (Data, Int, Int) -> Data?
+    var expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]?
+    var transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> Data?
+
+    static func stub(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data? = { _, _, _, _ in nil },
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data? = { _, _, _ in nil },
+        selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> Data? = { _, _, _ in nil },
+        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]? = { _ in nil },
+        transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> Data? = { _ in nil }
+    ) -> Self {
+        Self(
+            compositedPaperPreviewRGBA: compositedPaperPreviewRGBA,
+            compositedPreviewPixelData: compositedPreviewPixelData,
+            selectionOverlayRGBA: selectionOverlayRGBA,
+            expandedSelectionMask: expandedSelectionMask,
+            transformedLayerPixelData: transformedLayerPixelData
+        )
+    }
+}
+
 private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
-    let gateway: DocumentGpuOperationGateway
+    let gateway: TestGpuOperationGateway
 
     func eyedropperLoupeSurface(
         sourcePixelData: Data,
@@ -472,20 +498,11 @@ private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskP
         paperStyle: CanvasPaperStyle,
         blendWithPaper: Bool
     ) -> DocumentCompositeSurface? {
-        gateway.eyedropperLoupeRGBA(
-            sourcePixelData,
-            canvasWidth,
-            canvasHeight,
-            centerX,
-            centerY,
-            gridSize,
-            paperStyle,
-            blendWithPaper
-        ).value.flatMap { DocumentCompositeSurface(validatingWidth: gridSize, height: gridSize, pixelData: $0) }
+        nil
     }
 
     func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        gateway.selectionOverlayRGBA(maskData, width, height).value.flatMap {
+        gateway.selectionOverlayRGBA(maskData, width, height).flatMap {
             DocumentCompositeSurface(validatingWidth: width, height: height, pixelData: $0)
         }
     }
@@ -495,11 +512,11 @@ private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskP
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        gateway.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels).value
+        gateway.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
     }
 
     func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
-        gateway.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).value.flatMap {
+        gateway.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).flatMap {
             DocumentCompositeSurface(validatingWidth: width, height: height, pixelData: $0)
         }
     }
@@ -518,7 +535,7 @@ private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskP
 }
 
 private struct TestLayerTransformProcessor: LayerTransformProcessing {
-    let gateway: DocumentGpuOperationGateway
+    let gateway: TestGpuOperationGateway
 
     func transformedLayerPixels(
         source: Data,
@@ -555,7 +572,7 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
                 destinationQuad: destinationQuad,
                 usesFreeformQuad: !quadOffsets.isZero
             )
-        ).value
+        )
     }
 
     func transformedSelection(
@@ -595,7 +612,7 @@ extension DocumentApplicationEnvironment {
         layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
         editingGateway: DocumentEditingGateway? = nil,
         strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        gpuOperationGateway: DocumentGpuOperationGateway = .stub(),
+        gpuOperationGateway: TestGpuOperationGateway = .stub(),
         canvasPreviewRenderer: (any CanvasPreviewRendering)? = nil,
         layerTransformProcessor: (any LayerTransformProcessing)? = nil,
         selectionMaskProcessor: (any SelectionMaskProcessing)? = nil
@@ -635,7 +652,7 @@ extension DocumentApplicationRuntime {
         layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
         editingGateway: DocumentEditingGateway? = nil,
         strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        gpuOperationGateway: DocumentGpuOperationGateway = .stub(),
+        gpuOperationGateway: TestGpuOperationGateway = .stub(),
         canvasPreviewRenderer: (any CanvasPreviewRendering)? = nil,
         layerTransformProcessor: (any LayerTransformProcessing)? = nil,
         selectionMaskProcessor: (any SelectionMaskProcessing)? = nil
@@ -656,15 +673,13 @@ extension DocumentApplicationRuntime {
         let mutationWorkflow = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway,
             documentEditingGateway: resolvedEditingGateway,
-            documentLayerEffectsGateway: layerEffectsGateway,
-            documentMutationGateway: mutationGateway,
-            textLayerGateway: documentTextLayerService
+            documentLayerEffectsGateway: layerEffectsGateway
         )
         let contentService = DocumentContentService(
             documentQueryGateway: queryGateway,
             documentRenderGateway: renderGateway,
-            documentMutationGateway: mutationGateway,
-            textLayerGateway: documentTextLayerService
+            documentEditingGateway: resolvedEditingGateway,
+            documentMutationGateway: mutationGateway
         )
         let defaultCanvasPreviewRenderer = TestCanvasPreviewRenderer(gateway: gpuOperationGateway)
         let canvasPreviewRenderer = canvasPreviewRenderer ?? defaultCanvasPreviewRenderer
@@ -674,17 +689,34 @@ extension DocumentApplicationRuntime {
             documentContentService: contentService,
             layerTransformProcessor: layerTransformProcessor
         )
-        let selectionWorkflow = SelectionWorkflowService(operations: gpuOperationGateway.selectionMaskOperations)
+        let selectionWorkflow = SelectionWorkflowService(
+            combinedSelectionMask: { _, _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
+            expandedSelectionMask: { request in
+                gpuOperationGateway.expandedSelectionMask(request)
+                    .map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
+            },
+            lassoSelection: { _, _, _ in .failure(.kernelFailed(operation: "stub")) },
+            autoSelection: { _, _, _, _, _, _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
+            colorRangeSelection: { _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
+            expandedMask: { mask, _, _, _ in .success(mask) },
+            contractedMask: { mask, _, _, _ in .success(mask) },
+            featheredMask: { mask, _, _, _ in .success(mask) },
+            invertMask: { mask in .success(mask.map { $0 == 0 ? 255 : 0 }) },
+            croppedSelectionMask: { _, _, _ in nil }
+        )
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: GpuCanvasEyedropperSampler(),
+            eyedropperSampler: PrimoDocumentRuntime.GpuCanvasEyedropperSampler(),
             selectionProcessor: selectionMaskProcessor
         )
-        let renderingWorkflow = DocumentRenderingWorkflow(operations: gpuOperationGateway.renderingOperations)
+        let renderingWorkflow = DocumentApplicationRuntimeFactory.liveWorkflows().presentation.renderingWorkflow
         let textLayerService = DocumentTextLayerService(
-            textLayerData: documentTextLayerService.textLayerData,
-            setTextLayer: documentTextLayerService.setTextLayer,
-            clearTextLayerData: documentTextLayerService.clearTextLayerData
+            textLayerData: { _ in nil },
+            setTextLayer: { index, textLayer in
+                resolvedEditingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
+                    .map { _ in () }
+            },
+            clearTextLayerData: { _ in }
         )
         let exportClient = DocumentExportClient(
             compositeSurface: exportGateway.compositeSurface,
@@ -700,8 +732,8 @@ extension DocumentApplicationRuntime {
         )
         return Self(
             presentation: DocumentPresentationRuntime(
-                lightweightPresentation: queryGateway.lightweightPresentation,
-                presentation: queryGateway.presentation,
+                lightweightPresentation: { .testValue() },
+                presentation: { .testValue() },
                 renderingWorkflow: renderingWorkflow
             ),
             canvasMutation: CanvasMutationRuntime(
@@ -726,7 +758,7 @@ extension DocumentApplicationRuntime {
             export: DocumentExportRuntime(exportClient: exportClient),
             preview: CanvasPreviewRuntime(
                 canvasPreviewRenderer: canvasPreviewRenderer,
-                canvasEyedropperSampler: GpuCanvasEyedropperSampler(),
+                canvasEyedropperSampler: PrimoDocumentRuntime.GpuCanvasEyedropperSampler(),
                 selectionMaskProcessor: selectionMaskProcessor,
                 canvasPresentationEnvironment: canvasPresentationEnvironment
             )
@@ -734,172 +766,9 @@ extension DocumentApplicationRuntime {
     }
 }
 
-extension DocumentGpuOperationGateway {
-    static func stub(
-        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data? = { _, _, _, _ in nil },
-        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data? = { _, _, _ in nil },
-        compositedPreviewIncrementalUpdate: @escaping @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate? = { _, _, _, _ in nil },
-        selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> Data? = { _, _, _ in nil },
-        eyedropperLoupeRGBA: @escaping @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> Data? = { _, _, _, _, _, _, _, _ in nil },
-        shapePreviewSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentCompositeSurface? = { _, _, _, _ in nil },
-        textLayerSurface: @escaping @Sendable (TextLayerData, CGSize) -> DocumentCompositeSurface? = { _, _ in nil },
-        textLayoutRect: @escaping @Sendable (TextLayerData, CGSize) -> CGRect? = { _, _ in nil },
-        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data? = { _, _, _, _ in nil },
-        alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]? = { _, _, _ in nil },
-        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask? = { _, _, _ in nil },
-        combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]? = { _, _, _, _, _ in nil },
-        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]? = { _ in nil },
-        lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> [UInt8]? = { _, _, _ in nil },
-        autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]? = { _, _, _, _, _, _, _, _, _ in nil },
-        colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]? = { _, _, _, _ in nil },
-        expandedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
-        contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
-        featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
-        invertMask: @escaping @Sendable ([UInt8]) -> [UInt8]? = { _ in nil },
-        transformedSelectionMask: @escaping @Sendable (TransformedSelectionMaskRequest) -> [UInt8]? = { _ in nil },
-        transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> Data? = { _ in nil },
-        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data? = { _, _, _, _, _ in nil },
-        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data? = { _, _, _, _, _, _, _ in nil },
-        releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void = { _ in }
-    ) -> Self {
-        Self(
-            compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
-                stubRenderingResult(compositedPaperPreviewRGBA(pixelData, width, height, paperStyle))
-            },
-            compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in
-                stubRenderingResult(compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels))
-            },
-            compositedPreviewIncrementalUpdate: { snapshot, activeLayerIndex, adjustedActiveLayerPixels, dirtyRect in
-                stubRenderingResult(compositedPreviewIncrementalUpdate(snapshot, activeLayerIndex, adjustedActiveLayerPixels, dirtyRect))
-            },
-            selectionOverlayRGBA: { maskData, width, height in
-                stubRenderingResult(selectionOverlayRGBA(maskData, width, height))
-            },
-            eyedropperLoupeRGBA: { sourcePixelData, canvasWidth, canvasHeight, centerX, centerY, gridSize, paperStyle, blendWithPaper in
-                stubRenderingResult(
-                    eyedropperLoupeRGBA(
-                        sourcePixelData,
-                        canvasWidth,
-                        canvasHeight,
-                        centerX,
-                        centerY,
-                        gridSize,
-                        paperStyle,
-                        blendWithPaper
-                    )
-                )
-            },
-            shapePreviewSurface: { samples, brush, canvasWidth, canvasHeight in
-                stubRenderingResult(shapePreviewSurface(samples, brush, canvasWidth, canvasHeight))
-            },
-            textLayerSurface: { textLayer, canvasSize in
-                stubRenderingResult(textLayerSurface(textLayer, canvasSize))
-            },
-            textLayoutRect: textLayoutRect,
-            processedLayerPixelData: { pixelData, width, height, request in
-                stubRenderingResult(processedLayerPixelData(pixelData, width, height, request))
-            },
-            alphaMask: { pixelData, width, height in
-                stubRenderingResult(alphaMask(pixelData, width, height))
-            },
-            croppedSelectionMask: croppedSelectionMask,
-            combinedSelectionMask: { base, incoming, mode, width, height in
-                stubRenderingResult(combinedSelectionMask(base, incoming, mode, width, height))
-            },
-            expandedSelectionMask: { request in
-                stubRenderingResult(expandedSelectionMask(request))
-            },
-            lassoSelection: { points, width, height in
-                stubRenderingResult(lassoSelection(points, width, height))
-            },
-            autoSelection: { pixelData, width, height, seedX, seedY, thresholdMode, opacityTolerance, colorTolerance, expansion in
-                stubRenderingResult(
-                    autoSelection(
-                        pixelData,
-                        width,
-                        height,
-                        seedX,
-                        seedY,
-                        thresholdMode,
-                        opacityTolerance,
-                        colorTolerance,
-                        expansion
-                    )
-                )
-            },
-            colorRangeSelection: { pixelData, width, height, request in
-                stubRenderingResult(colorRangeSelection(pixelData, width, height, request))
-            },
-            expandedMask: { mask, width, height, expansion in
-                stubRenderingResult(expandedMask(mask, width, height, expansion))
-            },
-            contractedMask: { mask, width, height, contraction in
-                stubRenderingResult(contractedMask(mask, width, height, contraction))
-            },
-            featheredMask: { mask, width, height, radius in
-                stubRenderingResult(featheredMask(mask, width, height, radius))
-            },
-            invertMask: { mask in
-                stubRenderingResult(invertMask(mask))
-            },
-            transformedSelectionMask: { request in
-                stubRenderingResult(transformedSelectionMask(request))
-            },
-            transformedLayerPixelData: { request in
-                stubRenderingResult(transformedLayerPixelData(request))
-            },
-            scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in
-                stubRenderingResult(scaledPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight))
-            },
-            translatedPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
-                stubRenderingResult(
-                    translatedPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY)
-                )
-            },
-            releaseSurfaceHandle: releaseSurfaceHandle
-        )
-    }
-
-    private static func stubRenderingResult<Value>(_ value: Value?) -> DocumentRenderingResult<Value> {
-        value.map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
-    }
-}
-
 extension DocumentRenderingWorkflow {
-    static func stub(
-        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data? = { _, _, _, _ in nil },
-        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data? = { _, _, _ in nil },
-        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data? = { _, _, _, _ in nil },
-        alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]? = { _, _, _ in nil },
-        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask? = { _, _, _ in nil },
-        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data? = { _, _, _, _, _ in nil },
-        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data? = { _, _, _, _, _, _, _ in nil }
-    ) -> Self {
-        Self(
-            compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
-                stubRenderingResult(compositedPaperPreviewRGBA(pixelData, width, height, paperStyle))
-            },
-            compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in
-                stubRenderingResult(compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels))
-            },
-            processedLayerPixelData: { pixelData, width, height, request in
-                stubRenderingResult(processedLayerPixelData(pixelData, width, height, request))
-            },
-            alphaMask: { pixelData, width, height in
-                stubRenderingResult(alphaMask(pixelData, width, height))
-            },
-            croppedSelectionMask: croppedSelectionMask,
-            scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in
-                stubRenderingResult(scaledPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight))
-            },
-            translatedPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
-                stubRenderingResult(translatedPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY))
-            }
-        )
-    }
-
-    private static func stubRenderingResult<Value>(_ value: Value?) -> DocumentRenderingResult<Value> {
-        value.map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
+    static func stub() -> Self {
+        DocumentApplicationRuntime.stub().workflows.presentation.renderingWorkflow
     }
 }
 
