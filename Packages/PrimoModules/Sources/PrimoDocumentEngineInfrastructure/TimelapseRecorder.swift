@@ -13,10 +13,13 @@ struct TimelapseRecorder: Sendable {
         in store: SwiftDocumentStore
     ) {
         if let event {
-            if marksOperationPersistence {
-                store.snapshot.timelapseUsesOperationPersistence = true
+            store.update {
+                if marksOperationPersistence {
+                    $0.timelapseUsesOperationPersistence = true
+                }
+                $0.timelapseEvents.append(event)
+                return true
             }
-            store.snapshot.timelapseEvents.append(event)
         }
     }
 
@@ -43,8 +46,11 @@ struct TimelapseRecorder: Sendable {
         )
         do {
             try services.timelapse.frameStore.persistFrameData(jpegData, to: frameURL)
-            store.snapshot.timelapseFrames.append(TimelapseFrame(imageURL: frameURL, size: CGSize(width: scaled.width, height: scaled.height)))
-            store.snapshot.timelapseUsesOperationPersistence = false
+            store.update {
+                $0.timelapseFrames.append(TimelapseFrame(imageURL: frameURL, size: CGSize(width: scaled.width, height: scaled.height)))
+                $0.timelapseUsesOperationPersistence = false
+                return true
+            }
         } catch {
             logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
         }

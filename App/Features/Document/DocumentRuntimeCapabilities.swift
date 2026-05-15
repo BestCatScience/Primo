@@ -13,8 +13,8 @@ import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 
 protocol PresentationReadable: Sendable {
-    func lightweightPresentation() -> PaintDocumentPresentation
-    func presentation() -> PaintDocumentPresentation
+    func lightweightPresentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure>
+    func presentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure>
 }
 
 protocol DirtyRefreshRequesting: Sendable {

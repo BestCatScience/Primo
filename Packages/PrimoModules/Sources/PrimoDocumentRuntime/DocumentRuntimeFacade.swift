@@ -150,9 +150,6 @@ public enum DocumentLayerCommand: Sendable {
     case mergeExistingLayerDown(ExistingLayerIndex)
     case setEditableTextLayer(index: EditableLayerIndex, TextLayerData)
     case applyEditableProcessing(index: EditableLayerIndex, LayerProcessingRequest)
-    case mergeLayerDown(Int)
-    case setTextLayer(index: Int, TextLayerData)
-    case applyProcessing(index: Int, LayerProcessingRequest)
 }
 
 public enum DocumentStrokeCommand: Sendable {
@@ -213,24 +210,46 @@ public struct DocumentTextLayerService: Sendable {
     private let clearTextLayerDataHandler: @Sendable (Int) -> DocumentMutationResult
 
     public init(
-        textLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>,
-        setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
-        clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
+        textLayerData: @escaping @Sendable (ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure>,
+        setTextLayer: @escaping @Sendable (EditableLayerIndex, TextLayerData) -> DocumentMutationResult,
+        clearTextLayerData: @escaping @Sendable (EditableLayerIndex) -> DocumentMutationResult
     ) {
-        self.textLayerDataHandler = textLayerData
-        self.setTextLayerHandler = setTextLayer
-        self.clearTextLayerDataHandler = clearTextLayerData
+        self.textLayerDataHandler = { textLayerData(ExistingLayerIndex($0, revision: .initial)) }
+        self.setTextLayerHandler = { setTextLayer(EditableLayerIndex($0), $1) }
+        self.clearTextLayerDataHandler = { clearTextLayerData(EditableLayerIndex($0)) }
     }
 
-    public func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> {
+    package init(
+        rawTextLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>,
+        rawSetTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
+        rawClearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
+    ) {
+        self.textLayerDataHandler = rawTextLayerData
+        self.setTextLayerHandler = rawSetTextLayer
+        self.clearTextLayerDataHandler = rawClearTextLayerData
+    }
+
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> {
+        textLayerDataHandler(index.rawValue)
+    }
+
+    public func setTextLayer(_ index: EditableLayerIndex, _ textLayer: TextLayerData) -> DocumentMutationResult {
+        setTextLayerHandler(index.rawValue, textLayer)
+    }
+
+    public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult {
+        clearTextLayerDataHandler(index.rawValue)
+    }
+
+    package func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> {
         textLayerDataHandler(index)
     }
 
-    public func setTextLayer(_ index: Int, _ textLayer: TextLayerData) -> DocumentMutationResult {
+    package func setTextLayer(_ index: Int, _ textLayer: TextLayerData) -> DocumentMutationResult {
         setTextLayerHandler(index, textLayer)
     }
 
-    public func clearTextLayerData(_ index: Int) -> DocumentMutationResult {
+    package func clearTextLayerData(_ index: Int) -> DocumentMutationResult {
         clearTextLayerDataHandler(index)
     }
 }
@@ -357,16 +376,6 @@ public struct DocumentRenderingWorkflow: Sendable {
         compositedPaperPreviewRGBAHandler(surface.data, surface.width, surface.height, paperStyle)
     }
 
-    @available(*, deprecated, message: "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.")
-    public func compositedPaperPreviewRGBA(
-        _ pixelData: Data,
-        _ width: Int,
-        _ height: Int,
-        _ paperStyle: CanvasPaperStyle
-    ) -> DocumentRenderingResult<Data> {
-        compositedPaperPreviewRGBAHandler(pixelData, width, height, paperStyle)
-    }
-
     public func compositedPreviewPixelData(
         _ snapshot: MetalDocumentSnapshot,
         _ activeLayerIndex: Int,
@@ -382,41 +391,16 @@ public struct DocumentRenderingWorkflow: Sendable {
         processedLayerPixelDataHandler(source.data, source.width, source.height, request)
     }
 
-    @available(*, deprecated, message: "Use processedLayerPixelData(_:_:) with RgbaSurface.")
-    public func processedLayerPixelData(
-        _ source: Data,
-        _ width: Int,
-        _ height: Int,
-        _ request: LayerProcessingRequest
-    ) -> DocumentRenderingResult<Data> {
-        processedLayerPixelDataHandler(source, width, height, request)
-    }
-
     public func alphaMask(_ surface: RgbaSurface) -> DocumentRenderingResult<[UInt8]> {
         alphaMaskHandler(surface.data, surface.width, surface.height)
-    }
-
-    @available(*, deprecated, message: "Use alphaMask(_:) with RgbaSurface.")
-    public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
-        alphaMaskHandler(pixelData, width, height)
     }
 
     public func croppedSelectionMask(_ mask: MaskSurface) -> DocumentCroppedSelectionMask? {
         croppedSelectionMaskHandler(Array(mask.data), mask.width, mask.height)
     }
 
-    @available(*, deprecated, message: "Use croppedSelectionMask(_:) with MaskSurface.")
-    public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
-        croppedSelectionMaskHandler(mask, width, height)
-    }
-
     public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry) -> DocumentRenderingResult<Data> {
         scaledPixelDataHandler(source.data, source.width, source.height, targetGeometry.width, targetGeometry.height)
-    }
-
-    @available(*, deprecated, message: "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.")
-    public func scaledPixelData(_ source: Data, _ width: Int, _ height: Int, _ targetWidth: Int, _ targetHeight: Int) -> DocumentRenderingResult<Data> {
-        scaledPixelDataHandler(source, width, height, targetWidth, targetHeight)
     }
 
     public func translatedPixelData(
@@ -426,19 +410,6 @@ public struct DocumentRenderingWorkflow: Sendable {
         offsetY: Int
     ) -> DocumentRenderingResult<Data> {
         translatedPixelDataHandler(source.data, source.width, source.height, targetGeometry.width, targetGeometry.height, offsetX, offsetY)
-    }
-
-    @available(*, deprecated, message: "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.")
-    public func translatedPixelData(
-        _ source: Data,
-        _ width: Int,
-        _ height: Int,
-        _ targetWidth: Int,
-        _ targetHeight: Int,
-        _ offsetX: Int,
-        _ offsetY: Int
-    ) -> DocumentRenderingResult<Data> {
-        translatedPixelDataHandler(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
     }
 
 }
@@ -550,16 +521,6 @@ public struct DocumentPresentationRuntime: Sendable {
         renderingPipeline.compositedPaperPreviewRGBA(surface, paperStyle)
     }
 
-    @available(*, deprecated, message: "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.")
-    public func compositedPaperPreviewRGBA(
-        _ pixelData: Data,
-        _ width: Int,
-        _ height: Int,
-        _ paperStyle: CanvasPaperStyle
-    ) -> DocumentRenderingResult<Data> {
-        renderingPipeline.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle)
-    }
-
     public func compositedPreviewPixelData(
         _ snapshot: MetalDocumentSnapshot,
         _ activeLayerIndex: Int,
@@ -575,47 +536,16 @@ public struct DocumentPresentationRuntime: Sendable {
         renderingPipeline.processedLayerPixelData(source, request)
     }
 
-    @available(*, deprecated, message: "Use processedLayerPixelData(_:_:) with RgbaSurface.")
-    public func processedLayerPixelData(
-        _ source: Data,
-        _ width: Int,
-        _ height: Int,
-        _ request: LayerProcessingRequest
-    ) -> DocumentRenderingResult<Data> {
-        renderingPipeline.processedLayerPixelData(source, width, height, request)
-    }
-
     public func alphaMask(_ surface: RgbaSurface) -> DocumentRenderingResult<[UInt8]> {
         renderingPipeline.alphaMask(surface)
-    }
-
-    @available(*, deprecated, message: "Use alphaMask(_:) with RgbaSurface.")
-    public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
-        renderingPipeline.alphaMask(pixelData, width, height)
     }
 
     public func croppedSelectionMask(_ mask: MaskSurface) -> DocumentCroppedSelectionMask? {
         renderingPipeline.croppedSelectionMask(mask)
     }
 
-    @available(*, deprecated, message: "Use croppedSelectionMask(_:) with MaskSurface.")
-    public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
-        renderingPipeline.croppedSelectionMask(mask, width, height)
-    }
-
     public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry) -> DocumentRenderingResult<Data> {
         renderingPipeline.scaledPixelData(source, targetGeometry: targetGeometry)
-    }
-
-    @available(*, deprecated, message: "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.")
-    public func scaledPixelData(
-        _ source: Data,
-        _ width: Int,
-        _ height: Int,
-        _ targetWidth: Int,
-        _ targetHeight: Int
-    ) -> DocumentRenderingResult<Data> {
-        renderingPipeline.scaledPixelData(source, width, height, targetWidth, targetHeight)
     }
 
     public func translatedPixelData(
@@ -627,18 +557,6 @@ public struct DocumentPresentationRuntime: Sendable {
         renderingPipeline.translatedPixelData(source, targetGeometry: targetGeometry, offsetX: offsetX, offsetY: offsetY)
     }
 
-    @available(*, deprecated, message: "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.")
-    public func translatedPixelData(
-        _ source: Data,
-        _ width: Int,
-        _ height: Int,
-        _ targetWidth: Int,
-        _ targetHeight: Int,
-        _ offsetX: Int,
-        _ offsetY: Int
-    ) -> DocumentRenderingResult<Data> {
-        renderingPipeline.translatedPixelData(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
-    }
 }
 
 public struct CanvasMutationRuntime: Sendable {
@@ -781,16 +699,12 @@ public struct LayerEditingRuntime: Sendable {
     package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
     @available(*, deprecated, message: "Use deleteFolder(_:) with ExistingFolderID.")
     package func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
-    @available(*, deprecated, message: "Use deleteLayer(_:) with ExistingLayerIndex.")
-    package func deleteLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
     @available(*, deprecated, message: "Use duplicateLayer(_:named:) with ExistingLayerIndex.")
     package func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
     @available(*, deprecated, message: "Use moveLayer(_:to:) with ExistingLayerIndex.")
     package func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
     @available(*, deprecated, message: "Use assignLayer(_:toFolder:) with ExistingLayerIndex and ExistingFolderID.")
     package func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
-    @available(*, deprecated, message: "Use mergeLayerDown(_:) with ExistingLayerIndex.")
-    package func mergeLayerDown(_ index: Int) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
     @available(*, deprecated, message: "Use setLayerVisibility(_:visible:) with ExistingLayerIndex.")
     package func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
     @available(*, deprecated, message: "Use setActiveLayer(_:) with ExistingLayerIndex.")
@@ -813,12 +727,6 @@ public struct LayerEditingRuntime: Sendable {
     package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
     @available(*, deprecated, message: "Use setLayerName(_:name:) with ExistingLayerIndex.")
     package func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
-    @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
-    package func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
-    @available(*, deprecated, message: "Use applyLayerProcessing(_:request:) with EditableLayerIndex.")
-    package func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
-    @available(*, deprecated, message: "Use setTextLayer(_:textLayer:) with EditableLayerIndex.")
-    package func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
     @available(*, deprecated, message: "Use clearLayer(_:) with EditableLayerIndex.")
     package func clearLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
     @available(*, deprecated, message: "Use replaceLayerMask(_:mask:) with EditableLayerIndex and LayerMaskData.")
@@ -830,8 +738,6 @@ public struct LayerEditingRuntime: Sendable {
 
     public func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
     public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
-    @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
-    package func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
     public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
@@ -963,10 +869,6 @@ package struct CanvasStrokeRuntime: Sendable {
     public func cancelStroke() -> DocumentMutationResult { strokeCommands.cancelStroke() }
     public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex.rawValue) }
     public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex.rawValue, clearSelectionAfterBlur) }
-    @available(*, deprecated, message: "Use applyGpuStrokeSurface(_:_:layerIndex:) with EditableLayerIndex.")
-    package func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex) }
-    @available(*, deprecated, message: "Use blurStroke(_:_:layerIndex:clearSelectionAfterBlur:) with EditableLayerIndex.")
-    package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) }
     public func endBlurStroke() -> DocumentMutationResult { strokeCommands.endBlurStroke() }
     public func cancelBlurStroke() -> DocumentMutationResult { strokeCommands.cancelBlurStroke() }
     public func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult { strokeCommands.fill(sample, brush) }
@@ -1021,16 +923,6 @@ public struct StrokeEditingRuntime: Sendable {
 
     public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
         strokeRuntime.blurStroke(samples, brush, layerIndex: layerIndex, clearSelectionAfterBlur: clearSelectionAfterBlur)
-    }
-
-    @available(*, deprecated, message: "Use applyGpuStrokeSurface(_:_:layerIndex:) with EditableLayerIndex.")
-    package func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult {
-        strokeRuntime.applyGpuStrokeSurface(samples, brush, layerIndex)
-    }
-
-    @available(*, deprecated, message: "Use blurStroke(_:_:layerIndex:clearSelectionAfterBlur:) with EditableLayerIndex.")
-    package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
-        strokeRuntime.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
     }
 
     public func endBlurStroke() -> DocumentMutationResult {
@@ -1204,6 +1096,26 @@ public struct CanvasPreviewRuntime: Sendable {
     }
 
     public func eyedropperLoupeSurface(
+        source: RgbaSurface,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.eyedropperLoupeSurface(
+            sourcePixelData: source.data,
+            canvasWidth: source.width,
+            canvasHeight: source.height,
+            centerX: centerX,
+            centerY: centerY,
+            gridSize: gridSize,
+            paperStyle: paperStyle,
+            blendWithPaper: blendWithPaper
+        )
+    }
+
+    package func eyedropperLoupeSurface(
         sourcePixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int,
@@ -1225,7 +1137,11 @@ public struct CanvasPreviewRuntime: Sendable {
         )
     }
 
-    public func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+    public func paperCompositeSurface(_ surface: RgbaSurface, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.paperCompositeSurface(pixelData: surface.data, width: surface.width, height: surface.height, paperStyle: paperStyle)
+    }
+
+    package func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
         canvasPreviewRenderer.paperCompositeSurface(pixelData: pixelData, width: width, height: height, paperStyle: paperStyle)
     }
 
@@ -1257,7 +1173,11 @@ public struct CanvasPreviewRuntime: Sendable {
         )
     }
 
-    public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
+    public func selectionOverlaySurface(_ mask: MaskSurface) -> DocumentCompositeSurface? {
+        selectionMaskProcessor.selectionOverlaySurface(maskData: mask.data, width: mask.width, height: mask.height)
+    }
+
+    package func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
         selectionMaskProcessor.selectionOverlaySurface(maskData: maskData, width: width, height: height)
     }
 

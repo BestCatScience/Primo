@@ -8,7 +8,7 @@ struct DocumentMutationWorkflowSupport<Action> {
     typealias DocumentCanvasMutation = DocumentFeature.DocumentCanvasMutation
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
 
-    var presentationProvider: () -> PaintDocumentPresentation
+    var presentationProvider: () -> Result<PaintDocumentPresentation, DocumentMutationFailure>
     var refreshRequestedAction: Action
     var feedbackAction: (ApplicationFeature.Feedback) -> Action
     var presentationAppliedAction: Action
@@ -24,7 +24,7 @@ struct DocumentMutationWorkflowSupport<Action> {
         case .none:
             refreshEffect = .none
         case .current:
-            refreshEffect = applyPresentation(presentationProvider(), to: &state)
+            refreshEffect = applyPresentationResult(presentationProvider(), to: &state)
         case .dirty:
             refreshEffect = .send(refreshRequestedAction)
         }
@@ -72,6 +72,20 @@ struct DocumentMutationWorkflowSupport<Action> {
             return .none
         }
         return .send(presentationAppliedAction)
+    }
+
+    func applyPresentationResult(
+        _ result: Result<PaintDocumentPresentation, DocumentMutationFailure>,
+        to state: inout State
+    ) -> Effect<Action> {
+        switch result {
+        case let .success(presentation):
+            return applyPresentation(presentation, to: &state)
+        case let .failure(failure):
+            return documentMutationFeedbackEffect(
+                for: DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure)
+            )
+        }
     }
 
     private func apply(

@@ -351,11 +351,18 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         case let .failure(failure):
             return .failure(failure)
         }
-        store.restore(previous)
+        guard store.restore(previous) else {
+            return .failure(.bridgeMutationFailed("undoInvalidSnapshot"))
+        }
         presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         timelapseRecorder.record(.undo, in: store)
-        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
+        guard store.update({
+            $0.revision = max(currentRevision, $0.revision) + 1
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("undoRevisionUpdate"))
+        }
         captureDirtyUpdate()
         return .success(())
     }
@@ -369,11 +376,18 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         case let .failure(failure):
             return .failure(failure)
         }
-        store.restore(next)
+        guard store.restore(next) else {
+            return .failure(.bridgeMutationFailed("redoInvalidSnapshot"))
+        }
         presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         timelapseRecorder.record(.redo, in: store)
-        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
+        guard store.update({
+            $0.revision = max(currentRevision, $0.revision) + 1
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("redoRevisionUpdate"))
+        }
         captureDirtyUpdate()
         return .success(())
     }
@@ -473,8 +487,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         ) else {
             return .failure(.bridgeMutationFailed("resizeCanvasInvalidSnapshot"))
         }
-        store.snapshot = resizedSnapshot
-        store.snapshot.thumbnailCache.removeAll()
+        guard store.update({
+            $0 = resizedSnapshot
+            $0.thumbnailCache.removeAll()
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("resizeCanvasInvalidSnapshot"))
+        }
         presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
         recordMutation(before: plan.before, timelapseEvent: nil)
@@ -597,6 +616,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func applyLayerSurfaceMutation(index: Int, payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.gpu(.invalidPayloadSize(
@@ -641,7 +661,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 index: index,
                 payload: fallbackPayload,
                 timelapseEvent: nil,
-                recordsFinalLayerPixels: layer.alphaLocked
+                recordsFinalLayerPixels: layer.alphaLocked,
+                incomingPayloadLease: payloadLease
             )
         }
         return .failure(failure)
@@ -777,22 +798,22 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         _ plan: RuntimeLayerProcessingPlan,
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard store.snapshot.revision == plan.revision,
               documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(.gpu(.staleSnapshot(operation: "applyLayerProcessing")))
         }
         if let failure = validateEditableLayer(plan.index) {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(failure)
         }
         return applyLayerMutationPayload(
             index: plan.index,
             payload: payload,
             timelapseEvent: nil,
-            recordsFinalLayerPixels: true
+            recordsFinalLayerPixels: true,
+            incomingPayloadLease: payloadLease
         )
     }
 
@@ -844,21 +865,21 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         _ plan: RuntimeFillPlan,
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard store.snapshot.revision == plan.revision,
               documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(.gpu(.staleSnapshot(operation: "fill")))
         }
         if let failure = validateEditableLayer(plan.layerIndex) {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(failure)
         }
         return applyLayerMutationPayload(
             index: plan.layerIndex,
             payload: payload,
-            timelapseEvent: .fill(layerIndex: .unchecked(plan.layerIndex), brush: plan.brush, sample: plan.sample)
+            timelapseEvent: .fill(layerIndex: .unchecked(plan.layerIndex), brush: plan.brush, sample: plan.sample),
+            incomingPayloadLease: payloadLease
         )
     }
 
@@ -904,15 +925,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         _ plan: RuntimeStrokeCommitPlan,
         gpuResult: DocumentRuntimeStrokeMutationResult
     ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: gpuResult.gpuBufferHandle, services: gpuServices)
         guard store.snapshot.revision == plan.revision,
               documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
-            gpuServices.release(gpuResult.gpuBufferHandle)
             return .failure(.gpu(.staleSnapshot(operation: "applyCommittedStroke")))
         }
         if let failure = validateEditableLayer(plan.layerIndex) {
-            gpuServices.release(gpuResult.gpuBufferHandle)
             return .failure(failure)
         }
         let dirtyRect = LayerPixelRect.unsafeUnchecked(originX: gpuResult.dirtyRect.originX,
@@ -925,7 +945,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let adjustedOutput: Data
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[plan.layerIndex].alphaLocked {
-            if let sourceHandle = gpuResult.gpuBufferHandle {
+            if let sourceHandle = payloadLease.borrowedHandle {
                 guard let alphaPreservedHandle = gpuServices.preservingExistingAlphaBufferHandle(
                     sourceHandle: sourceHandle,
                     existingHandle: nil,
@@ -933,12 +953,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                     width: store.snapshot.canvasWidth,
                     height: store.snapshot.canvasHeight
                 ) else {
-                    gpuServices.release(sourceHandle)
                     return .failure(.gpu(.kernelFailed(operation: "applyCommittedStrokeAlphaPreserve")))
                 }
                 adjustedOutput = existing
                 nextHandle = alphaPreservedHandle
-                gpuServices.release(sourceHandle)
+                if alphaPreservedHandle == sourceHandle {
+                    _ = payloadLease.adoptHandle()
+                } else {
+                    payloadLease.releaseNow()
+                }
             } else {
                 let committedOutput = gpuResult.rectPixelData ?? Data()
                 guard committedOutput.count == rgbaByteCount else {
@@ -955,7 +978,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 )
                 nextHandle = nil
             }
-        } else if let handle = gpuResult.gpuBufferHandle {
+        } else if let handle = payloadLease.adoptHandle() {
             adjustedOutput = existing
             nextHandle = handle
         } else {
@@ -1046,15 +1069,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         _ plan: RuntimeBlurPlan,
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard store.snapshot.revision == plan.revision,
               documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(.gpu(.staleSnapshot(operation: "blurStroke")))
         }
         if let failure = validateEditableLayer(plan.layerIndex) {
-            gpuServices.release(payload.gpuBufferHandle)
             return .failure(failure)
         }
         let current = currentPixelData(for: plan.layerIndex)
@@ -1067,8 +1089,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 isAlphaLocked: true
             )
             nextHandle = nil
-            gpuServices.release(payload.gpuBufferHandle)
-        } else if let handle = payload.gpuBufferHandle {
+            payloadLease.releaseNow()
+        } else if let handle = payloadLease.adoptHandle() {
             nextPixelData = current
             nextHandle = handle
         } else {
@@ -1391,9 +1413,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         let currentRevision = store.snapshot.revision
         releaseLayerBufferHandles()
-        store.restore(baseline)
+        guard store.restore(baseline) else {
+            strokeCoordinator.clearBlurStroke()
+            return
+        }
         presentationBuilder.clearThumbnailSurfaces()
-        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
+        _ = store.update {
+            $0.revision = max(currentRevision, $0.revision) + 1
+            return true
+        }
         captureDirtyUpdate()
         strokeCoordinator.clearBlurStroke()
     }
@@ -1760,7 +1788,10 @@ extension SwiftDocumentRuntime {
 
     func setPaperStyle(_ style: CanvasPaperStyle) {
         let before = undoSnapshot()
-        store.snapshot.paperStyle = style
+        _ = store.update {
+            $0.paperStyle = style
+            return true
+        }
         recordMutation(before: before, timelapseEvent: TimelapseOperation.setPaperStyle(style))
     }
 
@@ -1773,7 +1804,10 @@ extension SwiftDocumentRuntime {
             uuidClient: services.ids,
             gpuServices: gpuServices
         )
-        store.restore(newRuntime.store.snapshot)
+        _ = store.update {
+            $0 = newRuntime.store.snapshot
+            return true
+        }
         presentationBuilder.clearThumbnailSurfaces()
         undoHistory.clear()
         strokeCoordinator.clearCurrentStroke()
@@ -1941,8 +1975,10 @@ extension SwiftDocumentRuntime {
         index: Int,
         payload: DocumentLayerMutationPayload,
         timelapseEvent: TimelapseOperation?,
-        recordsFinalLayerPixels: Bool = false
+        recordsFinalLayerPixels: Bool = false,
+        incomingPayloadLease: GpuMutationPayloadLease? = nil
     ) -> DocumentMutationResult {
+        let payloadLease = incomingPayloadLease ?? GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.gpu(.invalidPayloadSize(
@@ -1978,7 +2014,7 @@ extension SwiftDocumentRuntime {
                 isAlphaLocked: store.snapshot.layers[index].alphaLocked
             )
             nextHandle = nil
-        } else if let handle = payload.gpuBufferHandle {
+        } else if let handle = payloadLease.adoptHandle() {
             adjusted = existing
             nextHandle = handle
         } else {
@@ -1986,9 +2022,6 @@ extension SwiftDocumentRuntime {
             nextHandle = nil
         }
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
-        if nextHandle != payload.gpuBufferHandle {
-            gpuServices.release(payload.gpuBufferHandle)
-        }
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
         let finalTimelapseEvent = recordsFinalLayerPixels
@@ -2008,6 +2041,7 @@ extension SwiftDocumentRuntime {
         textLayer: TextLayerData,
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.gpu(.invalidPayloadSize(
@@ -2034,7 +2068,7 @@ extension SwiftDocumentRuntime {
         setLayerPixelState(
             index: index,
             pixelData: materializedPixelData(from: payload, existing: currentPixelData(for: index)),
-            gpuBufferHandle: payload.gpuBufferHandle
+            gpuBufferHandle: payloadLease.adoptHandle()
         )
         store.snapshot.layers[index].textLayer = textLayer
         invalidateThumbnail(for: index)

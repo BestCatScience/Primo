@@ -27,20 +27,20 @@ struct DocumentPresentationWorkflowAccess: PresentationWorkflowAccess {
         self.exportRuntime = exportRuntime
     }
 
-    func lightweightPresentation() -> PaintDocumentPresentation {
+    func lightweightPresentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         presentationRuntime.lightweightPresentation()
     }
 
-    func presentation() -> PaintDocumentPresentation {
+    func presentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure> {
         presentationRuntime.presentation()
     }
 
     func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
-        persistenceRuntime.setPaperStyle(paperStyle)
+        _ = persistenceRuntime.setPaperStyle(paperStyle)
     }
 
     func prewarmDrawingResources() {
-        persistenceRuntime.prewarmDrawingResources()
+        _ = persistenceRuntime.prewarmDrawingResources()
     }
 
     var exportGateway: DocumentExportGateway {
@@ -155,8 +155,6 @@ extension LayerContentSubmitting {
     }
 }
 
-extension StrokeEditingRuntime: StrokePreviewPort, StrokeMutationSubmitting, StrokeCommitPort {}
-
 extension LayerEditingRuntime:
     LayerMutationWorkflowSubmitting,
     LayerContentWorkflowSubmitting,
@@ -166,8 +164,7 @@ extension LayerEditingRuntime:
     LayerContentPort,
     CanvasEditingExecuting,
     SelectionWorkflowRequesting,
-    SelectionProcessingPort,
-    CanvasTransformPort
+    SelectionProcessingPort
 {}
 
 struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisibilityPort {
@@ -190,7 +187,7 @@ struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting, StrokeC
     let service: DocumentStrokeCommandService
 
     func cancelStroke() {
-        service.cancelStroke()
+        _ = service.cancelStroke()
     }
 
     func endBlurStroke() -> DocumentMutationResult {
@@ -198,7 +195,7 @@ struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting, StrokeC
     }
 
     func cancelBlurStroke() {
-        service.cancelBlurStroke()
+        _ = service.cancelBlurStroke()
     }
 
     func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult {
@@ -313,7 +310,7 @@ extension LayerWorkflowEnvironment {
     }
 
     var canvasStrokeInteractionService: any StrokePreviewLeasing {
-        strokeRuntime
+        DocumentStrokePreviewAdapter(runtime: strokeRuntime)
     }
 }
 
@@ -332,7 +329,7 @@ extension DocumentCanvasEditingPresentationAdapter {
 
 extension DocumentPaperStyleAdapter {
     func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
-        runtime.setPaperStyle(paperStyle)
+        _ = runtime.setPaperStyle(paperStyle)
     }
 }
 
@@ -406,7 +403,7 @@ extension DocumentStrokePreviewAdapter {
 
 extension DocumentStrokeCommitAdapter {
     func cancelStroke() {
-        runtime.cancelStroke()
+        _ = runtime.cancelStroke()
     }
 
     func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
@@ -418,7 +415,7 @@ extension DocumentStrokeCommitAdapter {
     }
 
     func cancelBlurStroke() {
-        runtime.cancelBlurStroke()
+        _ = runtime.cancelBlurStroke()
     }
 
     func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult {
@@ -623,10 +620,11 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
         paperStyle: CanvasPaperStyle,
         blendWithPaper: Bool
     ) -> DocumentCompositeSurface? {
-        runtime.eyedropperLoupeSurface(
-            sourcePixelData: sourcePixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
+        guard let source = RgbaSurface(width: canvasWidth, height: canvasHeight, data: sourcePixelData) else {
+            return nil
+        }
+        return runtime.eyedropperLoupeSurface(
+            source: source,
             centerX: centerX,
             centerY: centerY,
             gridSize: gridSize,
@@ -636,7 +634,10 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
     }
 
     func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        runtime.selectionOverlaySurface(maskData: maskData, width: width, height: height)
+        guard let mask = MaskSurface(width: width, height: height, data: maskData) else {
+            return nil
+        }
+        return runtime.selectionOverlaySurface(mask)
     }
 
     func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data) -> Data? {
@@ -648,7 +649,10 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
     }
 
     func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
-        runtime.paperCompositeSurface(pixelData: pixelData, width: width, height: height, paperStyle: paperStyle)
+        guard let surface = RgbaSurface(width: width, height: height, data: pixelData) else {
+            return nil
+        }
+        return runtime.paperCompositeSurface(surface, paperStyle: paperStyle)
     }
 
     func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
@@ -688,7 +692,10 @@ private struct CanvasPreviewRuntimeSelectionMaskProcessor: SelectionMaskProcessi
     let runtime: CanvasPreviewRuntime
 
     func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        runtime.selectionOverlaySurface(maskData: maskData, width: width, height: height)
+        guard let mask = MaskSurface(width: width, height: height, data: maskData) else {
+            return nil
+        }
+        return runtime.selectionOverlaySurface(mask)
     }
 }
 

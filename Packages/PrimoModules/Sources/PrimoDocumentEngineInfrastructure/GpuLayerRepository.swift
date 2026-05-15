@@ -49,16 +49,21 @@ struct GpuLayerRepository: Sendable {
         rgbaByteCount: Int,
         services: DocumentRuntimeGpuServices
     ) {
-        guard let geometry = store.snapshot.pixelGeometry else {
-            return
-        }
-        for index in handles.keys where store.snapshot.layers.indices.contains(index) {
-            store.snapshot.layers[index].replacePixelData(currentPixelData(
-                for: index,
-                in: store.snapshot,
-                rgbaByteCount: rgbaByteCount,
-                services: services
-            ), geometry: geometry)
+        store.update { snapshot in
+            guard let geometry = snapshot.pixelGeometry else {
+                return false
+            }
+            for index in handles.keys where snapshot.layers.indices.contains(index) {
+                guard snapshot.layers[index].replacePixelData(currentPixelData(
+                    for: index,
+                    in: snapshot,
+                    rgbaByteCount: rgbaByteCount,
+                    services: services
+                ), geometry: geometry) else {
+                    return false
+                }
+            }
+            return true
         }
     }
 
@@ -69,8 +74,13 @@ struct GpuLayerRepository: Sendable {
         in store: SwiftDocumentStore,
         services: DocumentRuntimeGpuServices
     ) {
-        guard let geometry = store.snapshot.pixelGeometry,
-              store.snapshot.layers[index].replacePixelData(pixelData, geometry: geometry) else {
+        guard store.update({ snapshot in
+            guard snapshot.layers.indices.contains(index),
+                  let geometry = snapshot.pixelGeometry else {
+                return false
+            }
+            return snapshot.layers[index].replacePixelData(pixelData, geometry: geometry)
+        }) else {
             services.release(gpuBufferHandle)
             return
         }

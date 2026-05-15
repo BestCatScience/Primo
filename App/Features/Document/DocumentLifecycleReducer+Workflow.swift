@@ -253,7 +253,7 @@ extension DocumentLifecycleReducer {
             state.layerSidebar = LayerSidebarFeature.State()
             state.brushPalette = BrushPaletteFeature.State()
             DocumentFeature.toolPanelStateCoordinator.resetPanels(in: &state)
-            _ = documentMutationWorkflowSupport.applyPresentation(documentPresentationReader.presentation(), to: &state)
+            _ = documentMutationWorkflowSupport.applyPresentationResult(documentPresentationReader.presentation(), to: &state)
             return .send(
                 .delegate(
                     .freshDocumentMutationSucceeded(

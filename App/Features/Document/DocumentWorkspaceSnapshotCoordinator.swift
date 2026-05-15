@@ -19,7 +19,7 @@ extension DocumentFeature {
                     paperStyle: paperStyle,
                     gpuOperations: documentRenderingWorkflow
                 )
-            } ?? documentExportGateway.compositeSurface(paperStyle)
+            } ?? (try? documentExportGateway.compositeSurface(paperStyle).get())
             return WorkspaceDocumentSnapshot(
                 activeTab: nil,
                 paperStyle: paperStyle,

@@ -11,10 +11,6 @@ import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
 struct DocumentRuntimeCompositionTests {
-    private enum ReentrantFailure: Error, Equatable {
-        case rejected
-    }
-
     private final class MutableRuntime: @unchecked Sendable {
         var value: Int
 
@@ -66,25 +62,25 @@ struct DocumentRuntimeCompositionTests {
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessAsFailure() throws {
         let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
 
-        let result: Result<Int, ReentrantFailure> = executor.performResult(failure: .rejected) { _ in
-            executor.performResult(failure: .rejected) { runtime in
+        let result: Result<Int, DocumentMutationFailure> = executor.performResult(operation: "outer") { _ in
+            executor.performResult(operation: "inner") { runtime in
                 .success(runtime.value)
             }
         }
 
-        #expect(result == .failure(.rejected))
+        #expect(result == .failure(.bridgeMutationFailed("Reentrant document runtime access: inner")))
     }
 
     @Test
     func lockedRuntimeExecutorReplacementSwapsRuntimeForLaterAccess() throws {
         let executor = LockedDocumentRuntimeExecutor(runtime: MutableRuntime(value: 1))
 
-        #expect(executor.performValue(failure: ReentrantFailure.rejected) { $0.value } == .success(1))
-        guard case .success = executor.replaceRuntimeResult(with: MutableRuntime(value: 2), failure: ReentrantFailure.rejected) else {
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(1))
+        guard case .success = executor.replaceRuntimeResult(with: MutableRuntime(value: 2), operation: "replace") else {
             Issue.record("Expected runtime replacement to succeed")
             return
         }
-        #expect(executor.performValue(failure: ReentrantFailure.rejected) { $0.value } == .success(2))
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(2))
     }
 
     @Test
@@ -101,10 +97,14 @@ struct DocumentRuntimeCompositionTests {
         let body = try String(contentsOf: sourceURL, encoding: .utf8)
 
         #expect(body.contains("package static var reentrantAccessMessage"))
+        #expect(body.contains("package static func reentrantMutationFailure(operation: String) -> DocumentMutationFailure"))
         #expect(!body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
-        #expect(body.contains("package func performResult<Success, Failure: Error>"))
+        #expect(body.contains("private func performResult<Success, Failure: Error>"))
+        #expect(body.contains("package func performResult<Success>(\n        operation: String,"))
+        #expect(body.contains("package func performThrowing<T>(\n        operation: String,"))
         #expect(body.contains("return .failure(failure())"))
-        #expect(body.contains("package func replaceRuntimeResult<Failure: Error>("))
+        #expect(body.contains("private func replaceRuntimeResult<Failure: Error>("))
+        #expect(body.contains("package func replaceRuntimeResult(\n        with newRuntime: Runtime,\n        operation: String"))
         #expect(body.contains("with newRuntime: Runtime,"))
         #expect(body.contains("failure: @autoclosure () -> Failure"))
     }
@@ -237,8 +237,8 @@ struct DocumentRuntimeCompositionTests {
         let body = try String(contentsOf: supportURL, encoding: .utf8)
 
         #expect(body.contains("package final class LockedDocumentRuntimeExecutor"))
-        #expect(body.contains("package func performValue<Success, Failure: Error>("))
-        #expect(body.contains("package func performResult<Success, Failure: Error>("))
+        #expect(body.contains("private func performValue<Success, Failure: Error>("))
+        #expect(body.contains("private func performResult<Success, Failure: Error>("))
         #expect(body.contains("private var isExecuting = false"))
         #expect(!body.contains("precondition(!isExecuting, Self.reentrantAccessMessage)"))
         #expect(body.contains("return .failure(failure())"))
@@ -277,8 +277,8 @@ struct DocumentRuntimeCompositionTests {
     func lockedRuntimeExecutorResultBoundaryReturnsFailureForReentrantAccess() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
 
-        let result: DocumentMutationResult = executor.performResult(failure: .emptyInput) { _ in
-            executor.performResult(failure: .bridgeMutationFailed("reentrant")) { _ in
+        let result: DocumentMutationResult = executor.performResult(operation: "outer") { _ in
+            executor.performResult(operation: "inner") { _ in
                 .success(())
             }
         }
@@ -287,15 +287,15 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected reentrant access failure")
             return
         }
-        #expect(failure == .bridgeMutationFailed("reentrant"))
+        #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
     }
 
     @Test
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessFromPerform() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
 
-        let result: DocumentMutationResult = executor.performResult(failure: .bridgeMutationFailed("perform reentrant outer")) { _ in
-            executor.performResult(failure: .bridgeMutationFailed("perform reentrant")) { _ in
+        let result: DocumentMutationResult = executor.performResult(operation: "outer") { _ in
+            executor.performResult(operation: "inner") { _ in
                 .success(())
             }
         }
@@ -304,7 +304,7 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected reentrant access failure")
             return
         }
-        #expect(failure == .bridgeMutationFailed("perform reentrant"))
+        #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
     }
 
     @Test
@@ -314,7 +314,7 @@ struct DocumentRuntimeCompositionTests {
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<1_000 {
                 group.addTask {
-                    _ = executor.performMutation(failure: DocumentMutationFailure.bridgeMutationFailed("concurrent")) { runtime in
+                    _ = executor.performMutation(operation: "concurrent") { runtime in
                         let nextValue = runtime.value + 1
                         runtime.value = nextValue
                     }
@@ -322,16 +322,16 @@ struct DocumentRuntimeCompositionTests {
             }
         }
 
-        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(1_000))
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(1_000))
     }
 
     @Test
     func lockedRuntimeExecutorReplacementUsesSameSynchronousBoundary() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
 
-        _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), failure: DocumentMutationFailure.bridgeMutationFailed("replace"))
+        _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), operation: "replace")
 
-        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(42))
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(42))
     }
 
     @Test
@@ -343,7 +343,7 @@ struct DocumentRuntimeCompositionTests {
         let replacementFinished = DispatchSemaphore(value: 0)
 
         DispatchQueue.global(qos: .userInitiated).async {
-            _ = executor.performMutation(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { runtime in
+            _ = executor.performMutation(operation: "read") { runtime in
                 #expect(runtime.value == 1)
                 readStarted.signal()
                 _ = releaseRead.wait(timeout: .now() + 2)
@@ -357,7 +357,7 @@ struct DocumentRuntimeCompositionTests {
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), failure: DocumentMutationFailure.bridgeMutationFailed("replace"))
+            _ = executor.replaceRuntimeResult(with: RuntimeCounter(value: 42), operation: "replace")
             replacementFinished.signal()
         }
 
@@ -372,7 +372,7 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected runtime replacement to finish after read releases the lock")
             return
         }
-        #expect(executor.performValue(failure: DocumentMutationFailure.bridgeMutationFailed("read")) { $0.value } == .success(42))
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(42))
     }
 
     @Test
@@ -446,16 +446,17 @@ struct DocumentRuntimeCompositionTests {
         for operation in gpuOperations {
             #expect(body.contains(operation), "DocumentEngineLive should keep \(operation) visible outside runtime executor bodies")
         }
-        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeLayerProcessingPlan\"))"))
-        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyLayerProcessingPlan\"))"))
-        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeFillPlan\"))"))
-        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyFillPlan\"))"))
-        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeStrokeCommitPlan\"))"))
-        #expect(body.contains("return runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyStrokeCommitPlan\"))"))
-        #expect(body.contains("let reservationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"reserveBlurSession\"))"))
-        #expect(body.contains("let planResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"makeBlurPlan\"))"))
-        #expect(body.contains("let mutationResult = runtimeExecutor.performResult(failure: reentrantRuntimeFailure(\"applyBlurPlan\"))"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeLayerProcessingPlan\")"))
+        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyLayerProcessingPlan\""))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeFillPlan\")"))
+        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyFillPlan\""))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeStrokeCommitPlan\")"))
+        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyStrokeCommitPlan\""))
+        #expect(body.contains("let reservationResult = runtimeExecutor.performResult(operation: \"reserveBlurSession\")"))
+        #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeBlurPlan\")"))
+        #expect(body.contains("let mutationResult = performGpuPayloadApply(\n                operation: \"applyBlurPlan\""))
         #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("if !didEnterRuntime {\n            gpuServices.release(handle)\n        }"))
     }
 
     @Test

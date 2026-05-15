@@ -165,12 +165,12 @@ package extension DocumentRuntimeServices {
         )
         let renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
         let textLayerService = DocumentTextLayerService(
-            textLayerData: composition.textLayerGateway.textLayerData,
+            textLayerData: { index in composition.textLayerGateway.textLayerData(index.rawValue) },
             setTextLayer: { index, textLayer in
-                composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
+                composition.editingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
                     .map { _ in () }
             },
-            clearTextLayerData: composition.textLayerGateway.clearTextLayerData
+            clearTextLayerData: { index in composition.textLayerGateway.clearTextLayerData(index.rawValue) }
         )
         let persistenceClient = DocumentPersistenceClient(
             saveProject: composition.persistenceGateway.saveProject,
@@ -293,18 +293,6 @@ package extension DocumentRuntime {
                 case let .applyEditableProcessing(index, request):
                     return mutationOutcome(
                         composition.editingGateway.execute(.content(.applyProcessing(index: index.rawValue, request: request)))
-                            .map { _ in .completed }
-                    )
-                case let .mergeLayerDown(index):
-                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index).map { .completed })
-                case let .setTextLayer(index, textLayer):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
-                            .map { _ in .completed }
-                    )
-                case let .applyProcessing(index, request):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.applyProcessing(index: index, request: request)))
                             .map { _ in .completed }
                     )
                 }

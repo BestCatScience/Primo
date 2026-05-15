@@ -300,6 +300,22 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func alphaLockedGpuStrokeAdoptsSameAlphaPreservedHandle() throws {
+        let strokePixels = Data(repeating: 0x55, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.setLayerAlphaLocked(index: 0, isAlphaLocked: true).get()
+        _ = try runtime.applyGpuStrokeSurface(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0
+        ).get()
+
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
+    }
+
+    @Test
     func cancelBlurStrokeRestoresBaselineWithoutUndoOrTimelapse() throws {
         let blurredPixels = Data(repeating: 0x77, count: 16)
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [], blurOutputs: [blurredPixels])

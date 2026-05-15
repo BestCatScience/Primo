@@ -103,12 +103,18 @@ final class DocumentPresentationBuilder: @unchecked Sendable {
     }
 
     func invalidateThumbnail(for index: Int, in store: SwiftDocumentStore) {
-        store.snapshot.thumbnailCache[index] = nil
+        store.update {
+            $0.thumbnailCache[index] = nil
+            return true
+        }
         thumbnailSurfaceCache[index] = nil
     }
 
     func invalidateAllThumbnails(in store: SwiftDocumentStore) {
-        store.snapshot.thumbnailCache.removeAll(keepingCapacity: true)
+        store.update {
+            $0.thumbnailCache.removeAll(keepingCapacity: true)
+            return true
+        }
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
     }
 

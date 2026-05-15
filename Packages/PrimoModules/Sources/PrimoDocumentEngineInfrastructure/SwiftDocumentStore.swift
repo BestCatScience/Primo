@@ -444,6 +444,17 @@ final class SwiftDocumentStore: @unchecked Sendable {
         return true
     }
 
+    @discardableResult
+    func update(_ mutation: (inout SwiftDocumentStoreSnapshot) -> Bool) -> Bool {
+        var nextSnapshot = snapshot
+        guard mutation(&nextSnapshot),
+              let validatedSnapshot = nextSnapshot.validated() else {
+            return false
+        }
+        snapshot = validatedSnapshot
+        return true
+    }
+
     func validatedSnapshot() -> SwiftDocumentStoreSnapshot {
         guard let validatedSnapshot = snapshot.validated() else {
             preconditionFailure("SwiftDocumentStore snapshot invariant was violated")

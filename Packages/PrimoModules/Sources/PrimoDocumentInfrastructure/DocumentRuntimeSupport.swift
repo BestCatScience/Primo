@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentMutationContracts
 
 public struct DocumentProjectPreview: Equatable, Sendable {
     public let canvasSize: CGSize
@@ -27,6 +28,10 @@ public struct DocumentProjectPreview: Equatable, Sendable {
 package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable {
     package static var reentrantAccessMessage: String { "Reentrant document runtime access" }
 
+    package static func reentrantMutationFailure(operation: String) -> DocumentMutationFailure {
+        .bridgeMutationFailed("\(reentrantAccessMessage): \(operation)")
+    }
+
     private let lock = NSRecursiveLock()
     private var isExecuting = false
     private var runtime: Runtime
@@ -35,7 +40,7 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         self.runtime = runtime
     }
 
-    package func performResult<Success, Failure: Error>(
+    private func performResult<Success, Failure: Error>(
         failure: @autoclosure () -> Failure,
         _ body: (Runtime) -> Result<Success, Failure>
     ) -> Result<Success, Failure> {
@@ -52,7 +57,14 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         return body(runtime)
     }
 
-    package func performValue<Success, Failure: Error>(
+    package func performResult<Success>(
+        operation: String,
+        _ body: (Runtime) -> Result<Success, DocumentMutationFailure>
+    ) -> Result<Success, DocumentMutationFailure> {
+        performResult(failure: Self.reentrantMutationFailure(operation: operation), body)
+    }
+
+    private func performValue<Success, Failure: Error>(
         failure: @autoclosure () -> Failure,
         _ body: (Runtime) -> Success
     ) -> Result<Success, Failure> {
@@ -61,7 +73,14 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         }
     }
 
-    package func performMutation<Failure: Error>(
+    package func performValue<Success>(
+        operation: String,
+        _ body: (Runtime) -> Success
+    ) -> Result<Success, DocumentMutationFailure> {
+        performValue(failure: Self.reentrantMutationFailure(operation: operation), body)
+    }
+
+    private func performMutation<Failure: Error>(
         failure: @autoclosure () -> Failure,
         _ body: (Runtime) -> Void
     ) -> Result<Void, Failure> {
@@ -71,7 +90,14 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         }
     }
 
-    package func performThrowing<T>(
+    package func performMutation(
+        operation: String,
+        _ body: (Runtime) -> Void
+    ) -> DocumentMutationResult {
+        performMutation(failure: Self.reentrantMutationFailure(operation: operation), body)
+    }
+
+    private func performThrowing<T>(
         reentrantError: @autoclosure () -> Error,
         _ body: (Runtime) throws -> T
     ) throws -> T {
@@ -88,7 +114,17 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         return try body(runtime)
     }
 
-    package func replaceRuntimeResult<Failure: Error>(
+    package func performThrowing<T>(
+        operation: String,
+        _ body: (Runtime) throws -> T
+    ) throws -> T {
+        try performThrowing(
+            reentrantError: Self.reentrantMutationFailure(operation: operation),
+            body
+        )
+    }
+
+    private func replaceRuntimeResult<Failure: Error>(
         with newRuntime: Runtime,
         failure: @autoclosure () -> Failure
     ) -> Result<Void, Failure> {
@@ -104,5 +140,15 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
         }
         runtime = newRuntime
         return .success(())
+    }
+
+    package func replaceRuntimeResult(
+        with newRuntime: Runtime,
+        operation: String
+    ) -> DocumentMutationResult {
+        replaceRuntimeResult(
+            with: newRuntime,
+            failure: Self.reentrantMutationFailure(operation: operation)
+        )
     }
 }

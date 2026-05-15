@@ -22,14 +22,21 @@ extension PresentationRefreshReducer {
                 "Loading lightweight presentation",
                 processEnvironmentClient: processEnvironmentClient
             )
-            let lightweightPresentation = documentPresentationReader.lightweightPresentation()
+            let lightweightPresentationResult = documentPresentationReader.lightweightPresentation()
             let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
             AppDiagnostics.debug(
                 PrimoRootFeature.startupLogger,
                 "Lightweight presentation loaded in \(String(describing: bootstrapDuration))",
                 processEnvironmentClient: processEnvironmentClient
             )
-            await send(.bootstrapPresentationLoaded(lightweightPresentation))
+            switch lightweightPresentationResult {
+            case let .success(lightweightPresentation):
+                await send(.bootstrapPresentationLoaded(lightweightPresentation))
+            case let .failure(failure):
+                if let feedback = DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure) {
+                    await send(.delegate(.documentMutationFeedback(feedback)))
+                }
+            }
             presentationWorkflowAccess.prewarmDrawingResources()
             await send(.deferredPresentationLoadRequested)
         }
@@ -50,21 +57,35 @@ extension PresentationRefreshReducer {
                 "Loading full presentation after initial launch",
                 processEnvironmentClient: processEnvironmentClient
             )
-            let presentation = documentPresentationReader.presentation()
+            let presentationResult = documentPresentationReader.presentation()
             let presentationDuration = presentationStart.duration(to: clock.now)
             AppDiagnostics.debug(
                 PrimoRootFeature.startupLogger,
                 "Full presentation loaded in \(String(describing: presentationDuration))",
                 processEnvironmentClient: processEnvironmentClient
             )
-            await send(.presentationLoaded(presentation))
+            switch presentationResult {
+            case let .success(presentation):
+                await send(.presentationLoaded(presentation))
+            case let .failure(failure):
+                if let feedback = DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure) {
+                    await send(.delegate(.documentMutationFeedback(feedback)))
+                }
+            }
         }
         .cancellable(id: ApplicationFeature.CancelID.startupPresentationLoad, cancelInFlight: true)
     }
 
     func deferredPresentationRefreshEffect() -> Effect<Action> {
         .run { [documentPresentationReader] send in
-            await send(.presentationLoaded(documentPresentationReader.presentation()))
+            switch documentPresentationReader.presentation() {
+            case let .success(presentation):
+                await send(.presentationLoaded(presentation))
+            case let .failure(failure):
+                if let feedback = DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure) {
+                    await send(.delegate(.documentMutationFeedback(feedback)))
+                }
+            }
         }
         .cancellable(id: ApplicationFeature.CancelID.deferredPresentationRefresh, cancelInFlight: true)
     }

@@ -769,7 +769,99 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
-    func documentRuntimeFacadeHasTypedOverloadsForRawRenderingAndMutationEntrypoints() throws {
+    func documentRuntimeFacadeStaysFreeOfLiveInfrastructureWiring() throws {
+        let repoRoot = try Self.repoRoot()
+        let runtimeRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime",
+            isDirectory: true
+        )
+        let graph = try Self.packageTargetGraph()
+        let runtimeDependencies = try #require(graph["PrimoDocumentRuntime"])
+        let bannedDependencySuffixes = ["Infrastructure", "RuntimeLive"]
+        for dependency in runtimeDependencies {
+            #expect(
+                bannedDependencySuffixes.allSatisfy { !dependency.hasSuffix($0) },
+                "PrimoDocumentRuntime should remain App-facing and not depend on live/infrastructure target \(dependency)"
+            )
+        }
+
+        let bannedImports: Set<String> = [
+            "PrimoDocumentRuntimeLive",
+            "PrimoDocumentEngineInfrastructure",
+            "PrimoDocumentMetalRuntimeInfrastructure",
+            "PrimoDocumentMetalStrokeInfrastructure",
+            "PrimoDocumentRenderingInfrastructure",
+            "PrimoDocumentStrokeInfrastructure"
+        ]
+        let bannedWiringTokens = [
+            "Factory.live(",
+            ".live(",
+            "DocumentRuntimeCompositionFactory.live",
+            "DocumentGpuOperationGatewayFactory.live",
+            "PrimoDocumentEngineInfrastructure."
+        ]
+        for source in try Self.swiftSources(under: runtimeRoot) {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let imports = Self.swiftImports(in: body)
+            #expect(
+                imports.isDisjoint(with: bannedImports),
+                "\(source.path) should stay free of live/infrastructure imports"
+            )
+            let semanticBody = Self.swiftCodeWithCommentsAndStringsBlanked(in: body)
+            for token in bannedWiringTokens {
+                #expect(
+                    !semanticBody.contains(token),
+                    "\(source.path) should not own live factory or infrastructure wiring token \(token)"
+                )
+            }
+        }
+    }
+
+    @Test
+    func documentRuntimeLiveOwnsLiveFactoriesAndInfrastructureWrappers() throws {
+        let repoRoot = try Self.repoRoot()
+        let liveURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift",
+            isDirectory: false
+        )
+        let liveBody = try String(contentsOf: liveURL, encoding: .utf8)
+        let liveImports = Self.swiftImports(in: liveBody)
+        let expectedInfrastructureImports: Set<String> = [
+            "PrimoDocumentEngineInfrastructure",
+            "PrimoDocumentMetalRuntimeInfrastructure",
+            "PrimoDocumentMetalStrokeInfrastructure",
+            "PrimoDocumentRenderingInfrastructure",
+            "PrimoDocumentStrokeInfrastructure"
+        ]
+        #expect(liveImports.contains("PrimoDocumentRuntime"))
+        #expect(
+            expectedInfrastructureImports.isSubset(of: liveImports),
+            "PrimoDocumentRuntimeLive should be the module that imports concrete infrastructure"
+        )
+
+        let graph = try Self.packageTargetGraph()
+        let liveDependencies = try #require(graph["PrimoDocumentRuntimeLive"])
+        #expect(liveDependencies.contains("PrimoDocumentRuntime"))
+        for dependency in expectedInfrastructureImports {
+            #expect(
+                liveDependencies.contains(dependency),
+                "PrimoDocumentRuntimeLive should own the live dependency on \(dependency)"
+            )
+        }
+
+        let publicLiveSymbols = Set(Self.publicTopLevelSymbols(in: liveBody))
+        #expect(publicLiveSymbols.contains("DocumentApplicationRuntimeFactory"))
+        #expect(publicLiveSymbols.contains("DocumentRuntimeFactory"))
+        #expect(publicLiveSymbols.contains("DocumentProjectPreviewLoader"))
+        #expect(publicLiveSymbols.contains("TimelapseExportService"))
+        #expect(liveBody.contains("package enum DocumentRuntimeCompositionFactory"))
+        #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live("))
+        #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview("))
+        #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo("))
+    }
+
+    @Test
+    func documentRuntimeFacadeHasTypedEntrypointsWithoutRawRenderingCompatibilityShims() throws {
         let repoRoot = try Self.repoRoot()
         let facade = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
@@ -797,44 +889,56 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData)",
             "public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData)",
             "public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex)",
-            "public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool)"
+            "public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool)",
+            "public func textLayerData(_ index: ExistingLayerIndex)",
+            "public func setTextLayer(_ index: EditableLayerIndex, _ textLayer: TextLayerData)",
+            "public func clearTextLayerData(_ index: EditableLayerIndex)",
+            "public func eyedropperLoupeSurface( source: RgbaSurface, centerX: Int, centerY: Int, gridSize: Int, paperStyle: CanvasPaperStyle, blendWithPaper: Bool )",
+            "public func paperCompositeSurface(_ surface: RgbaSurface, paperStyle: CanvasPaperStyle)",
+            "public func selectionOverlaySurface(_ mask: MaskSurface)"
         ]
         for signature in typedSignatures {
             #expect(signatures.contains(signature), "Missing typed public facade overload: \(signature)")
         }
 
-        let deprecatedRawReplacements = [
+        let remainingDeprecatedCanvasSizeReplacements = [
             "Use createCanvas(_:) with ValidCanvasSize.",
             "Use resizeCanvas(_:) with ValidCanvasSize.",
-            "Use resizeCanvasExtent(_:) with ValidCanvasSize.",
-            "Use compositedPaperPreviewRGBA(_:_:) with RgbaSurface.",
-            "Use processedLayerPixelData(_:_:) with RgbaSurface.",
-            "Use alphaMask(_:) with RgbaSurface.",
-            "Use croppedSelectionMask(_:) with MaskSurface.",
-            "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.",
-            "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry."
+            "Use resizeCanvasExtent(_:) with ValidCanvasSize."
         ]
-        for replacement in deprecatedRawReplacements {
+        for replacement in remainingDeprecatedCanvasSizeReplacements {
             #expect(body.contains("@available(*, deprecated, message: \"\(replacement)\")"))
         }
 
-        let deprecatedRawSurfaceFunctionNames: Set<String> = [
+        let removedRawSurfaceFunctionNames: Set<String> = [
+            "compositedPaperPreviewRGBA",
             "processedLayerPixelData",
             "alphaMask",
             "croppedSelectionMask",
             "scaledPixelData",
-            "translatedPixelData"
+            "translatedPixelData",
+            "eyedropperLoupeSurface",
+            "paperCompositeSurface",
+            "selectionOverlaySurface"
         ]
-        let publicRawSurfaceCompatibilityFunctions = publicCallables.filter { callable in
+        let publicRawSurfaceFunctions = publicCallables.filter { callable in
             callable.kind == "func" &&
-                deprecatedRawSurfaceFunctionNames.contains(callable.name) &&
-                callable.hasParameter(type: "Data") &&
+                removedRawSurfaceFunctionNames.contains(callable.name) &&
                 callable.hasParameter(named: "width", type: "Int") &&
                 callable.hasParameter(named: "height", type: "Int")
         }
         #expect(
-            publicRawSurfaceCompatibilityFunctions.allSatisfy { $0.attributes.contains("available") },
-            "Public raw Data + width + height surface compatibility APIs should be explicitly deprecated: \(publicRawSurfaceCompatibilityFunctions.map(\.signature))"
+            publicRawSurfaceFunctions.isEmpty,
+            "Public raw Data + width + height rendering APIs should be removed once typed RgbaSurface/MaskSurface overloads exist: \(publicRawSurfaceFunctions.map(\.signature))"
+        )
+
+        let textLayerServiceBody = try #require(Self.typeBody(named: "DocumentTextLayerService", in: body))
+        let publicTextLayerCallables = Self.callables(accessLevel: "public", in: textLayerServiceBody)
+        #expect(!publicTextLayerCallables.contains { $0.hasParameter(named: "index", type: "Int") })
+        let publicTextLayerInitializers = Self.initializerSignatures(accessLevel: "public", in: textLayerServiceBody)
+        #expect(
+            publicTextLayerInitializers.allSatisfy { !$0.contains("Int") },
+            "DocumentTextLayerService public initializer should accept typed layer index closures"
         )
     }
 
@@ -848,6 +952,22 @@ struct GpuSideEffectIsolationArchitectureTests {
         let body = try String(contentsOf: facade, encoding: .utf8)
         let layerEditingBody = try #require(Self.typeBody(named: "LayerEditingRuntime", in: body))
         let strokeEditingBody = try #require(Self.typeBody(named: "StrokeEditingRuntime", in: body))
+        let layerCommandBody = try #require(Self.typeBody(named: "DocumentLayerCommand", in: body))
+
+        for typedCase in [
+            "case mergeExistingLayerDown(ExistingLayerIndex)",
+            "case setEditableTextLayer(index: EditableLayerIndex, TextLayerData)",
+            "case applyEditableProcessing(index: EditableLayerIndex, LayerProcessingRequest)"
+        ] {
+            #expect(layerCommandBody.contains(typedCase), "DocumentLayerCommand should preserve typed public case \(typedCase)")
+        }
+        for rawCase in [
+            "case mergeLayerDown(Int)",
+            "case setTextLayer(index: Int, TextLayerData)",
+            "case applyProcessing(index: Int, LayerProcessingRequest)"
+        ] {
+            #expect(!layerCommandBody.contains(rawCase), "DocumentLayerCommand should not expose raw layer index case \(rawCase)")
+        }
 
         let layerMutationPrefixes = [
             "public func createFolder(",
@@ -902,6 +1022,42 @@ struct GpuSideEffectIsolationArchitectureTests {
         {
             #expect(!callable.hasParameter(named: "layerIndex", type: "Int"))
             #expect(callable.hasParameter(named: "layerIndex", type: "EditableLayerIndex"))
+        }
+
+        let removedPackageRawLayerSignatures = [
+            "package func deleteLayer(_ index: Int)",
+            "package func mergeLayerDown(_ index: Int)",
+            "package func replaceLayerPixels(_ index: Int, pixelData: Data)",
+            "package func replaceLayerPixels(_ index: Int, _ pixelData: Data)",
+            "package func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest)",
+            "package func setTextLayer(_ index: Int, textLayer: TextLayerData)"
+        ]
+        let packageLayerSignatures = Set(
+            Self.callables(accessLevel: "package", in: layerEditingBody)
+                .map(\.signature)
+                .map(Self.normalizedSignature)
+        )
+        for signature in removedPackageRawLayerSignatures {
+            #expect(
+                !packageLayerSignatures.contains(signature),
+                "\(signature) should be removed instead of kept as a deprecated raw compatibility shim"
+            )
+        }
+
+        let removedPackageRawStrokeSignatures = [
+            "package func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int)",
+            "package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool)"
+        ]
+        let packageStrokeSignatures = Set(
+            Self.callables(accessLevel: "package", in: strokeEditingBody)
+                .map(\.signature)
+                .map(Self.normalizedSignature)
+        )
+        for signature in removedPackageRawStrokeSignatures {
+            #expect(
+                !packageStrokeSignatures.contains(signature),
+                "\(signature) should be removed instead of kept as a deprecated raw compatibility shim"
+            )
         }
     }
 

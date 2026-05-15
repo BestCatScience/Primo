@@ -68,13 +68,63 @@ struct DocumentRuntimeCollaboratorTests {
     @Test
     func timelapseRecorderMarksOperationPersistenceWhenRecordingEvents() {
         let store = SwiftDocumentStore(width: 2, height: 2)
-        store.snapshot.timelapseUsesOperationPersistence = false
+        store.update {
+            $0.timelapseUsesOperationPersistence = false
+            return true
+        }
         let recorder = TimelapseRecorder()
 
         recorder.record(.undo, marksOperationPersistence: true, in: store)
 
         #expect(store.snapshot.timelapseUsesOperationPersistence)
         #expect(store.snapshot.timelapseEvents == [.undo])
+    }
+
+    @Test
+    func applyLayerSurfaceMutationReleasesGpuPayloadHandleOnEarlyFailure() {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: services)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        let payload = GpuLayerMutationPayload.unsafeUnchecked(
+            canvasWidth: 3,
+            canvasHeight: 2,
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
+            gpuBufferHandle: handle,
+            fallbackPixelData: nil
+        )
+
+        let result = runtime.applyLayerSurfaceMutation(index: 0, payload: payload)
+
+        guard case .failure = result else {
+            Issue.record("Expected invalid surface payload to fail")
+            return
+        }
+        #expect(box.releasedHandles == [handle])
+    }
+
+    @Test
+    func applyLayerMutationReleasesGpuPayloadHandleWhenValidationFails() {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: services)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        let payload = DocumentLayerMutationPayload.unsafeUnchecked(
+            canvasWidth: 2,
+            canvasHeight: 2,
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 1, originY: 0, width: 2, height: 2),
+            gpuBufferHandle: handle,
+            rectPixelData: Data(),
+            fullPixelData: nil
+        )
+
+        let result = runtime.applyLayerMutation(index: 0, payload: payload)
+
+        guard case .failure = result else {
+            Issue.record("Expected invalid layer payload to fail")
+            return
+        }
+        #expect(box.releasedHandles == [handle])
     }
 }
 

@@ -714,7 +714,7 @@ extension DocumentApplicationRuntime {
         let textLayerService = DocumentTextLayerService(
             textLayerData: { _ in nil },
             setTextLayer: { index, textLayer in
-                resolvedEditingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
+                resolvedEditingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
                     .map { _ in () }
             },
             clearTextLayerData: { _ in }

@@ -2,35 +2,44 @@ import Foundation
 
 enum LayerMutationEngine {
     static func remapFoldersAfterInsertion(in store: SwiftDocumentStore, at insertedIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            if let anchor = store.snapshot.folders[index].anchorLayerIndex, anchor >= insertedIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
+        store.update {
+            for index in $0.folders.indices {
+                if let anchor = $0.folders[index].anchorLayerIndex, anchor >= insertedIndex {
+                    $0.folders[index].anchorLayerIndex = anchor + 1
+                }
             }
+            return true
         }
     }
 
     static func remapFoldersAfterDeletion(in store: SwiftDocumentStore, of deletedIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            if let anchor = store.snapshot.folders[index].anchorLayerIndex {
-                if anchor == deletedIndex {
-                    store.snapshot.folders[index].anchorLayerIndex = nil
-                } else if anchor > deletedIndex {
-                    store.snapshot.folders[index].anchorLayerIndex = anchor - 1
+        store.update {
+            for index in $0.folders.indices {
+                if let anchor = $0.folders[index].anchorLayerIndex {
+                    if anchor == deletedIndex {
+                        $0.folders[index].anchorLayerIndex = nil
+                    } else if anchor > deletedIndex {
+                        $0.folders[index].anchorLayerIndex = anchor - 1
+                    }
                 }
             }
+            return true
         }
     }
 
     static func remapFoldersAfterMove(in store: SwiftDocumentStore, from sourceIndex: Int, to destinationIndex: Int) {
-        for index in store.snapshot.folders.indices {
-            guard let anchor = store.snapshot.folders[index].anchorLayerIndex else { continue }
-            if anchor == sourceIndex {
-                store.snapshot.folders[index].anchorLayerIndex = destinationIndex
-            } else if sourceIndex < destinationIndex, anchor > sourceIndex, anchor <= destinationIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor - 1
-            } else if sourceIndex > destinationIndex, anchor >= destinationIndex, anchor < sourceIndex {
-                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
+        store.update {
+            for index in $0.folders.indices {
+                guard let anchor = $0.folders[index].anchorLayerIndex else { continue }
+                if anchor == sourceIndex {
+                    $0.folders[index].anchorLayerIndex = destinationIndex
+                } else if sourceIndex < destinationIndex, anchor > sourceIndex, anchor <= destinationIndex {
+                    $0.folders[index].anchorLayerIndex = anchor - 1
+                } else if sourceIndex > destinationIndex, anchor >= destinationIndex, anchor < sourceIndex {
+                    $0.folders[index].anchorLayerIndex = anchor + 1
+                }
             }
+            return true
         }
     }
 

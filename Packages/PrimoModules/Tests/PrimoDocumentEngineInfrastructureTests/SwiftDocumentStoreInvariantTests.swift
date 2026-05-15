@@ -78,6 +78,84 @@ struct SwiftDocumentStoreInvariantTests {
     }
 
     @Test
+    func storeUpdateCommitsAcceptedSnapshotMutation() throws {
+        let store = SwiftDocumentStore(width: 2, height: 2)
+        let paperStyle = try #require(CanvasPaperStyle(
+            validatingRed: 0.25,
+            green: 0.5,
+            blue: 0.75,
+            alpha: 1,
+            isTransparent: false
+        ))
+
+        let didUpdate = store.update {
+            $0.paperStyle = paperStyle
+            $0.revision = 2
+            return true
+        }
+
+        #expect(didUpdate)
+        #expect(store.snapshot.paperStyle == paperStyle)
+        #expect(store.snapshot.revision == 2)
+    }
+
+    @Test
+    func storeUpdateRollsBackRejectedSnapshotMutation() throws {
+        let store = SwiftDocumentStore(width: 2, height: 2)
+        let originalSnapshot = store.snapshot
+        let paperStyle = try #require(CanvasPaperStyle(
+            validatingRed: 0.25,
+            green: 0.5,
+            blue: 0.75,
+            alpha: 1,
+            isTransparent: false
+        ))
+
+        let didUpdate = store.update {
+            $0.paperStyle = paperStyle
+            $0.revision = 2
+            return false
+        }
+
+        #expect(!didUpdate)
+        #expect(store.snapshot == originalSnapshot)
+    }
+
+    @Test
+    func storeUpdateIsAvailableForRuntimeOwnedSnapshotMutation() throws {
+        let storeSourcePath = #filePath
+            .replacingOccurrences(of: "/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentStoreInvariantTests.swift", with: "/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentStore.swift")
+        let runtimeSourcePath = #filePath
+            .replacingOccurrences(of: "/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentStoreInvariantTests.swift", with: "/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift")
+        let storeSource = try String(contentsOfFile: storeSourcePath, encoding: .utf8)
+        let runtimeSource = try String(contentsOfFile: runtimeSourcePath, encoding: .utf8)
+
+        #expect(storeSource.contains("func update(_ mutation: (inout SwiftDocumentStoreSnapshot) -> Bool) -> Bool"))
+        #expect(runtimeSource.contains("store.update"))
+    }
+
+    @Test
+    func runtimeCollaboratorsMutateStoreThroughUpdateHelper() throws {
+        let sourceRoot = #filePath
+            .replacingOccurrences(of: "/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentStoreInvariantTests.swift", with: "/Sources/PrimoDocumentEngineInfrastructure")
+        let collaboratorFiles = [
+            "DocumentPresentationBuilder.swift",
+            "GpuLayerRepository.swift",
+            "LayerMutationEngine.swift",
+            "TimelapseRecorder.swift",
+        ]
+        let directMutationPattern = #"store\.snapshot\.[^\n]*(\+=|-=|(?<![=!<>])=(?!=)|\.append|\.remove|\.insert|\.replace|removeAll)"#
+        let directMutationRegex = try NSRegularExpression(pattern: directMutationPattern)
+
+        for file in collaboratorFiles {
+            let source = try String(contentsOfFile: "\(sourceRoot)/\(file)", encoding: .utf8)
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+
+            #expect(directMutationRegex.firstMatch(in: source, options: [], range: range) == nil)
+        }
+    }
+
+    @Test
     func validSnapshotFeedsLightweightPresentation() throws {
         let runtime = SwiftDocumentRuntime(
             width: 2,
