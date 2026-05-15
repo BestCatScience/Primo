@@ -176,7 +176,7 @@ package extension DocumentRuntimeServices {
             saveProject: composition.persistenceGateway.saveProject,
             loadProject: composition.persistenceGateway.loadProject,
             setPaperStyle: composition.persistenceGateway.setPaperStyle,
-            newCanvas: composition.persistenceGateway.newCanvas,
+            rawNewCanvas: composition.persistenceGateway.newCanvas,
             prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources
         )
         let exportClient = DocumentExportClient(
@@ -261,12 +261,6 @@ package extension DocumentRuntime {
                     return mutationOutcome(services.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
                 case let .resizeExtentSized(size):
                     return mutationOutcome(services.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
-                case let .create(width, height):
-                    return mutationOutcome(services.canvasCommands.createCanvas(width, height).map { .completed })
-                case let .resize(width, height):
-                    return mutationOutcome(services.canvasCommands.resizeCanvas(width, height).map { .completed })
-                case let .resizeExtent(width, height):
-                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(width, height).map { .completed })
                 case let .initializeImported(request, layerName):
                     return mutationOutcome(services.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
                 case .compositeSurface:

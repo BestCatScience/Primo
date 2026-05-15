@@ -5,7 +5,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 public enum LayerContentMutationTarget: Equatable, Sendable {
-    case existingLayer(index: Int)
+    case existingLayer(index: EditableLayerIndex)
     case newLayer(name: String)
 }
 
@@ -48,18 +48,55 @@ public struct DocumentContentService: Sendable {
         self.documentMutationGateway = documentMutationGateway
     }
 
-    public func setTextLayer(
+    package func setTextLayer(
         _ layerIndex: Int,
         _ textLayer: TextLayerData
     ) -> DocumentMutationResult {
         executeContent(.setTextLayer(index: layerIndex, textLayer: textLayer))
     }
 
-    public func pixelDataForLayer(_ layerIndex: Int) -> Result<Data, DocumentMutationFailure> {
+    public func pixelDataForLayer(_ layerIndex: ExistingLayerIndex) -> Result<LayerPixelData, DocumentMutationFailure> {
+        let presentation: PaintDocumentPresentation
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(currentPresentation):
+            presentation = currentPresentation
+        }
+        guard layerIndex.revision == presentation.revision else {
+            return .failure(
+                .staleLayerIndex(
+                    index: layerIndex.rawValue,
+                    validationRevision: layerIndex.revision,
+                    currentRevision: presentation.revision
+                )
+            )
+        }
+        return documentRenderGateway.pixelDataForLayer(layerIndex.rawValue).flatMap { data in
+            guard let payload = LayerPixelData(
+                width: presentation.geometry.width,
+                height: presentation.geometry.height,
+                rgba: data
+            ) else {
+                return .failure(
+                    .gpu(
+                        .invalidPayloadSize(
+                            operation: "pixelDataForLayer",
+                            expected: presentation.geometry.rgbaByteCount,
+                            actual: data.count
+                        )
+                    )
+                )
+            }
+            return .success(payload)
+        }
+    }
+
+    package func pixelDataForLayer(_ layerIndex: Int) -> Result<Data, DocumentMutationFailure> {
         documentRenderGateway.pixelDataForLayer(layerIndex)
     }
 
-    public func replaceLayerPixels(
+    package func replaceLayerPixels(
         _ layerIndex: Int,
         _ pixelData: Data
     ) -> DocumentMutationResult {
@@ -132,7 +169,7 @@ public struct DocumentContentService: Sendable {
     }
 
     public func applyPixels(
-        _ pixelData: Data,
+        _ pixelData: LayerPixelData,
         to target: LayerContentMutationTarget
     ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
         let geometry: PixelGeometry
@@ -151,7 +188,8 @@ public struct DocumentContentService: Sendable {
             resolvedTarget = target
         }
 
-        guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
+        guard pixelData.width == geometry.width,
+              pixelData.height == geometry.height else {
             if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
                 return .failure(
                     .transactionFailure(
@@ -159,7 +197,7 @@ public struct DocumentContentService: Sendable {
                             .invalidPayloadSize(
                                 operation: "applyPixels",
                                 expected: geometry.rgbaByteCount,
-                                actual: pixelData.count
+                                actual: pixelData.rgba.count
                             )
                         ),
                         rollback: rollbackFailure
@@ -171,13 +209,13 @@ public struct DocumentContentService: Sendable {
                     .invalidPayloadSize(
                         operation: "applyPixels",
                         expected: geometry.rgbaByteCount,
-                        actual: pixelData.count
+                        actual: pixelData.rgba.count
                     )
                 )
             )
         }
 
-        switch executeContent(.replacePixels(index: resolvedTarget.index, pixelData: payload)) {
+        switch executeContent(.replacePixels(index: resolvedTarget.index, pixelData: pixelData)) {
         case let .failure(failure):
             if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
                 return .failure(
@@ -204,6 +242,31 @@ public struct DocumentContentService: Sendable {
                 return .success(AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index))
             }
         }
+    }
+
+    package func applyPixels(
+        _ pixelData: Data,
+        to target: LayerContentMutationTarget
+    ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
+        let geometry: PixelGeometry
+        switch documentQueryGateway.lightweightPresentation() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(presentation):
+            geometry = presentation.geometry
+        }
+        guard let payload = LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData) else {
+            return .failure(
+                .gpu(
+                    .invalidPayloadSize(
+                        operation: "applyPixels",
+                        expected: geometry.rgbaByteCount,
+                        actual: pixelData.count
+                    )
+                )
+            )
+        }
+        return applyPixels(payload, to: target)
     }
 
     public func applyTextLayer(
@@ -330,6 +393,37 @@ public struct DocumentContentService: Sendable {
             return .failure(.invalidLayerIndex(rawValue))
         }
         return .success(index)
+    }
+
+    private func editableLayerIndex(_ index: EditableLayerIndex) -> Result<EditableLayerIndex, DocumentMutationFailure> {
+        let context: DocumentLayerMutationContext
+        switch layerMutationContext() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(mutationContext):
+            context = mutationContext
+        }
+        guard index.revision == context.revision else {
+            return .failure(
+                .staleLayerIndex(
+                    index: index.rawValue,
+                    validationRevision: index.revision,
+                    currentRevision: context.revision
+                )
+            )
+        }
+        guard let validated = EditableLayerIndex.validated(
+            index.rawValue,
+            revision: context.revision,
+            layerCount: context.layerCount,
+            isLayerLocked: context.isLayerLocked
+        ) else {
+            if (0..<context.layerCount).contains(index.rawValue), context.isLayerLocked(index.rawValue) {
+                return .failure(.layerLocked(index.rawValue))
+            }
+            return .failure(.invalidLayerIndex(index.rawValue))
+        }
+        return .success(validated)
     }
 
     private func layerMutationContext() -> Result<DocumentLayerMutationContext, DocumentMutationFailure> {

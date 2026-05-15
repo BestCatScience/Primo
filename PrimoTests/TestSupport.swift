@@ -724,7 +724,7 @@ extension DocumentApplicationRuntime {
             saveProject: persistenceGateway.saveProject,
             loadProject: persistenceGateway.loadProject,
             setPaperStyle: persistenceGateway.setPaperStyle,
-            newCanvas: persistenceGateway.newCanvas,
+            rawNewCanvas: persistenceGateway.newCanvas,
             prewarmDrawingResources: persistenceGateway.prewarmDrawingResources
         )
         return Self(

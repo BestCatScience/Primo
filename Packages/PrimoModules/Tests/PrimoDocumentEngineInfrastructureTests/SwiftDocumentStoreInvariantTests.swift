@@ -139,6 +139,7 @@ struct SwiftDocumentStoreInvariantTests {
         let sourceRoot = #filePath
             .replacingOccurrences(of: "/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentStoreInvariantTests.swift", with: "/Sources/PrimoDocumentEngineInfrastructure")
         let collaboratorFiles = [
+            "CanvasResizeCoordinator.swift",
             "DocumentPresentationBuilder.swift",
             "GpuLayerRepository.swift",
             "LayerMutationEngine.swift",

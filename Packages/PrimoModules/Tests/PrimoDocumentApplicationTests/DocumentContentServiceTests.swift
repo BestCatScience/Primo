@@ -34,9 +34,14 @@ struct DocumentContentServiceTests {
             documentMutationGateway: mutationGateway(recorder: recorder)
         )
 
+        let pixelData = LayerPixelData(
+            width: 64,
+            height: 64,
+            rgba: Data(repeating: 0xff, count: 64 * 64 * 4)
+        )!
         let result = service.applyPixels(
-            Data(repeating: 0xff, count: 16),
-            to: .existingLayer(index: 4)
+            pixelData,
+            to: .existingLayer(index: EditableLayerIndex(4))
         )
 
         #expect(result == .failure(.invalidLayerIndex(4)))

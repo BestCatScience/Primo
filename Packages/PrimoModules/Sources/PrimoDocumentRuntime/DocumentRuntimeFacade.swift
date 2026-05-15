@@ -137,9 +137,6 @@ public enum DocumentCanvasCommand: Sendable {
     case createSized(ValidCanvasSize)
     case resizeSized(ValidCanvasSize)
     case resizeExtentSized(ValidCanvasSize)
-    case create(width: Int, height: Int)
-    case resize(width: Int, height: Int)
-    case resizeExtent(width: Int, height: Int)
     case initializeImported(ImportedCanvasRequest, layerName: String)
     case compositeSurface
     case setPaperStyle(CanvasPaperStyle)
@@ -265,13 +262,32 @@ public struct DocumentPersistenceClient: Sendable {
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
         loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject,
         setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
-        newCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
+        newCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult,
         prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
     ) {
         self.saveProjectHandler = saveProject
         self.loadProjectHandler = loadProject
         self.setPaperStyleHandler = setPaperStyle
-        self.newCanvasHandler = newCanvas
+        self.newCanvasHandler = { width, height in
+            guard let size = ValidCanvasSize(width, height) else {
+                return .failure(.invalidCanvasSize(width: width, height: height))
+            }
+            return newCanvas(size)
+        }
+        self.prewarmDrawingResourcesHandler = prewarmDrawingResources
+    }
+
+    package init(
+        saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
+        loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject,
+        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
+        rawNewCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
+        prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
+    ) {
+        self.saveProjectHandler = saveProject
+        self.loadProjectHandler = loadProject
+        self.setPaperStyleHandler = setPaperStyle
+        self.newCanvasHandler = rawNewCanvas
         self.prewarmDrawingResourcesHandler = prewarmDrawingResources
     }
 
@@ -287,7 +303,11 @@ public struct DocumentPersistenceClient: Sendable {
         setPaperStyleHandler(paperStyle)
     }
 
-    public func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+    public func newCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        newCanvasHandler(size.width, size.height)
+    }
+
+    package func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         newCanvasHandler(width, height)
     }
 
@@ -360,12 +380,6 @@ public struct DocumentRenderingWorkflow: Sendable {
             croppedSelectionMask: operations.croppedSelectionMask,
             scaledPixelData: operations.scaledPixelData,
             translatedPixelData: operations.translatedPixelData
-        )
-    }
-
-    package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.init(
-            operations: gpuOperations.renderingOperations
         )
     }
 
@@ -580,8 +594,7 @@ public struct CanvasMutationRuntime: Sendable {
         canvasCommands.createCanvas(size.width, size.height)
     }
 
-    @available(*, deprecated, message: "Use createCanvas(_:) with ValidCanvasSize.")
-    public func createCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+    package func createCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.createCanvas(width, height)
     }
 
@@ -589,8 +602,7 @@ public struct CanvasMutationRuntime: Sendable {
         canvasCommands.resizeCanvas(size.width, size.height)
     }
 
-    @available(*, deprecated, message: "Use resizeCanvas(_:) with ValidCanvasSize.")
-    public func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+    package func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.resizeCanvas(width, height)
     }
 
@@ -598,8 +610,7 @@ public struct CanvasMutationRuntime: Sendable {
         canvasCommands.resizeCanvasExtent(size.width, size.height)
     }
 
-    @available(*, deprecated, message: "Use resizeCanvasExtent(_:) with ValidCanvasSize.")
-    public func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
+    package func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
         canvasCommands.resizeCanvasExtent(width, height)
     }
 
@@ -736,15 +747,19 @@ public struct LayerEditingRuntime: Sendable {
     @available(*, deprecated, message: "Use applyLayerMask(_:) with EditableLayerIndex.")
     package func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
-    public func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
+    public func pixelDataForLayer(_ index: ExistingLayerIndex) -> Result<LayerPixelData, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
     public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
-    public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
+    public func applyPixels(_ pixelData: LayerPixelData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
     public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index.rawValue) }
     public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { textLayerService.clearTextLayerData(index.rawValue) }
     @available(*, deprecated, message: "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData.")
     package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
+    @available(*, deprecated, message: "Use pixelDataForLayer(_:) with ExistingLayerIndex.")
+    package func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
+    @available(*, deprecated, message: "Use applyPixels(_:to:) with LayerPixelData.")
+    package func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     @available(*, deprecated, message: "Use textLayerData(_:) with ExistingLayerIndex.")
     package func textLayerData(_ index: Int) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index) }
     @available(*, deprecated, message: "Use clearTextLayerData(_:) with EditableLayerIndex.")
@@ -831,7 +846,7 @@ public struct LayerEditingRuntime: Sendable {
     public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
     public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
     public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
-    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
+    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
     public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selectionWorkflow.expandedSelectionMask(source, expansion: expansion) }
     public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface { selectionWorkflow.contractedSelectionMask(source, contraction: contraction) }
     public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selectionWorkflow.featheredSelectionMask(source, radius: radius) }
@@ -1036,7 +1051,8 @@ public struct DocumentPersistenceRuntime: Sendable {
     public func saveProject(_ url: URL, _ paperStyle: CanvasPaperStyle) throws { try persistenceClient.saveProject(url, paperStyle) }
     public func loadProject(_ url: URL) throws -> LoadedPaintProject { try persistenceClient.loadProject(url) }
     public func setPaperStyle(_ paperStyle: CanvasPaperStyle) -> DocumentMutationResult { persistenceClient.setPaperStyle(paperStyle) }
-    public func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult { persistenceClient.newCanvas(width, height) }
+    public func newCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult { persistenceClient.newCanvas(size) }
+    package func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult { persistenceClient.newCanvas(width, height) }
     public func prewarmDrawingResources() -> DocumentMutationResult { persistenceClient.prewarmDrawingResources() }
 }
 
@@ -1081,7 +1097,19 @@ public struct CanvasPreviewRuntime: Sendable {
         self.canvasPresentationEnvironment = services.canvasPresentationEnvironment
     }
 
-    public func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data) -> Data? {
+    public func compositePreviewImageData(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: ExistingLayerIndex,
+        adjustedActiveLayerPixels: RgbaSurface
+    ) -> Data? {
+        canvasPreviewRenderer.compositePreviewImageData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex.rawValue,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels.data
+        )
+    }
+
+    package func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data) -> Data? {
         canvasPreviewRenderer.compositePreviewImageData(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
@@ -1139,12 +1167,12 @@ public struct CanvasPreviewRuntime: Sendable {
         canvasPreviewRenderer.paperCompositeSurface(pixelData: pixelData, width: width, height: height, paperStyle: paperStyle)
     }
 
-    public func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
-        canvasPreviewRenderer.shapePreviewSurface(stroke: stroke, style: style, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    public func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasGeometry: PixelGeometry) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.shapePreviewSurface(stroke: stroke, style: style, canvasWidth: canvasGeometry.width, canvasHeight: canvasGeometry.height)
     }
 
-    public func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
-        canvasPreviewRenderer.transformedTextPreviewSurface(textLayer: textLayer, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    public func transformedTextPreviewSurface(textLayer: TextLayerData, canvasGeometry: PixelGeometry) -> DocumentCompositeSurface? {
+        canvasPreviewRenderer.transformedTextPreviewSurface(textLayer: textLayer, canvasWidth: canvasGeometry.width, canvasHeight: canvasGeometry.height)
     }
 
     public func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
@@ -1153,14 +1181,14 @@ public struct CanvasPreviewRuntime: Sendable {
 
     public func sampledColor(
         snapshot: MetalDocumentSnapshot,
-        activeLayerIndex: Int,
+        activeLayerIndex: ExistingLayerIndex,
         source: EyedropperSamplingSource,
         point: CGPoint,
         paperStyle: CanvasPaperStyle
     ) -> SampledColor? {
         canvasEyedropperSampler.sampledColor(
             snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
+            activeLayerIndex: activeLayerIndex.rawValue,
             source: source,
             point: point,
             paperStyle: paperStyle

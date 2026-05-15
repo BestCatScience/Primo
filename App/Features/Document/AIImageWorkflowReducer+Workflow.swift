@@ -98,13 +98,17 @@ extension AIImageWorkflowReducer {
         ) -> Result<AIImagePreviewApplicationPlan, AIImageValidationFailure> {
             switch preview.descriptor.outputMode {
             case .replaceCurrentLayer:
-                guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
+                let targetLayer: EditableLayerIndex
+                switch DocumentWorkflowCommandValidator().editableLayerIndex(preview.outputLayerIndex, in: state) {
+                case let .success(index):
+                    targetLayer = index
+                case .failure:
                     return .failure(AIImageValidationFailure(feedback: .aiImageApplyFailed))
                 }
                 return .success(
                     AIImagePreviewApplicationPlan(
                         preview: preview,
-                        target: .existingLayer(index: preview.outputLayerIndex)
+                        target: .existingLayer(index: targetLayer)
                     )
                 )
 
@@ -127,8 +131,23 @@ extension AIImageWorkflowReducer {
         let contentService: any LayerContentWorkflowSubmitting
 
         func apply(_ plan: AIImagePreviewApplicationPlan) -> Result<AppliedPreview, DocumentMutationFailure> {
-            contentService.applyPixels(
-                plan.preview.outputSurface.pixelData,
+            guard let pixelData = LayerPixelData(
+                width: plan.preview.outputSurface.width,
+                height: plan.preview.outputSurface.height,
+                rgba: plan.preview.outputSurface.pixelData
+            ) else {
+                return .failure(
+                    .gpu(
+                        .invalidPayloadSize(
+                            operation: "applyPixels",
+                            expected: plan.preview.outputSurface.width * plan.preview.outputSurface.height * 4,
+                            actual: plan.preview.outputSurface.pixelData.count
+                        )
+                    )
+                )
+            }
+            return contentService.applyPixels(
+                pixelData,
                 to: plan.target
             )
             .map { AppliedPreview(targetLayerIndex: $0.targetLayerIndex) }

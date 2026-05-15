@@ -451,8 +451,21 @@ extension LayerWorkflowReducer {
             layerSidebar: state.layerSidebar
         )
         let appliedMutation: AppliedLayerContentMutation
+        guard
+            let geometry = PixelGeometry(
+                width: Int(state.canvas.canvasSize.width.rounded()),
+                height: Int(state.canvas.canvasSize.height.rounded())
+            ),
+            let importedLayerPixels = LayerPixelData(
+                width: geometry.width,
+                height: geometry.height,
+                rgba: importedPixelData
+            )
+        else {
+            return .send(.delegate(.documentMutationFeedback(.couldNotImportPhoto(nil))))
+        }
         switch layerContentWorkflowService.applyPixels(
-            importedPixelData,
+            importedLayerPixels,
             to: .newLayer(name: layerName)
         ) {
         case let .success(mutation):
@@ -505,7 +518,12 @@ extension LayerWorkflowReducer {
 
         let target: LayerContentMutationTarget
         if let existingIndex = draft.targetLayerIndex {
-            target = .existingLayer(index: existingIndex)
+            switch editableLayer(existingIndex, in: state) {
+            case let .success(index):
+                target = .existingLayer(index: index)
+            case .failure:
+                return documentMutationFeedbackEffect(for: .textLayerApplyFailed)
+            }
         } else {
             target = .newLayer(name: namingPolicy.textLayerName(from: draft.text))
         }

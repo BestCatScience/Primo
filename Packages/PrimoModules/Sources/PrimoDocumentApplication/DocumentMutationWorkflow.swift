@@ -76,79 +76,183 @@ public struct DocumentMutationWorkflowService: Sendable {
         executeIndexed(.structure(.addLayer(name: name)))
     }
 
-    public func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult {
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
+        createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue ?? -1)
+    }
+
+    public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult {
+        deleteFolder(folderID.rawValue)
+    }
+
+    public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult {
+        deleteLayer(index.rawValue)
+    }
+
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult {
+        duplicateLayer(index.rawValue, named: duplicateName)
+    }
+
+    public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult {
+        moveLayer(index.rawValue, to: destinationIndex.rawValue)
+    }
+
+    public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult {
+        assignLayer(index.rawValue, toFolder: folderID?.rawValue)
+    }
+
+    public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult {
+        mergeLayerDown(index.rawValue)
+    }
+
+    public func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult {
+        setLayerVisibility(index.rawValue, visible: visible)
+    }
+
+    public func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult {
+        setActiveLayer(index.rawValue)
+    }
+
+    public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult {
+        setLayerOpacity(index.rawValue, opacity: opacity.rawValue)
+    }
+
+    public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult {
+        setLayerLocked(index.rawValue, isLocked: isLocked)
+    }
+
+    public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult {
+        setLayerAlphaLocked(index.rawValue, isAlphaLocked: isAlphaLocked)
+    }
+
+    public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult {
+        setLayerClipped(index.rawValue, isClipped: isClipped)
+    }
+
+    public func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult {
+        setFolderExpanded(folderID.rawValue, isExpanded: isExpanded)
+    }
+
+    public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult {
+        setFolderVisibility(folderID.rawValue, visible: visible)
+    }
+
+    public func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult {
+        setFolderName(folderID.rawValue, name: name)
+    }
+
+    public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult {
+        setLayerBlendMode(index.rawValue, blendMode: blendMode)
+    }
+
+    public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult {
+        setLayerName(index.rawValue, name: name)
+    }
+
+    public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult {
+        replaceLayerPixels(command.index.rawValue, pixelData: command.pixelData)
+    }
+
+    public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult {
+        applyLayerProcessing(index.rawValue, request: request)
+    }
+
+    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult {
+        setTextLayer(index.rawValue, textLayer: textLayer)
+    }
+
+    public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult {
+        clearLayer(index.rawValue)
+    }
+
+    public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult {
+        replaceLayerMask(index.rawValue, maskData: mask.bytes)
+    }
+
+    public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult {
+        clearLayerMask(index.rawValue)
+    }
+
+    public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult {
+        applyLayerMask(index.rawValue)
+    }
+
+    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult {
         executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: activeLayerIndex)))
     }
 
-    public func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
+    package func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
         execute(.structure(.deleteFolder(folderID: folderID)))
     }
 
-    public func deleteLayer(_ index: Int) -> DocumentMutationResult {
+    package func deleteLayer(_ index: Int) -> DocumentMutationResult {
         execute(.structure(.deleteLayer(index: index)))
     }
 
-    public func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult {
+    package func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult {
         executeIndexed(.structure(.duplicateLayer(index: index, name: duplicateName)))
     }
 
-    public func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult {
+    package func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult {
         execute(.structure(.moveLayer(index: index, destinationIndex: destinationIndex)))
     }
 
-    public func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult {
+    package func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult {
         execute(.structure(.assignLayerToFolder(index: index, folderID: folderID)))
     }
 
-    public func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
+    package func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
         documentLayerEffectsGateway.mergeLayerDown(index)
     }
 
-    public func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult {
+    package func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult {
         execute(.attribute(.setLayerVisibility(index: index, isVisible: visible)))
     }
 
-    public func setActiveLayer(_ index: Int) -> DocumentMutationResult {
+    package func setActiveLayer(_ index: Int) -> DocumentMutationResult {
         execute(.attribute(.setActiveLayer(index: index)))
     }
 
-    public func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult {
+    package func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult {
         execute(.attribute(.setLayerOpacity(index: index, opacity: opacity)))
     }
 
-    public func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult {
+    package func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult {
         execute(.attribute(.setLayerLocked(index: index, isLocked: isLocked)))
     }
 
-    public func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
+    package func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
         execute(.attribute(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)))
     }
 
-    public func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult {
+    package func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult {
         execute(.attribute(.setLayerClipped(index: index, isClipped: isClipped)))
     }
 
-    public func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
+    package func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
         execute(.attribute(.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)))
     }
 
-    public func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult {
+    package func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult {
         execute(.attribute(.setFolderVisibility(folderID: folderID, isVisible: visible)))
     }
 
-    public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult {
+    package func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult {
         execute(.attribute(.setFolderName(folderID: folderID, name: name)))
     }
 
-    public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
+    package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
         execute(.attribute(.setLayerBlendMode(index: index, blendMode: blendMode)))
     }
 
-    public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult {
+    package func setLayerName(_ index: Int, name: String) -> DocumentMutationResult {
         execute(.attribute(.setLayerName(index: index, name: name)))
     }
 
-    public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
+    package func replaceLayerPixels(_ index: Int, pixelData: LayerPixelData) -> DocumentMutationResult {
+        executeContent(.replacePixels(index: index, pixelData: pixelData))
+    }
+
+    package func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
         let geometry: PixelGeometry
         switch documentQueryGateway.lightweightPresentation() {
         case let .failure(failure):
@@ -170,19 +274,19 @@ public struct DocumentMutationWorkflowService: Sendable {
         return executeContent(.replacePixels(index: index, pixelData: payload))
     }
 
-    public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
+    package func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
         executeContent(.applyProcessing(index: index, request: request))
     }
 
-    public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
+    package func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
         executeContent(.setTextLayer(index: index, textLayer: textLayer))
     }
 
-    public func clearLayer(_ index: Int) -> DocumentMutationResult {
+    package func clearLayer(_ index: Int) -> DocumentMutationResult {
         executeContent(.clear(index: index))
     }
 
-    public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult {
+    package func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult {
         let geometry: PixelGeometry
         switch documentQueryGateway.lightweightPresentation() {
         case let .failure(failure):
@@ -204,11 +308,11 @@ public struct DocumentMutationWorkflowService: Sendable {
         return executeContent(.replaceMask(index: index, mask: payload))
     }
 
-    public func clearLayerMask(_ index: Int) -> DocumentMutationResult {
+    package func clearLayerMask(_ index: Int) -> DocumentMutationResult {
         executeContent(.clearMask(index: index))
     }
 
-    public func applyLayerMask(_ index: Int) -> DocumentMutationResult {
+    package func applyLayerMask(_ index: Int) -> DocumentMutationResult {
         executeContent(.applyMask(index: index))
     }
 

@@ -50,10 +50,18 @@ extension CanvasEditingWorkflowReducer {
         state: inout State,
         request: ColorRangeSelectionRequest
     ) -> Effect<Action> {
+        guard
+            case let .success(activeLayerIndex) = documentWorkflowCommandValidator.existingLayerIndex(
+                state.canvas.activeLayerIndex,
+                in: state
+            )
+        else {
+            return .none
+        }
         let incomingSelection = selectionWorkflowService.makeColorRangeSelection(
             request: request,
             snapshot: state.canvas.renderSnapshot,
-            activeLayerIndex: state.canvas.activeLayerIndex,
+            activeLayerIndex: activeLayerIndex,
             mode: state.canvas.selectionMode
         )
         let selection = selectionWorkflowService.combinedSelection(
@@ -417,9 +425,16 @@ extension CanvasEditingWorkflowReducer {
         }
 
         let sourcePixels: Data
-        switch documentContentService.pixelDataForLayer(state.canvas.activeLayerIndex) {
+        let activeLayerIndex: ExistingLayerIndex
+        switch DocumentWorkflowCommandValidator().existingLayerIndex(state.canvas.activeLayerIndex, in: state) {
+        case let .success(index):
+            activeLayerIndex = index
+        case .failure:
+            return nil
+        }
+        switch documentContentService.pixelDataForLayer(activeLayerIndex) {
         case let .success(pixelData):
-            sourcePixels = pixelData
+            sourcePixels = pixelData.rgba
         case .failure:
             return nil
         }

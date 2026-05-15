@@ -438,7 +438,7 @@ extension DocumentLayerVisibilityAdapter {
 }
 
 extension DocumentLayerContentAdapter {
-    func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> {
+    func pixelDataForLayer(_ index: ExistingLayerIndex) -> Result<LayerPixelData, DocumentMutationFailure> {
         runtime.pixelDataForLayer(index)
     }
 
@@ -524,7 +524,7 @@ extension DocumentSelectionProcessingAdapter {
         runtime.featheredSelection(selection, canvasSize: canvasSize, radius: radius)
     }
 
-    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? {
+    func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? {
         runtime.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode)
     }
 
@@ -583,7 +583,12 @@ extension DocumentPersistenceRuntime {
             saveProject: saveProject,
             loadProject: loadProject,
             setPaperStyle: setPaperStyle,
-            newCanvas: newCanvas,
+            newCanvas: { width, height in
+                guard let size = ValidCanvasSize(width, height) else {
+                    return .failure(.invalidCanvasSize(width: width, height: height))
+                }
+                return newCanvas(size)
+            },
             prewarmDrawingResources: prewarmDrawingResources
         )
     }
@@ -633,10 +638,22 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
     }
 
     func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data) -> Data? {
-        runtime.compositePreviewImageData(
+        guard
+            let geometry = PixelGeometry(width: snapshot.width, height: snapshot.height),
+            let layerIndex = DocumentLayerMutationContext(
+                revision: .initial,
+                layerCount: snapshot.layers.count,
+                folderIDs: [],
+                isLayerLocked: { _ in false }
+            ).existingLayerIndex(activeLayerIndex),
+            let surface = RgbaSurface(geometry: geometry, data: adjustedActiveLayerPixels)
+        else {
+            return nil
+        }
+        return runtime.compositePreviewImageData(
             snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: adjustedActiveLayerPixels
+            activeLayerIndex: layerIndex,
+            adjustedActiveLayerPixels: surface
         )
     }
 
@@ -648,11 +665,13 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
     }
 
     func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
-        runtime.shapePreviewSurface(stroke: stroke, style: style, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        return runtime.shapePreviewSurface(stroke: stroke, style: style, canvasGeometry: canvasGeometry)
     }
 
     func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
-        runtime.transformedTextPreviewSurface(textLayer: textLayer, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        return runtime.transformedTextPreviewSurface(textLayer: textLayer, canvasGeometry: canvasGeometry)
     }
 
     func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
@@ -670,9 +689,17 @@ private struct CanvasPreviewRuntimeEyedropperSampler: CanvasEyedropperSampling {
         point: CGPoint,
         paperStyle: CanvasPaperStyle
     ) -> SampledColor? {
-        runtime.sampledColor(
+        guard let layerIndex = DocumentLayerMutationContext(
+            revision: .initial,
+            layerCount: snapshot.layers.count,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        ).existingLayerIndex(activeLayerIndex) else {
+            return nil
+        }
+        return runtime.sampledColor(
             snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
+            activeLayerIndex: layerIndex,
             source: source,
             point: point,
             paperStyle: paperStyle

@@ -652,6 +652,21 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!workflow.contains("textLayerGateway"))
 
         let publicContentMethods = [
+            "replaceLayerPixels(_ command: LayerPixelReplacementCommand)",
+            "applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest)",
+            "setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData)",
+            "clearLayer(_ index: EditableLayerIndex)",
+            "replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData)",
+            "clearLayerMask(_ index: EditableLayerIndex)",
+            "applyLayerMask(_ index: EditableLayerIndex)"
+        ]
+        for signature in publicContentMethods {
+            let body = try #require(Self.functionBody(matching: "public func \(signature)", in: workflow))
+            #expect(body.contains(".rawValue") || body.contains("LayerPixelReplacementCommand"))
+            #expect(!body.contains("documentMutationGateway."))
+            #expect(!body.contains("textLayerGateway."))
+        }
+        for signature in [
             "replaceLayerPixels(_ index: Int, pixelData: Data)",
             "applyLayerProcessing(_ index: Int, request: LayerProcessingRequest)",
             "setTextLayer(_ index: Int, textLayer: TextLayerData)",
@@ -659,15 +674,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             "replaceLayerMask(_ index: Int, maskData: Data)",
             "clearLayerMask(_ index: Int)",
             "applyLayerMask(_ index: Int)"
-        ]
-        for signature in publicContentMethods {
-            let body = try #require(Self.functionBody(matching: "public func \(signature)", in: workflow))
+        ] {
             #expect(
-                body.contains("executeContent("),
-                "\(signature) should enter the validated content command path before raw gateway execution"
+                Self.functionBody(matching: "public func \(signature)", in: workflow) == nil,
+                "\(signature) should not remain public after typed content commands exist"
             )
-            #expect(!body.contains("documentMutationGateway."))
-            #expect(!body.contains("textLayerGateway."))
         }
         #expect(workflow.contains("LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData)"))
         #expect(workflow.contains("LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData)"))
@@ -707,7 +718,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Runtime facade wrappers should expose behavior through methods/properties, not public raw service storage"
         )
         #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
-        #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
+        #expect(!body.contains("init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection; live modules own that wiring")
         #expect(
             body.contains("public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult"),
             "LayerEditingRuntime should expose typed pixel replacement"
@@ -858,6 +869,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo("))
+        #expect(liveBody.contains("package init(gpuOperations: DocumentGpuOperationGateway)"))
+        #expect(liveBody.contains("DocumentGpuOperationGatewayFactory.live()"))
     }
 
     @Test
@@ -897,6 +910,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func transformationBounds(selection: CanvasSelection?, surface: RgbaSurface)",
             "public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry)",
             "public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int)",
+            "public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode)",
             "public func expandedSelectionMask(_ source: MaskSurface, expansion: Int)",
             "public func contractedSelectionMask(_ source: MaskSurface, contraction: Int)",
             "public func featheredSelectionMask(_ source: MaskSurface, radius: Int)",
@@ -904,19 +918,13 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode)",
             "public func eyedropperLoupeSurface( source: RgbaSurface, centerX: Int, centerY: Int, gridSize: Int, paperStyle: CanvasPaperStyle, blendWithPaper: Bool )",
             "public func paperCompositeSurface(_ surface: RgbaSurface, paperStyle: CanvasPaperStyle)",
+            "public func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasGeometry: PixelGeometry)",
+            "public func transformedTextPreviewSurface(textLayer: TextLayerData, canvasGeometry: PixelGeometry)",
+            "public func sampledColor( snapshot: MetalDocumentSnapshot, activeLayerIndex: ExistingLayerIndex, source: EyedropperSamplingSource, point: CGPoint, paperStyle: CanvasPaperStyle )",
             "public func selectionOverlaySurface(_ mask: MaskSurface)"
         ]
         for signature in typedSignatures {
             #expect(signatures.contains(signature), "Missing typed public facade overload: \(signature)")
-        }
-
-        let remainingDeprecatedCanvasSizeReplacements = [
-            "Use createCanvas(_:) with ValidCanvasSize.",
-            "Use resizeCanvas(_:) with ValidCanvasSize.",
-            "Use resizeCanvasExtent(_:) with ValidCanvasSize."
-        ]
-        for replacement in remainingDeprecatedCanvasSizeReplacements {
-            #expect(body.contains("@available(*, deprecated, message: \"\(replacement)\")"))
         }
 
         let removedRawSurfaceFunctionNames: Set<String> = [
@@ -935,6 +943,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             "croppedSelection",
             "eyedropperLoupeSurface",
             "paperCompositeSurface",
+            "shapePreviewSurface",
+            "transformedTextPreviewSurface",
             "selectionOverlaySurface"
         ]
         let publicRawSurfaceFunctions = publicCallables.filter { callable in
@@ -946,6 +956,22 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(
             publicRawSurfaceFunctions.isEmpty,
             "Public raw Data + width + height rendering APIs should be removed once typed RgbaSurface/MaskSurface overloads exist: \(publicRawSurfaceFunctions.map(\.signature))"
+        )
+        #expect(
+            !publicCallables.contains { $0.name == "makeColorRangeSelection" && $0.hasParameter(named: "activeLayerIndex", type: "Int") },
+            "Public color-range selection should accept ExistingLayerIndex instead of raw Int"
+        )
+        #expect(
+            !publicCallables.contains { $0.name == "sampledColor" && $0.hasParameter(named: "activeLayerIndex", type: "Int") },
+            "Public eyedropper sampling should accept ExistingLayerIndex instead of raw Int"
+        )
+        #expect(
+            !publicCallables.contains { $0.name == "shapePreviewSurface" && $0.hasParameter(named: "canvasWidth", type: "Int") },
+            "Public shape preview should accept PixelGeometry instead of raw canvas dimensions"
+        )
+        #expect(
+            !publicCallables.contains { $0.name == "transformedTextPreviewSurface" && $0.hasParameter(named: "canvasWidth", type: "Int") },
+            "Public text preview should accept PixelGeometry instead of raw canvas dimensions"
         )
 
         let textLayerServiceBody = try #require(Self.typeBody(named: "DocumentTextLayerService", in: body))

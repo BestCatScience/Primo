@@ -23,24 +23,77 @@ public struct ImportedCanvasRequest: Equatable, Sendable {
 }
 
 public struct DocumentCanvasCommandService: Sendable {
-    public let createCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
-    public let resizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
-    public let resizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    package let rawCreateCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    package let rawResizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    package let rawResizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
     public let initializeImportedCanvas: @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult
     public let compositeSurface: @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
 
     public init(
-        createCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
-        resizeCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
-        resizeCanvasExtent: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        createCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult,
+        resizeCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult,
+        resizeCanvasExtent: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult,
         initializeImportedCanvas: @escaping @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult,
         compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
     ) {
-        self.createCanvas = createCanvas
-        self.resizeCanvas = resizeCanvas
-        self.resizeCanvasExtent = resizeCanvasExtent
+        self.rawCreateCanvas = { width, height in
+            guard let size = ValidCanvasSize(width, height) else {
+                return .failure(.invalidCanvasSize(width: width, height: height))
+            }
+            return createCanvas(size)
+        }
+        self.rawResizeCanvas = { width, height in
+            guard let size = ValidCanvasSize(width, height) else {
+                return .failure(.invalidCanvasSize(width: width, height: height))
+            }
+            return resizeCanvas(size)
+        }
+        self.rawResizeCanvasExtent = { width, height in
+            guard let size = ValidCanvasSize(width, height) else {
+                return .failure(.invalidCanvasSize(width: width, height: height))
+            }
+            return resizeCanvasExtent(size)
+        }
         self.initializeImportedCanvas = initializeImportedCanvas
         self.compositeSurface = compositeSurface
+    }
+
+    package init(
+        rawCreateCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        rawResizeCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        rawResizeCanvasExtent: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        initializeImportedCanvas: @escaping @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult,
+        compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure>
+    ) {
+        self.rawCreateCanvas = rawCreateCanvas
+        self.rawResizeCanvas = rawResizeCanvas
+        self.rawResizeCanvasExtent = rawResizeCanvasExtent
+        self.initializeImportedCanvas = initializeImportedCanvas
+        self.compositeSurface = compositeSurface
+    }
+
+    public func createCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        rawCreateCanvas(size.width, size.height)
+    }
+
+    public func resizeCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        rawResizeCanvas(size.width, size.height)
+    }
+
+    public func resizeCanvasExtent(_ size: ValidCanvasSize) -> DocumentMutationResult {
+        rawResizeCanvasExtent(size.width, size.height)
+    }
+
+    package func createCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        rawCreateCanvas(width, height)
+    }
+
+    package func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        rawResizeCanvas(width, height)
+    }
+
+    package func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        rawResizeCanvasExtent(width, height)
     }
 
     public init(
@@ -50,7 +103,7 @@ public struct DocumentCanvasCommandService: Sendable {
         persistenceGateway: DocumentPersistenceGateway
     ) {
         self.init(
-            createCanvas: { width, height in
+            rawCreateCanvas: { width, height in
                 guard let size = ValidCanvasSize(width, height) else {
                     return .failure(.invalidCanvasSize(width: width, height: height))
                 }
@@ -60,13 +113,13 @@ public struct DocumentCanvasCommandService: Sendable {
                 }
                 return persistenceGateway.prewarmDrawingResources()
             },
-            resizeCanvas: { width, height in
+            rawResizeCanvas: { width, height in
                 guard let size = ValidCanvasSize(width, height) else {
                     return .failure(.invalidCanvasSize(width: width, height: height))
                 }
                 return mutationGateway.resizeCanvas(size.width, size.height)
             },
-            resizeCanvasExtent: { width, height in
+            rawResizeCanvasExtent: { width, height in
                 guard let size = ValidCanvasSize(width, height) else {
                     return .failure(.invalidCanvasSize(width: width, height: height))
                 }

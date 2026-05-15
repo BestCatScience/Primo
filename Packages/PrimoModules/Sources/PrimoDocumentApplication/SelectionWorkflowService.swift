@@ -296,7 +296,7 @@ public struct SelectionWorkflowService: Sendable {
     public func makeColorRangeSelection(
         request: ColorRangeSelectionRequest,
         snapshot: MetalDocumentSnapshot?,
-        activeLayerIndex: Int,
+        activeLayerIndex: ExistingLayerIndex,
         mode: SelectionToolMode
     ) -> CanvasSelection? {
         guard let snapshot else { return nil }
@@ -307,7 +307,7 @@ public struct SelectionWorkflowService: Sendable {
         let pixelData: Data
         switch request.source {
         case .activeLayer:
-            guard let layer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else { return nil }
+            guard let layer = snapshot.layers.first(where: { $0.index == activeLayerIndex.rawValue }) else { return nil }
             pixelData = layer.pixelData
         case .canvas:
             pixelData = snapshot.compositePixelData

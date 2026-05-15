@@ -27,7 +27,8 @@ struct DocumentRuntimeCompositionTests {
         let initial = await iterator.next()
         #expect(initial?.canvasSize.width != 3)
 
-        let outcome = await runtime.execute(.canvas(.create(width: 3, height: 3)))
+        let size = try #require(ValidCanvasSize(3, 3))
+        let outcome = await runtime.execute(.canvas(.createSized(size)))
         guard case .mutation(.success) = outcome else {
             Issue.record("Expected create command to succeed")
             return
@@ -393,7 +394,8 @@ struct DocumentRuntimeCompositionTests {
         await consumer.value
         let countAfterCancellation = presentations.count
 
-        let outcome = await runtime.execute(.canvas(.create(width: 7, height: 7)))
+        let size = try #require(ValidCanvasSize(7, 7))
+        let outcome = await runtime.execute(.canvas(.createSized(size)))
         guard case .mutation(.success) = outcome else {
             Issue.record("Expected create command to succeed")
             return
