@@ -33,6 +33,9 @@ let package = Package(
         .library(name: "PrimoWorkspaceRuntime", targets: ["PrimoWorkspaceRuntime"]),
         .library(name: "PrimoBrushFileFormats", targets: ["PrimoBrushFileFormats"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-syntax", exact: "601.0.1"),
+    ],
     targets: [
         .target(
             name: "PrimoCoreTypes"
@@ -490,6 +493,8 @@ let package = Package(
                 "PrimoDocumentInfrastructure",
                 "PrimoDocumentRuntime",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+                .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
             ],
             exclude: [
                 "__Snapshots__"

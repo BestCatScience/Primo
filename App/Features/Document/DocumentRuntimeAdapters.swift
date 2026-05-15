@@ -142,7 +142,12 @@ extension LayerMutationSubmitting {
 
 extension LayerContentSubmitting {
     func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult {
-        replaceLayerPixels(command.layer.layerIndex.rawValue, command.pixelData.rgba)
+        replaceLayerPixels(
+            LayerPixelReplacementCommand(
+                index: command.layer.layerIndex,
+                pixelData: command.pixelData
+            )
+        )
     }
 }
 
@@ -453,8 +458,8 @@ extension DocumentLayerContentAdapter {
         runtime.pixelDataForLayer(index)
     }
 
-    func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult {
-        runtime.replaceLayerPixels(index, pixelData)
+    func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult {
+        runtime.replaceLayerPixels(command)
     }
 }
 

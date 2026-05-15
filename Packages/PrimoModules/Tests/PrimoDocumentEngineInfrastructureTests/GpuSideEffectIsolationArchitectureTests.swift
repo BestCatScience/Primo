@@ -696,6 +696,18 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
         #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
+        #expect(
+            body.contains("public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult"),
+            "LayerEditingRuntime should expose typed pixel replacement"
+        )
+        #expect(
+            body.contains("@available(*, deprecated, message: \"Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.\")\n    public func replaceLayerPixels(_ index: Int, pixelData: Data)"),
+            "LayerEditingRuntime raw labeled pixel replacement should warn callers toward the typed command"
+        )
+        #expect(
+            body.contains("@available(*, deprecated, message: \"Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.\")\n    public func replaceLayerPixels(_ index: Int, _ pixelData: Data)"),
+            "LayerEditingRuntime raw unlabeled pixel replacement should warn callers toward the typed command"
+        )
 
         let renderingWorkflowBody = try #require(Self.typeBody(named: "DocumentRenderingWorkflow", in: body))
         let publicRenderingInitializers = Self.initializerSignatures(accessLevel: "public", in: renderingWorkflowBody)
@@ -1717,12 +1729,16 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         #expect(!contentContracts.contains("public typealias LayerPixelData = Data"))
         #expect(!contentContracts.contains("public typealias LayerMaskData = Data"))
+        #expect(contentContracts.contains("public struct LayerPixelReplacementCommand"))
         let pixelData = try #require(Self.declarationBody(named: "LayerPixelData", in: contentContracts))
         let maskData = try #require(Self.declarationBody(named: "LayerMaskData", in: contentContracts))
+        let replacementCommand = try #require(Self.declarationBody(named: "LayerPixelReplacementCommand", in: contentContracts))
         #expect(Set(Self.storedPropertyNames(accessLevel: "public", in: pixelData)) == ["width", "height", "rgba"])
         #expect(Set(Self.storedPropertyNames(accessLevel: "public", in: maskData)) == ["width", "height", "bytes"])
+        #expect(Set(Self.storedPropertyNames(accessLevel: "public", in: replacementCommand)) == ["index", "pixelData"])
         #expect(Self.initializerSignatures(accessLevel: "public", in: pixelData).contains("public init?(width: Int, height: Int, rgba: Data)"))
         #expect(Self.initializerSignatures(accessLevel: "public", in: maskData).contains("public init?(width: Int, height: Int, bytes: Data)"))
+        #expect(Self.initializerSignatures(accessLevel: "public", in: replacementCommand).contains("public init(index: EditableLayerIndex, pixelData: LayerPixelData)"))
     }
 
     @Test
@@ -1958,32 +1974,7 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func swiftImports(in source: String) -> Set<String> {
-        let importKinds: Set<String> = [
-            "class",
-            "enum",
-            "func",
-            "let",
-            "protocol",
-            "struct",
-            "typealias",
-            "var"
-        ]
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        return Set(code.split(separator: "\n").compactMap { line in
-            var trimmed = line.trimmingCharacters(in: .whitespaces)
-            while trimmed.hasPrefix("@"),
-                  let attributeEnd = trimmed.firstIndex(where: { $0 == " " || $0 == "\t" }) {
-                trimmed = String(trimmed[attributeEnd...]).trimmingCharacters(in: .whitespaces)
-            }
-            guard trimmed.hasPrefix("import ") else { return nil }
-            var parts = trimmed.dropFirst("import ".count)
-                .split(whereSeparator: { $0 == " " || $0 == "." })
-            guard let first = parts.first else { return nil }
-            if importKinds.contains(String(first)) {
-                parts.removeFirst()
-            }
-            return parts.first.map(String.init)
-        })
+        ArchitectureSourceInspector(source: source).importedModules
     }
 
     private static func swiftCodeWithCommentsAndStringsBlanked(in source: String) -> String {
@@ -2061,24 +2052,9 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func publicTopLevelSymbols(in source: String) -> [String] {
-        source.split(separator: "\n").compactMap { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("public ") else { return nil }
-            let parts = trimmed.split(whereSeparator: { $0 == " " || $0 == ":" || $0 == "<" || $0 == "(" })
-            guard let declarationIndex = parts.firstIndex(where: { part in
-                part == "struct" ||
-                    part == "enum" ||
-                    part == "protocol" ||
-                    part == "class" ||
-                    part == "actor" ||
-                    part == "typealias"
-            }) else {
-                return nil
-            }
-            let nameIndex = parts.index(after: declarationIndex)
-            guard parts.indices.contains(nameIndex) else { return nil }
-            return String(parts[nameIndex])
-        }
+        ArchitectureSourceInspector(source: source).topLevelDeclarations
+            .filter { $0.accessLevel == "public" }
+            .map(\.name)
     }
 
     private static func infrastructureProductNames(in source: String) -> [String] {
@@ -2087,66 +2063,32 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func storedPropertyNames(accessLevel: String, in source: String) -> [String] {
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        let pattern = #"^\s*\#(accessLevel)\s+(?:private\(set\)\s+)?(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)"#
-        let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-        let range = NSRange(code.startIndex..<code.endIndex, in: code)
-        return regex?.matches(in: code, range: range).compactMap { match in
-            guard let nameRange = Range(match.range(at: 1), in: code) else { return nil }
-            let lineEnd = code[nameRange.upperBound...].firstIndex(of: "\n") ?? code.endIndex
-            guard !code[nameRange.upperBound..<lineEnd].contains("{") else { return nil }
-            return String(code[nameRange])
-        } ?? []
+        ArchitectureSourceInspector(source: source).properties
+            .filter { $0.accessLevel == accessLevel && $0.isStored }
+            .map(\.name)
     }
 
     private static func computedPropertyNames(accessLevel: String, in source: String) -> Set<String> {
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        let pattern = #"^\s*\#(accessLevel)\s+(?:private\(set\)\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)[^\n{]*\{"#
-        let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-        let range = NSRange(code.startIndex..<code.endIndex, in: code)
-        return Set(regex?.matches(in: code, range: range).compactMap { match in
-            guard let nameRange = Range(match.range(at: 1), in: code) else { return nil }
-            return String(code[nameRange])
-        } ?? [])
+        Set(
+            ArchitectureSourceInspector(source: source).properties
+                .filter { $0.accessLevel == accessLevel && !$0.isStored }
+                .map(\.name)
+        )
     }
 
     private static func initializerSignatures(accessLevel: String, in source: String) -> [String] {
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        let marker = "\(accessLevel) init"
-        var signatures: [String] = []
-        var searchStart = code.startIndex
-
-        while let markerRange = code.range(of: marker, range: searchStart..<code.endIndex),
-              let openParen = code[markerRange.upperBound...].firstIndex(of: "("),
-              let closeParen = Self.matchingDelimiter(in: code, open: openParen, opening: "(", closing: ")") {
-            let end = code.index(after: closeParen)
-            signatures.append(
-                String(code[markerRange.lowerBound..<end])
-                    .split(whereSeparator: \.isNewline)
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .joined(separator: " ")
-            )
-            searchStart = end
-        }
-
-        return signatures
+        ArchitectureSourceInspector(source: source).initializerSignatures
+            .filter { $0.hasPrefix("\(accessLevel) init") }
     }
 
     private static func functionSignatures(accessLevel: String? = nil, in source: String) -> [String] {
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        let accessPrefix = accessLevel.map { #"\#($0)\s+"# } ?? #"(?:(?:public|package|private|internal|fileprivate)\s+)?"#
-        let pattern = #"^\s*\#(accessPrefix)(?:static\s+|class\s+)?func\s+"#
-        let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-        let range = NSRange(code.startIndex..<code.endIndex, in: code)
-        return regex?.matches(in: code, range: range).compactMap { match in
-            guard let declarationStart = Range(match.range, in: code)?.lowerBound,
-                  let openParen = code[declarationStart...].firstIndex(of: "("),
-                  let closeParen = Self.matchingDelimiter(in: code, open: openParen, opening: "(", closing: ")") else {
-                return nil
+        ArchitectureSourceInspector(source: source).functionSignatures
+            .filter { signature in
+                guard let accessLevel else { return true }
+                return signature.hasPrefix("\(accessLevel) ") ||
+                    signature.hasPrefix("\(accessLevel) static ") ||
+                    signature.hasPrefix("\(accessLevel) class ")
             }
-            let end = code.index(after: closeParen)
-            return Self.normalizedSignature(String(code[declarationStart..<end]))
-        } ?? []
     }
 
     private static func normalizedSignature(_ signature: String) -> String {
@@ -2179,32 +2121,7 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func declarationBody(named typeName: String, in source: String) -> String? {
-        let code = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
-        guard let declaration = code.range(of: "struct \(typeName)") ??
-            code.range(of: "enum \(typeName)") ??
-            code.range(of: "protocol \(typeName)") ??
-            code.range(of: "class \(typeName)") ??
-            code.range(of: "actor \(typeName)") else {
-            return nil
-        }
-        guard let openingBrace = code[declaration.lowerBound...].firstIndex(of: "{") else {
-            return nil
-        }
-        var depth = 0
-        var index = openingBrace
-        while index < code.endIndex {
-            let character = code[index]
-            if character == "{" {
-                depth += 1
-            } else if character == "}" {
-                depth -= 1
-                if depth == 0 {
-                    return String(code[openingBrace...index])
-                }
-            }
-            index = code.index(after: index)
-        }
-        return nil
+        ArchitectureSourceInspector(source: source).declarationSource(named: typeName)
     }
 
     private static func typeBody(named typeName: String, in source: String) -> String? {
@@ -2236,10 +2153,48 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     private static func packageTargetGraph() throws -> [String: Set<String>] {
+        try cachedPackageTargetGraph.get()
+    }
+
+    private static let cachedPackageTargetGraph: Result<[String: Set<String>], Error> = Result {
+        try loadPackageTargetGraph()
+    }
+
+    private static func loadPackageTargetGraph() throws -> [String: Set<String>] {
         let repoRoot = try Self.repoRoot()
-        let manifest = repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false)
-        let body = try String(contentsOf: manifest, encoding: .utf8)
-        return PackageManifestTargetParser.parseTargetDependencies(from: body)
+        let packageRoot = repoRoot.appendingPathComponent("Packages/PrimoModules", isDirectory: true)
+        let scratchRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "primo-dump-package-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: scratchRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratchRoot) }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+        process.arguments = [
+            "package",
+            "--package-path",
+            packageRoot.path,
+            "--scratch-path",
+            scratchRoot.path,
+            "dump-package"
+        ]
+        var environment = ProcessInfo.processInfo.environment
+        environment["DEVELOPER_DIR"] = environment["DEVELOPER_DIR"] ?? "/Applications/Xcode.app/Contents/Developer"
+        process.environment = environment
+
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        let outputData = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        if process.terminationStatus != 0 {
+            let message = String(data: outputData, encoding: .utf8) ?? ""
+            throw PackageGraphError.dumpPackageFailed(message)
+        }
+        return try PackageDumpTargetGraph.decode(from: outputData)
     }
 
     #if os(macOS)
@@ -2337,6 +2292,55 @@ private enum SymbolSnapshotError: Error, CustomStringConvertible {
             return "symbol graph extraction failed: \(message)"
         case let .invalidSymbolGraph(path):
             return "invalid symbol graph: \(path)"
+        }
+    }
+}
+
+private enum PackageGraphError: Error, CustomStringConvertible {
+    case dumpPackageFailed(String)
+
+    var description: String {
+        switch self {
+        case let .dumpPackageFailed(message):
+            return "swift package dump-package failed: \(message)"
+        }
+    }
+}
+
+private enum PackageDumpTargetGraph {
+    static func decode(from data: Data) throws -> [String: Set<String>] {
+        let package = try JSONDecoder().decode(DumpPackage.self, from: data)
+        return Dictionary(uniqueKeysWithValues: package.targets.map { target in
+            (target.name, Set(target.dependencies.compactMap(\.targetName)))
+        })
+    }
+
+    private struct DumpPackage: Decodable {
+        let targets: [Target]
+    }
+
+    private struct Target: Decodable {
+        let name: String
+        let dependencies: [Dependency]
+    }
+
+    private struct Dependency: Decodable {
+        let targetName: String?
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let byName = try container.decodeIfPresent([String?].self, forKey: .byName) {
+                targetName = byName.first ?? nil
+            } else if let product = try container.decodeIfPresent([String?].self, forKey: .product) {
+                targetName = product.first ?? nil
+            } else {
+                targetName = nil
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case byName
+            case product
         }
     }
 }
@@ -2444,117 +2448,6 @@ private enum PackageManifestProductParser {
         }
 
         return blocks
-    }
-
-    private static func firstQuotedValue(after label: String, in block: String) -> String? {
-        guard let labelRange = block.range(of: label) else { return nil }
-        return quotedStrings(in: String(block[labelRange.upperBound...])).first
-    }
-
-    private static func quotedStrings(in text: String) -> [String] {
-        var output: [String] = []
-        var index = text.startIndex
-        while let opening = text[index...].firstIndex(of: "\"") {
-            var cursor = text.index(after: opening)
-            var value = ""
-            var escaped = false
-            while cursor < text.endIndex {
-                let character = text[cursor]
-                if escaped {
-                    value.append(character)
-                    escaped = false
-                } else if character == "\\" {
-                    escaped = true
-                } else if character == "\"" {
-                    output.append(value)
-                    index = text.index(after: cursor)
-                    break
-                } else {
-                    value.append(character)
-                }
-                cursor = text.index(after: cursor)
-            }
-            if cursor >= text.endIndex { break }
-        }
-        return output
-    }
-
-    private static func matchingDelimiter(
-        in text: String,
-        open: String.Index,
-        opening: Character,
-        closing: Character
-    ) -> String.Index? {
-        var depth = 0
-        var cursor = open
-        var isInsideString = false
-        var escaped = false
-        while cursor < text.endIndex {
-            let character = text[cursor]
-            if isInsideString {
-                if escaped {
-                    escaped = false
-                } else if character == "\\" {
-                    escaped = true
-                } else if character == "\"" {
-                    isInsideString = false
-                }
-            } else if character == "\"" {
-                isInsideString = true
-            } else if character == opening {
-                depth += 1
-            } else if character == closing {
-                depth -= 1
-                if depth == 0 { return cursor }
-            }
-            cursor = text.index(after: cursor)
-        }
-        return nil
-    }
-}
-
-private enum PackageManifestTargetParser {
-    static func parseTargetDependencies(from manifest: String) -> [String: Set<String>] {
-        var graph: [String: Set<String>] = [:]
-        for block in targetBlocks(in: manifest) {
-            guard let name = firstQuotedValue(after: "name:", in: block) else { continue }
-            graph[name] = Set(dependencies(in: block))
-        }
-        return graph
-    }
-
-    private static func targetBlocks(in manifest: String) -> [String] {
-        var blocks: [String] = []
-        var searchStart = manifest.startIndex
-        while let markerRange = manifest.range(of: ".target(", range: searchStart..<manifest.endIndex) {
-            let openParen = manifest.index(before: markerRange.upperBound)
-            guard let closeParen = matchingDelimiter(
-                in: manifest,
-                open: openParen,
-                opening: "(",
-                closing: ")"
-            ) else {
-                break
-            }
-            blocks.append(String(manifest[markerRange.lowerBound...closeParen]))
-            searchStart = manifest.index(after: closeParen)
-        }
-        return blocks
-    }
-
-    private static func dependencies(in targetBlock: String) -> [String] {
-        guard let dependenciesRange = targetBlock.range(of: "dependencies:"),
-              let openBracket = targetBlock[dependenciesRange.upperBound...].firstIndex(of: "["),
-              let closeBracket = matchingDelimiter(
-                in: targetBlock,
-                open: openBracket,
-                opening: "[",
-                closing: "]"
-              )
-        else {
-            return []
-        }
-        return quotedStrings(in: String(targetBlock[openBracket...closeBracket]))
     }
 
     private static func firstQuotedValue(after label: String, in block: String) -> String? {

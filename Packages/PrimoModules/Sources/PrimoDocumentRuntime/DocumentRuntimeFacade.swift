@@ -772,6 +772,7 @@ public struct LayerEditingRuntime: Sendable {
     public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
     public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
     public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
+    @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
     public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
     public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
     public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
@@ -781,6 +782,8 @@ public struct LayerEditingRuntime: Sendable {
     public func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
     public func pixelDataForLayer(_ index: Int) -> Data { contentService.pixelDataForLayer(index) }
+    public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
+    @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
     public func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
     public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }

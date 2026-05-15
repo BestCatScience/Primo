@@ -18,6 +18,16 @@ public struct LayerPixelData: Equatable, Sendable {
     }
 }
 
+public struct LayerPixelReplacementCommand: Equatable, Sendable {
+    public let index: EditableLayerIndex
+    public let pixelData: LayerPixelData
+
+    public init(index: EditableLayerIndex, pixelData: LayerPixelData) {
+        self.index = index
+        self.pixelData = pixelData
+    }
+}
+
 public struct LayerMaskData: Equatable, Sendable {
     public let width: Int
     public let height: Int

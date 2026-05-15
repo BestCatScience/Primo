@@ -107,6 +107,127 @@ struct DocumentContentServiceTests {
     }
 
     @Test
+    func typedPixelReplacementExecutesValidatedContentMutation() throws {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
+
+        let result = service.replaceLayerPixels(
+            LayerPixelReplacementCommand(index: index, pixelData: pixelData)
+        )
+
+        try result.get()
+        #expect(recorder.values == ["replaceLayerPixels:0"])
+    }
+
+    @Test
+    func typedPixelReplacementRejectsStaleLayerIndexBeforeMutationGateway() throws {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1, revision: .initial.advanced()),
+            documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let index = try #require(EditableLayerIndex.validated(0, revision: .initial, layerCount: 1, isLayerLocked: { _ in false }))
+        let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
+
+        let result = service.replaceLayerPixels(
+            LayerPixelReplacementCommand(index: index, pixelData: pixelData)
+        )
+
+        switch result {
+        case let .failure(failure):
+            #expect(failure == .staleLayerIndex(index: 0, validationRevision: .initial, currentRevision: .initial.advanced()))
+        case .success:
+            Issue.record("Expected stale layer index failure")
+        }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func typedPixelReplacementRejectsLayerThatIsNoLongerEditableBeforeMutationGateway() throws {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let index = try #require(EditableLayerIndex.validated(1, layerCount: 2, isLayerLocked: { _ in false }))
+        let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
+
+        let result = service.replaceLayerPixels(
+            LayerPixelReplacementCommand(index: index, pixelData: pixelData)
+        )
+
+        switch result {
+        case let .failure(failure):
+            #expect(failure == .invalidLayerIndex(1))
+        case .success:
+            Issue.record("Expected invalid layer index failure")
+        }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func typedPixelReplacementRejectsLayerThatBecameLockedBeforeMutationGateway() throws {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1, lockedLayerIndexes: [0]),
+            documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let pixelData = try #require(LayerPixelData(width: 64, height: 64, rgba: Data(repeating: 0xff, count: 64 * 64 * 4)))
+
+        let result = service.replaceLayerPixels(
+            LayerPixelReplacementCommand(index: index, pixelData: pixelData)
+        )
+
+        switch result {
+        case let .failure(failure):
+            #expect(failure == .layerLocked(0))
+        case .success:
+            Issue.record("Expected locked layer failure")
+        }
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
+    func typedPixelReplacementRejectsPixelDataWithDifferentGeometryBeforeMutationGateway() throws {
+        let recorder = CallRecorder()
+        let service = DocumentContentService(
+            documentQueryGateway: queryGateway(activeLayerIndex: 0, layerCount: 1),
+            documentRenderGateway: renderGateway(),
+            documentEditingGateway: editingGateway(recorder: recorder),
+            documentMutationGateway: mutationGateway(recorder: recorder)
+        )
+        let index = try #require(EditableLayerIndex.validated(0, layerCount: 1, isLayerLocked: { _ in false }))
+        let pixelData = try #require(LayerPixelData(width: 1, height: 1, rgba: Data(repeating: 0xff, count: 4)))
+
+        let result = service.replaceLayerPixels(
+            LayerPixelReplacementCommand(index: index, pixelData: pixelData)
+        )
+
+        guard case let .failure(.gpu(.invalidPayloadSize(operation, expected, actual))) = result else {
+            Issue.record("Expected invalid payload size failure")
+            return
+        }
+        #expect(operation == "replaceLayerPixels")
+        #expect(expected == 64 * 64 * 4)
+        #expect(actual == 4)
+        #expect(recorder.values.isEmpty)
+    }
+
+    @Test
     func applyPixelsRollsBackCreatedLayerAfterFailure() {
         let recorder = CallRecorder()
         let service = DocumentContentService(
@@ -238,7 +359,8 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
 private func queryGateway(
     activeLayerIndex: Int,
     layerCount: Int,
-    lockedLayerIndexes: Set<Int> = []
+    lockedLayerIndexes: Set<Int> = [],
+    revision: DocumentRevision = .initial
 ) -> DocumentQueryGateway {
     var indices = Array(0..<layerCount)
     if !indices.contains(activeLayerIndex) {
@@ -250,7 +372,8 @@ private func queryGateway(
         activeLayerIndex: activeLayerIndex,
         layerRows: rows,
         layerSidebarRows: rows.map { .layer($0, depth: 0) },
-        renderSnapshot: nil
+        renderSnapshot: nil,
+        revision: revision
     )!
     return DocumentQueryGateway(
         lightweightPresentation: { presentation },

@@ -83,6 +83,42 @@ public struct DocumentContentService: Sendable {
         }
     }
 
+    public func replaceLayerPixels(
+        _ command: LayerPixelReplacementCommand
+    ) -> DocumentMutationResult {
+        let presentation = documentQueryGateway.lightweightPresentation()
+        let index = command.index
+        guard index.revision == presentation.revision else {
+            return .failure(
+                .staleLayerIndex(
+                    index: index.rawValue,
+                    validationRevision: index.revision,
+                    currentRevision: presentation.revision
+                )
+            )
+        }
+        guard (0..<presentation.layerRows.count).contains(index.rawValue) else {
+            return .failure(.invalidLayerIndex(index.rawValue))
+        }
+        if presentation.layerRows.first(where: { $0.index == index.rawValue })?.isLocked == true {
+            return .failure(.layerLocked(index.rawValue))
+        }
+        let geometry = presentation.geometry
+        guard command.pixelData.width == geometry.width,
+              command.pixelData.height == geometry.height else {
+            return .failure(
+                .gpu(
+                    .invalidPayloadSize(
+                        operation: "replaceLayerPixels",
+                        expected: geometry.rgbaByteCount,
+                        actual: command.pixelData.rgba.count
+                    )
+                )
+            )
+        }
+        return executeContent(.replacePixels(index: index.rawValue, pixelData: command.pixelData))
+    }
+
     public func applyPixels(
         _ pixelData: Data,
         to target: LayerContentMutationTarget

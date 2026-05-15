@@ -1,0 +1,278 @@
+import Foundation
+import SwiftParser
+import SwiftSyntax
+
+struct ArchitectureSourceInspector {
+    struct Declaration: Equatable {
+        let name: String
+        let kind: String
+        let accessLevel: String
+    }
+
+    struct Property: Equatable {
+        let name: String
+        let accessLevel: String
+        let type: String?
+        let isStored: Bool
+    }
+
+    private let source: String
+    private let tree: SourceFileSyntax
+
+    init(source: String) {
+        self.source = source
+        self.tree = Parser.parse(source: source)
+    }
+
+    var importedModules: Set<String> {
+        let visitor = ImportVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.modules
+    }
+
+    var topLevelDeclarations: [Declaration] {
+        let visitor = TopLevelDeclarationVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.declarations
+    }
+
+    var properties: [Property] {
+        let visitor = PropertyVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.properties
+    }
+
+    var initializerSignatures: [String] {
+        let visitor = InitializerVisitor(source: source, viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.signatures
+    }
+
+    var functionSignatures: [String] {
+        let visitor = FunctionVisitor(source: source, viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.signatures
+    }
+
+    func declarationSource(named name: String) -> String? {
+        let visitor = DeclarationSourceVisitor(source: source, name: name, viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.declaration
+    }
+}
+
+private final class TopLevelDeclarationVisitor: SyntaxVisitor {
+    var declarations: [ArchitectureSourceInspector.Declaration] = []
+    private var nominalDepth = 0
+
+    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "struct", modifiers: node.modifiers)
+        nominalDepth += 1
+        return .visitChildren
+    }
+
+    override func visitPost(_ node: StructDeclSyntax) {
+        nominalDepth -= 1
+    }
+
+    override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "enum", modifiers: node.modifiers)
+        nominalDepth += 1
+        return .visitChildren
+    }
+
+    override func visitPost(_ node: EnumDeclSyntax) {
+        nominalDepth -= 1
+    }
+
+    override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "protocol", modifiers: node.modifiers)
+        nominalDepth += 1
+        return .visitChildren
+    }
+
+    override func visitPost(_ node: ProtocolDeclSyntax) {
+        nominalDepth -= 1
+    }
+
+    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "class", modifiers: node.modifiers)
+        nominalDepth += 1
+        return .visitChildren
+    }
+
+    override func visitPost(_ node: ClassDeclSyntax) {
+        nominalDepth -= 1
+    }
+
+    override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "actor", modifiers: node.modifiers)
+        nominalDepth += 1
+        return .visitChildren
+    }
+
+    override func visitPost(_ node: ActorDeclSyntax) {
+        nominalDepth -= 1
+    }
+
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+        record(name: node.name.text, kind: "typealias", modifiers: node.modifiers)
+        return .skipChildren
+    }
+
+    private func record(name: String, kind: String, modifiers: DeclModifierListSyntax) {
+        guard nominalDepth == 0 else { return }
+        declarations.append(
+            ArchitectureSourceInspector.Declaration(
+                name: name,
+                kind: kind,
+                accessLevel: accessLevel(in: modifiers)
+            )
+        )
+    }
+}
+
+private final class ImportVisitor: SyntaxVisitor {
+    var modules: Set<String> = []
+
+    override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+        let path = node.path.trimmedDescription
+        if let module = path.split(separator: ".").first {
+            modules.insert(String(module))
+        }
+        return .skipChildren
+    }
+}
+
+private final class PropertyVisitor: SyntaxVisitor {
+    var properties: [ArchitectureSourceInspector.Property] = []
+
+    override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
+        let access = accessLevel(in: node.modifiers)
+        for binding in node.bindings {
+            guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self) else { continue }
+            properties.append(
+                ArchitectureSourceInspector.Property(
+                    name: identifier.identifier.text,
+                    accessLevel: access,
+                    type: binding.typeAnnotation?.type.trimmedDescription,
+                    isStored: binding.accessorBlock == nil
+                )
+            )
+        }
+        return .skipChildren
+    }
+}
+
+private final class InitializerVisitor: SyntaxVisitor {
+    var signatures: [String] = []
+    private let source: String
+
+    init(source: String, viewMode: SyntaxTreeViewMode) {
+        self.source = source
+        super.init(viewMode: viewMode)
+    }
+
+    override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+        signatures.append(signaturePrefix(for: Syntax(node), in: source))
+        return .skipChildren
+    }
+}
+
+private final class FunctionVisitor: SyntaxVisitor {
+    var signatures: [String] = []
+    private let source: String
+
+    init(source: String, viewMode: SyntaxTreeViewMode) {
+        self.source = source
+        super.init(viewMode: viewMode)
+    }
+
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        signatures.append(signaturePrefix(for: Syntax(node), in: source))
+        return .skipChildren
+    }
+}
+
+private final class DeclarationSourceVisitor: SyntaxVisitor {
+    var declaration: String?
+    private let source: String
+    private let name: String
+
+    init(source: String, name: String, viewMode: SyntaxTreeViewMode) {
+        self.source = source
+        self.name = name
+        super.init(viewMode: viewMode)
+    }
+
+    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+    override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+    override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+    override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind { record(node, named: node.name.text) }
+
+    private func record(_ node: some SyntaxProtocol, named candidate: String) -> SyntaxVisitorContinueKind {
+        guard declaration == nil, candidate == name else {
+            return declaration == nil ? .visitChildren : .skipChildren
+        }
+        declaration = sourceSlice(for: Syntax(node), in: source)
+        return .skipChildren
+    }
+}
+
+private func accessLevel(in modifiers: DeclModifierListSyntax) -> String {
+    for modifier in modifiers {
+        let text = modifier.name.text
+        if ["public", "package", "private", "fileprivate", "internal"].contains(text) {
+            return text
+        }
+    }
+    return "internal"
+}
+
+private func signaturePrefix(for node: Syntax, in source: String) -> String {
+    let declaration = sourceSlice(for: node, in: source)
+    guard let openParen = declaration.firstIndex(of: "("),
+          let closeParen = matchingDelimiter(in: declaration, open: openParen, opening: "(", closing: ")") else {
+        return normalizedSignature(declaration)
+    }
+    return normalizedSignature(String(declaration[..<declaration.index(after: closeParen)]))
+}
+
+private func sourceSlice(for node: Syntax, in source: String) -> String {
+    let start = node.positionAfterSkippingLeadingTrivia.utf8Offset
+    let end = node.endPositionBeforeTrailingTrivia.utf8Offset
+    let bytes = Array(source.utf8)
+    guard start >= 0, end >= start, end <= bytes.count else { return "" }
+    return String(decoding: bytes[start..<end], as: UTF8.self)
+}
+
+private func normalizedSignature(_ signature: String) -> String {
+    signature
+        .split(whereSeparator: \.isNewline)
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .joined(separator: " ")
+        .replacingOccurrences(of: #" +"#, with: " ", options: .regularExpression)
+}
+
+private func matchingDelimiter(
+    in text: String,
+    open: String.Index,
+    opening: Character,
+    closing: Character
+) -> String.Index? {
+    var depth = 0
+    var cursor = open
+    while cursor < text.endIndex {
+        let character = text[cursor]
+        if character == opening {
+            depth += 1
+        } else if character == closing {
+            depth -= 1
+            if depth == 0 { return cursor }
+        }
+        cursor = text.index(after: cursor)
+    }
+    return nil
+}
