@@ -453,9 +453,7 @@ extension DocumentCanvasTransformAdapter {
     }
 
     func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -467,8 +465,6 @@ extension DocumentCanvasTransformAdapter {
     ) -> Data? {
         runtime.transformedLayerPixels(
             source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
             selection: selection,
             translation: translation,
             scaleX: scaleX,
@@ -506,15 +502,11 @@ extension DocumentCanvasTransformAdapter {
 
     func transformationBounds(
         selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
+        surface: RgbaSurface
     ) -> CGRect? {
         runtime.transformationBounds(
             selection: selection,
-            pixelData: pixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+            surface: surface
         )
     }
 }
@@ -551,7 +543,7 @@ extension DocumentSelectionProcessingAdapter {
     func makeAutoSelection(
         at point: CGPoint,
         snapshot: MetalDocumentSnapshot?,
-        layerIndex: Int,
+        layerIndex: ExistingLayerIndex,
         thresholdMode: FillThresholdMode,
         opacityTolerance: Double,
         colorTolerance: Double,
@@ -568,8 +560,8 @@ extension DocumentSelectionProcessingAdapter {
         )
     }
 
-    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
-        runtime.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? {
+        runtime.expandedMask(from: selection, canvasGeometry: canvasGeometry)
     }
 }
 

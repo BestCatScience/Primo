@@ -101,10 +101,18 @@ extension CanvasEditingWorkflowReducer {
         state: inout State,
         sample: StylusSample
     ) -> Effect<Action> {
+        guard
+            case let .success(activeLayerIndex) = documentWorkflowCommandValidator.existingLayerIndex(
+                state.canvas.activeLayerIndex,
+                in: state
+            )
+        else {
+            return .none
+        }
         let incomingSelection = selectionWorkflowService.makeAutoSelection(
             at: sample.point,
             snapshot: state.canvas.renderSnapshot,
-            layerIndex: state.canvas.activeLayerIndex,
+            layerIndex: activeLayerIndex,
             thresholdMode: state.brushPalette.selection.thresholdMode,
             opacityTolerance: state.brushPalette.selection.opacityTolerance,
             colorTolerance: state.brushPalette.selection.colorTolerance,
@@ -290,10 +298,9 @@ extension CanvasEditingWorkflowReducer {
         guard
             let baseSnapshot,
             let layer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+            let sourceSurface = RgbaSurface(width: baseSnapshot.width, height: baseSnapshot.height, data: layer.pixelData),
             let transformedPixels = layerTransformProcessor.transformedLayerPixels(
-                source: layer.pixelData,
-                canvasWidth: baseSnapshot.width,
-                canvasHeight: baseSnapshot.height,
+                source: sourceSurface,
                 selection: state.canvas.selectionMoveSourceSelection ?? state.canvas.selection,
                 translation: offset,
                 scaleX: 1,
@@ -438,13 +445,16 @@ extension CanvasEditingWorkflowReducer {
     ) -> CanvasSelectionMoveSession? {
         let expectedCount = canvasWidth * canvasHeight * 4
         guard source.count == expectedCount else { return nil }
-        guard let selectedMask = selectionWorkflowService.expandedMask(
-            from: selection,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
-        ) else {
+        guard
+            let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+            let selectedMask = selectionWorkflowService.expandedMask(
+                from: selection,
+                canvasGeometry: canvasGeometry
+            )
+        else {
             return nil
         }
+        let selectedMaskData = [UInt8](selectedMask.data)
 
         var basePixels = source
         var payloadPixels = Data(repeating: 0, count: expectedCount)
@@ -461,7 +471,7 @@ extension CanvasEditingWorkflowReducer {
                         return
                     }
 
-                    for pixelIndex in selectedMask.indices where selectedMask[pixelIndex] > 0 {
+                    for pixelIndex in selectedMaskData.indices where selectedMaskData[pixelIndex] > 0 {
                         let byteOffset = pixelIndex * 4
                         guard sourceBase[byteOffset + 3] > 0 else { continue }
                         payload[byteOffset] = sourceBase[byteOffset]

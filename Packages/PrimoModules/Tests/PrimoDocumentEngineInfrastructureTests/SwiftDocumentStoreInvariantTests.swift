@@ -156,6 +156,21 @@ struct SwiftDocumentStoreInvariantTests {
     }
 
     @Test
+    func swiftDocumentRuntimeMutatesStoreThroughUpdateHelper() throws {
+        let runtimeSourcePath = #filePath
+            .replacingOccurrences(of: "/Tests/PrimoDocumentEngineInfrastructureTests/SwiftDocumentStoreInvariantTests.swift", with: "/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift")
+        let runtimeSource = try String(contentsOfFile: runtimeSourcePath, encoding: .utf8)
+        let directSnapshotAssignmentPattern = #"store\.snapshot\s*=(?!=)"#
+        let directSnapshotMutationPattern = #"store\.snapshot\.[^\n]*(\+=|-=|(?<![=!<>])=(?!=)|\.append|\.remove|\.insert|\.replace|removeAll|setOpacity)"#
+        let assignmentRegex = try NSRegularExpression(pattern: directSnapshotAssignmentPattern)
+        let mutationRegex = try NSRegularExpression(pattern: directSnapshotMutationPattern)
+        let range = NSRange(runtimeSource.startIndex..<runtimeSource.endIndex, in: runtimeSource)
+
+        #expect(assignmentRegex.firstMatch(in: runtimeSource, options: [], range: range) == nil)
+        #expect(mutationRegex.firstMatch(in: runtimeSource, options: [], range: range) == nil)
+    }
+
+    @Test
     func validSnapshotFeedsLightweightPresentation() throws {
         let runtime = SwiftDocumentRuntime(
             width: 2,

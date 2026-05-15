@@ -168,13 +168,13 @@ protocol SelectionWorkflowRequesting: Sendable {
     func makeAutoSelection(
         at point: CGPoint,
         snapshot: MetalDocumentSnapshot?,
-        layerIndex: Int,
+        layerIndex: ExistingLayerIndex,
         thresholdMode: FillThresholdMode,
         opacityTolerance: Double,
         colorTolerance: Double,
         expansion: Int
     ) -> CanvasSelection?
-    func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]?
+    func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface?
 }
 
 protocol SelectionProcessingPort: SelectionWorkflowRequesting {}

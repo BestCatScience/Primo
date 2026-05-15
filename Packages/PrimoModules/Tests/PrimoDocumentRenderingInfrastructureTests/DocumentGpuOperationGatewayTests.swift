@@ -55,7 +55,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
-    func layerTransformExpandsCroppedSelectionWithOriginBeforeCanvasSize() {
+    func layerTransformExpandsCroppedSelectionWithOriginBeforeCanvasSize() throws {
         let box = ExpandedSelectionMaskCallBox()
         let gateway = DocumentGpuOperationGateway(
             compositedPaperPreviewRGBA: { _, _, _, _ in failedRendering() },
@@ -96,6 +96,7 @@ struct DocumentGpuOperationGatewayTests {
         )
         let processor = GpuLayerTransformProcessor(gpuOperations: gateway)
         let source = Data(repeating: 0, count: 4 * 3 * 4)
+        let sourceSurface = try #require(RgbaSurface(width: 4, height: 3, data: source))
         let selection = CanvasSelection.unsafeUnchecked(
             bounds: CGRect(x: 2.4, y: 1.7, width: 2, height: 1),
             maskWidth: 2,
@@ -105,9 +106,7 @@ struct DocumentGpuOperationGatewayTests {
         )
 
         let output = processor.transformedLayerPixels(
-            source: source,
-            canvasWidth: 4,
-            canvasHeight: 3,
+            source: sourceSurface,
             selection: selection,
             translation: CGSize(width: 1, height: 0),
             scaleX: 1,

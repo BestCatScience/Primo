@@ -271,9 +271,7 @@ public protocol SelectionMaskProcessing: Sendable {
 
 public protocol LayerTransformProcessing: Sendable {
     func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -298,9 +296,7 @@ public protocol LayerTransformProcessing: Sendable {
 
     func transformationBounds(
         selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
+        surface: RgbaSurface
     ) -> CGRect?
 }
 

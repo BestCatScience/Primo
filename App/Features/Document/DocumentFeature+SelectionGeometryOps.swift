@@ -14,10 +14,13 @@ extension DocumentFeature {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard
+            let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+            let mask = selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry)
+        else {
             return nil
         }
-        return Data(mask)
+        return mask.data
     }
 
     static func transformationBounds(

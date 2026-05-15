@@ -519,9 +519,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
               ) else {
             return .failure(.bridgeMutationFailed("addLayerInvalidStoreGeometry"))
         }
-        store.snapshot.layers.append(layer)
-        let index = store.snapshot.layers.count - 1
-        store.snapshot.activeLayerIndex = index
+        var insertedIndex: Int?
+        guard store.update({ snapshot in
+            snapshot.layers.append(layer)
+            let index = snapshot.layers.count - 1
+            snapshot.activeLayerIndex = index
+            insertedIndex = index
+            return true
+        }), let index = insertedIndex else {
+            return .failure(.bridgeMutationFailed("addLayer"))
+        }
         materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .addLayer(name: name))
@@ -532,14 +539,24 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard store.snapshot.layers.indices.contains(index) else {
             return .failure(.invalidLayerIndex(index))
         }
-        store.snapshot.activeLayerIndex = index
+        guard store.update({
+            $0.activeLayerIndex = index
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setActiveLayer"))
+        }
         return .success(())
     }
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].name = name
+        guard store.update({
+            $0.layers[index].name = name
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerName"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerName(index: .unchecked(index), name: name))
         return .success(())
     }
@@ -550,7 +567,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .success(())
         }
         let before = undoSnapshot()
-        store.snapshot.layers[index].visible = isVisible
+        guard store.update({
+            $0.layers[index].visible = isVisible
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerVisibility"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
         return .success(())
     }
@@ -696,7 +718,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.bridgeMutationFailed("replaceLayerMask"))
         }
         let before = undoSnapshot()
-        store.snapshot.layers[index].replaceMaskData(data, geometry: geometry)
+        guard store.update({
+            $0.layers[index].replaceMaskData(data, geometry: geometry)
+        }) else {
+            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+        }
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .replaceLayerMask(index: .unchecked(index), data: data))
         return .success(())
@@ -707,7 +733,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard store.snapshot.layers[index].maskData != nil else { return .success(()) }
         let before = undoSnapshot()
         guard let geometry = store.snapshot.pixelGeometry,
-              store.snapshot.layers[index].replaceMaskData(nil, geometry: geometry) else {
+              store.update({
+                  $0.layers[index].replaceMaskData(nil, geometry: geometry)
+              }) else {
             return .failure(.bridgeMutationFailed("clearLayerMask"))
         }
         invalidateThumbnail(for: index)
@@ -729,7 +757,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             let before = undoSnapshot()
             setLayerPixelState(index: index, pixelData: maskedPixels, gpuBufferHandle: nil)
             guard let geometry = store.snapshot.pixelGeometry,
-                  store.snapshot.layers[index].replaceMaskData(nil, geometry: geometry) else {
+                  store.update({
+                      $0.layers[index].replaceMaskData(nil, geometry: geometry)
+                  }) else {
                 return .failure(.bridgeMutationFailed("applyLayerMask"))
             }
             invalidateThumbnail(for: index)
@@ -993,7 +1023,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             adjustedOutput = committedOutput
             nextHandle = nil
         }
-        store.snapshot.layers[plan.layerIndex].textLayer = nil
+        guard updateLayerTextLayer(index: plan.layerIndex, textLayer: nil) else {
+            gpuServices.release(nextHandle)
+            return .failure(.bridgeMutationFailed("applyCommittedStrokeTextLayer"))
+        }
         setLayerPixelState(index: plan.layerIndex, pixelData: adjustedOutput, gpuBufferHandle: nextHandle)
         invalidateThumbnail(for: plan.layerIndex)
         recordMutation(
@@ -1102,7 +1135,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             pixelData: nextPixelData,
             gpuBufferHandle: nextHandle
         )
-        store.snapshot.layers[plan.layerIndex].textLayer = nil
+        guard updateLayerTextLayer(index: plan.layerIndex, textLayer: nil) else {
+            gpuServices.release(nextHandle)
+            return .failure(.bridgeMutationFailed("blurStrokeTextLayer"))
+        }
         invalidateThumbnail(for: plan.layerIndex)
         captureDirtyUpdate(rect: payload.dirtyRect)
         if plan.captureTimelapse {
@@ -1140,9 +1176,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         layer.name = name
         let duplicatedIndex = index + 1
-        store.snapshot.layers.insert(layer, at: duplicatedIndex)
+        guard store.update({
+            $0.layers.insert(layer, at: duplicatedIndex)
+            $0.activeLayerIndex = duplicatedIndex
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("duplicateLayer"))
+        }
         remapFoldersAfterInsertion(at: duplicatedIndex)
-        store.snapshot.activeLayerIndex = duplicatedIndex
         materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
@@ -1153,7 +1194,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
         let before = undoSnapshot()
-        deleteLayerUnchecked(index: index)
+        guard deleteLayerUnchecked(index: index) else {
+            return .failure(.bridgeMutationFailed("deleteLayer"))
+        }
         recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
         return .success(())
     }
@@ -1165,12 +1208,17 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let before = undoSnapshot()
         materializeGpuBackedLayerPixels()
         let movedLayerWasActive = store.snapshot.activeLayerIndex == index
-        let layer = store.snapshot.layers.remove(at: index)
-        store.snapshot.layers.insert(layer, at: destinationIndex)
-        remapFoldersAfterMove(from: index, to: destinationIndex)
-        if movedLayerWasActive {
-            store.snapshot.activeLayerIndex = destinationIndex
+        guard store.update({ snapshot in
+            let layer = snapshot.layers.remove(at: index)
+            snapshot.layers.insert(layer, at: destinationIndex)
+            if movedLayerWasActive {
+                snapshot.activeLayerIndex = destinationIndex
+            }
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("moveLayer"))
         }
+        remapFoldersAfterMove(from: index, to: destinationIndex)
         invalidateAllThumbnails()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)))
@@ -1187,16 +1235,21 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         let before = undoSnapshot()
         let id = store.snapshot.nextFolderID
-        store.snapshot.nextFolderID += 1
-        store.snapshot.folders.append(
-            SwiftDocumentFolderRecord(
-                id: id,
-                name: name,
-                visible: true,
-                expanded: true,
-                anchorLayerIndex: anchorLayerIndex
+        guard store.update({
+            $0.nextFolderID += 1
+            $0.folders.append(
+                SwiftDocumentFolderRecord(
+                    id: id,
+                    name: name,
+                    visible: true,
+                    expanded: true,
+                    anchorLayerIndex: anchorLayerIndex
+                )
             )
-        )
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("createFolder"))
+        }
         recordMutation(
             before: before,
             timelapseEvent: .createFolder(
@@ -1213,9 +1266,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.folders.remove(at: folderIndex)
-        for index in store.snapshot.layers.indices where store.snapshot.layers[index].folderID == folderID {
-            store.snapshot.layers[index].folderID = nil
+        guard store.update({ snapshot in
+            snapshot.folders.remove(at: folderIndex)
+            for index in snapshot.layers.indices where snapshot.layers[index].folderID == folderID {
+                snapshot.layers[index].folderID = nil
+            }
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("deleteFolder"))
         }
         recordMutation(before: before, timelapseEvent: .deleteFolder(folderID: .unchecked(folderID)))
         return .success(())
@@ -1226,7 +1284,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.folders[folderIndex].visible = isVisible
+        guard store.update({
+            $0.folders[folderIndex].visible = isVisible
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setFolderVisibility"))
+        }
         recordMutation(before: before, timelapseEvent: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible))
         return .success(())
     }
@@ -1236,7 +1299,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.folders[folderIndex].name = name
+        guard store.update({
+            $0.folders[folderIndex].name = name
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setFolderName"))
+        }
         recordMutation(before: before, timelapseEvent: .setFolderName(folderID: .unchecked(folderID), name: name))
         return .success(())
     }
@@ -1246,7 +1314,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.folders[folderIndex].expanded = isExpanded
+        guard store.update({
+            $0.folders[folderIndex].expanded = isExpanded
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setFolderExpanded"))
+        }
         recordMutation(before: before, timelapseEvent: .setFolderExpanded(folderID: .unchecked(folderID), isExpanded: isExpanded))
         return .success(())
     }
@@ -1261,7 +1334,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.invalidFolderID(folderID))
         }
         let before = undoSnapshot()
-        store.snapshot.layers[index].folderID = folderID
+        guard store.update({
+            $0.layers[index].folderID = folderID
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("assignLayerToFolder"))
+        }
         recordMutation(
             before: before,
             timelapseEvent: .assignLayerToFolder(
@@ -1275,7 +1353,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].locked = isLocked
+        guard store.update({
+            $0.layers[index].locked = isLocked
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerLocked"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerLocked(index: .unchecked(index), isLocked: isLocked))
         return .success(())
     }
@@ -1283,7 +1366,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].alphaLocked = isAlphaLocked
+        guard store.update({
+            $0.layers[index].alphaLocked = isAlphaLocked
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerAlphaLocked"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked))
         return .success(())
     }
@@ -1291,7 +1379,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].clipped = isClipped
+        guard store.update({
+            $0.layers[index].clipped = isClipped
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerClipped"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerClipped(index: .unchecked(index), isClipped: isClipped))
         return .success(())
     }
@@ -1300,7 +1393,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard DocumentLayerOpacity(opacity) != nil else { return .failure(.invalidOpacity(opacity)) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].setOpacity(opacity)
+        guard store.update({
+            $0.layers[index].setOpacity(opacity)
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerOpacity"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerOpacity(index: .unchecked(index), opacity: opacity))
         return .success(())
     }
@@ -1308,7 +1405,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         let before = undoSnapshot()
-        store.snapshot.layers[index].blendMode = blendMode
+        guard store.update({
+            $0.layers[index].blendMode = blendMode
+            return true
+        }) else {
+            return .failure(.bridgeMutationFailed("setLayerBlendMode"))
+        }
         recordMutation(before: before, timelapseEvent: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode))
         return .success(())
     }
@@ -1349,8 +1451,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             ),
             gpuBufferHandle: nil
         )
-        store.snapshot.layers[index - 1].textLayer = nil
-        deleteLayerUnchecked(index: index)
+        guard updateLayerTextLayer(index: index - 1, textLayer: nil),
+              deleteLayerUnchecked(index: index) else {
+            return .failure(.bridgeMutationFailed("mergeLayerDown"))
+        }
         recordMutation(before: before, timelapseEvent: .mergeLayerDown(index: .unchecked(index)))
         return .success(())
     }
@@ -1373,7 +1477,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func clearTextLayerData(index: Int) {
         guard store.snapshot.layers.indices.contains(index) else { return }
-        store.snapshot.layers[index].textLayer = nil
+        updateLayerTextLayer(index: index, textLayer: nil)
     }
 
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
@@ -1936,13 +2040,19 @@ extension SwiftDocumentRuntime {
         return store.snapshot.layers[index].locked ? .layerLocked(index) : nil
     }
 
-    private func deleteLayerUnchecked(index: Int) {
+    private func deleteLayerUnchecked(index: Int) -> Bool {
         materializeGpuBackedLayerPixels()
-        store.snapshot.layers.remove(at: index)
+        guard store.update({ snapshot in
+            snapshot.layers.remove(at: index)
+            snapshot.activeLayerIndex = min(snapshot.activeLayerIndex, snapshot.layers.count - 1)
+            return true
+        }) else {
+            return false
+        }
         remapFoldersAfterDeletion(of: index)
-        store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
         invalidateAllThumbnails()
         releaseLayerBufferHandles()
+        return true
     }
 
     private func replaceLayerPixelsUnchecked(index: Int, data: Data, timelapseEvent: TimelapseOperation?) -> DocumentMutationResult {
@@ -1960,7 +2070,9 @@ extension SwiftDocumentRuntime {
             isAlphaLocked: store.snapshot.layers[index].alphaLocked
         )
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil)
-        store.snapshot.layers[index].textLayer = nil
+        guard updateLayerTextLayer(index: index, textLayer: nil) else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsTextLayer"))
+        }
         invalidateThumbnail(for: index)
         recordMutation(
             before: before,
@@ -2022,7 +2134,9 @@ extension SwiftDocumentRuntime {
             nextHandle = nil
         }
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
-        store.snapshot.layers[index].textLayer = nil
+        guard updateLayerTextLayer(index: index, textLayer: nil) else {
+            return .failure(.bridgeMutationFailed("applyLayerMutationTextLayer"))
+        }
         invalidateThumbnail(for: index)
         let finalTimelapseEvent = recordsFinalLayerPixels
             ? TimelapseOperation.replaceLayerPixels(index: .unchecked(index), data: adjusted)
@@ -2070,7 +2184,9 @@ extension SwiftDocumentRuntime {
             pixelData: materializedPixelData(from: payload, existing: currentPixelData(for: index)),
             gpuBufferHandle: payloadLease.adoptHandle()
         )
-        store.snapshot.layers[index].textLayer = textLayer
+        guard updateLayerTextLayer(index: index, textLayer: textLayer) else {
+            return .failure(.bridgeMutationFailed("applyTextLayerMutationTextLayer"))
+        }
         invalidateThumbnail(for: index)
         recordMutation(
             before: before,
@@ -2120,6 +2236,15 @@ extension SwiftDocumentRuntime {
         )
     }
 
+    @discardableResult
+    private func updateLayerTextLayer(index: Int, textLayer: TextLayerData?) -> Bool {
+        store.update {
+            guard $0.layers.indices.contains(index) else { return false }
+            $0.layers[index].textLayer = textLayer
+            return true
+        }
+    }
+
     private func releaseLayerBufferHandles() {
         gpuLayerRepository.releaseLayerBufferHandles(services: gpuServices)
     }
@@ -2160,7 +2285,10 @@ extension SwiftDocumentRuntime {
         )
         logUndoHistoryStats(stats, reason: "recordMutation")
         timelapseRecorder.record(timelapseEvent, marksOperationPersistence: true, in: store)
-        store.snapshot.revision += 1
+        _ = store.update {
+            $0.revision += 1
+            return true
+        }
         captureDirtyUpdate(rect: dirtyRect)
     }
 

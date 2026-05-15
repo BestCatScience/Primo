@@ -441,9 +441,7 @@ private final class RecordingLayerTransformProcessor: LayerTransformProcessing, 
     }
 
     func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -456,7 +454,7 @@ private final class RecordingLayerTransformProcessor: LayerTransformProcessing, 
         lock.lock()
         transformedLayerPixelsCalls += 1
         lock.unlock()
-        return source
+        return source.data
     }
 
     func transformedSelection(
@@ -475,9 +473,7 @@ private final class RecordingLayerTransformProcessor: LayerTransformProcessing, 
 
     func transformationBounds(
         selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
+        surface: RgbaSurface
     ) -> CGRect? {
         nil
     }

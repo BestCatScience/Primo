@@ -30,11 +30,13 @@ extension DocumentFeature {
         padding: Int = 64,
         selectionWorkflow: any SelectionWorkflowRequesting
     ) -> InpaintCrop? {
-        guard let expandedMask = selectionWorkflow.expandedMask(
-            from: selection,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
-        ) else {
+        guard
+            let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+            let expandedMask = selectionWorkflow.expandedMask(
+                from: selection,
+                canvasGeometry: canvasGeometry
+            )
+        else {
             return nil
         }
 
@@ -43,7 +45,7 @@ extension DocumentFeature {
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             selectionBounds: selection.bounds,
-            expandedMask: expandedMask,
+            expandedMask: [UInt8](expandedMask.data),
             padding: padding
         )
     }

@@ -131,11 +131,18 @@ struct SelectionWorkflowServiceTests {
             layers: [layer]
         )
 
+        let layerIndex = try #require(
+            DocumentLayerMutationContext(
+                layerCount: 3,
+                folderIDs: [],
+                isLayerLocked: { _ in false }
+            ).existingLayerIndex(2)
+        )
         let selection = try #require(
             service.makeAutoSelection(
                 at: CGPoint(x: 0, y: 0),
                 snapshot: snapshot,
-                layerIndex: 2,
+                layerIndex: layerIndex,
                 thresholdMode: .opacity,
                 opacityTolerance: 0,
                 colorTolerance: 0,

@@ -120,7 +120,15 @@ public struct SelectionWorkflowService: Sendable {
         return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .rectangle)
     }
 
-    public func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+    public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? {
+        expandedMask(
+            from: selection,
+            canvasWidth: canvasGeometry.width,
+            canvasHeight: canvasGeometry.height
+        ).flatMap { MaskSurface(geometry: canvasGeometry, data: Data($0)) }
+    }
+
+    package func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
         guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
         guard let selectionGeometry = PixelGeometry(width: selection.maskWidth, height: selection.maskHeight) else { return nil }
         guard selection.maskData.count == selectionGeometry.maskByteCount else { return nil }
@@ -228,6 +236,26 @@ public struct SelectionWorkflowService: Sendable {
     public func makeAutoSelection(
         at point: CGPoint,
         snapshot: MetalDocumentSnapshot?,
+        layerIndex: ExistingLayerIndex,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> CanvasSelection? {
+        makeAutoSelection(
+            at: point,
+            snapshot: snapshot,
+            layerIndex: layerIndex.rawValue,
+            thresholdMode: thresholdMode,
+            opacityTolerance: opacityTolerance,
+            colorTolerance: colorTolerance,
+            expansion: expansion
+        )
+    }
+
+    package func makeAutoSelection(
+        at point: CGPoint,
+        snapshot: MetalDocumentSnapshot?,
         layerIndex: Int,
         thresholdMode: FillThresholdMode,
         opacityTolerance: Double,
@@ -296,33 +324,77 @@ public struct SelectionWorkflowService: Sendable {
         return croppedSelection(from: expandedMask, width: width, height: height, mode: mode)
     }
 
-    public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
+    public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface {
+        let data = expandedSelectionMask(
+            [UInt8](source.data),
+            width: source.width,
+            height: source.height,
+            expansion: expansion
+        )
+        return MaskSurface(geometry: source.geometry, data: Data(data)) ?? source
+    }
+
+    package func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return expandedMaskHandler(source, width, height, expansion).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
-    public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
+    public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface {
+        let data = contractedSelectionMask(
+            [UInt8](source.data),
+            width: source.width,
+            height: source.height,
+            contraction: contraction
+        )
+        return MaskSurface(geometry: source.geometry, data: Data(data)) ?? source
+    }
+
+    package func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return contractedMaskHandler(source, width, height, contraction).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
-    public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
+    public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface {
+        let data = featheredSelectionMask(
+            [UInt8](source.data),
+            width: source.width,
+            height: source.height,
+            radius: radius
+        )
+        return MaskSurface(geometry: source.geometry, data: Data(data)) ?? source
+    }
+
+    package func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return featheredMaskHandler(source, width, height, radius).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
-    public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
+    public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface {
+        let data = invertedSelectionMask([UInt8](source.data))
+        return MaskSurface(geometry: source.geometry, data: Data(data)) ?? source
+    }
+
+    package func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
         invertMaskHandler(source).value
             ?? [UInt8](repeating: 0, count: source.count)
     }
 
-    public func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
+    public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? {
+        croppedSelection(
+            from: [UInt8](source.data),
+            width: source.width,
+            height: source.height,
+            mode: mode
+        )
+    }
+
+    package func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else {
             return nil
         }

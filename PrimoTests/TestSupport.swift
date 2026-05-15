@@ -539,9 +539,7 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
     let gateway: TestGpuOperationGateway
 
     func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -553,16 +551,16 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
     ) -> Data? {
         let sourceQuad = TransformQuad(
             topLeft: .zero,
-            topRight: CGPoint(x: canvasWidth, y: 0),
-            bottomLeft: CGPoint(x: 0, y: canvasHeight),
-            bottomRight: CGPoint(x: canvasWidth, y: canvasHeight)
+            topRight: CGPoint(x: source.width, y: 0),
+            bottomLeft: CGPoint(x: 0, y: source.height),
+            bottomRight: CGPoint(x: source.width, y: source.height)
         )
         let destinationQuad = quadOffsets.applying(to: sourceQuad)
         return gateway.transformedLayerPixelData(
             TransformedLayerPixelDataRequest(
-                source: source,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
+                source: source.data,
+                canvasWidth: source.width,
+                canvasHeight: source.height,
                 expandedSelectionMask: selection.map { Array($0.maskData) },
                 translation: translation,
                 scaleX: scaleX,
@@ -592,9 +590,7 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
 
     func transformationBounds(
         selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
+        surface: RgbaSurface
     ) -> CGRect? {
         nil
     }

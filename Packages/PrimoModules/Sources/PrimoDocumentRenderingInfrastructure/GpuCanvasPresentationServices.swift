@@ -271,6 +271,32 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     }
 
     public func transformedLayerPixels(
+        source: RgbaSurface,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        transformedLayerPixels(
+            source: source.data,
+            canvasWidth: source.width,
+            canvasHeight: source.height,
+            selection: selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets
+        )
+    }
+
+    package func transformedLayerPixels(
         source: Data,
         canvasWidth: Int,
         canvasHeight: Int,
@@ -345,6 +371,18 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     }
 
     public func transformationBounds(
+        selection: CanvasSelection?,
+        surface: RgbaSurface
+    ) -> CGRect? {
+        transformationBounds(
+            selection: selection,
+            pixelData: surface.data,
+            canvasWidth: surface.width,
+            canvasHeight: surface.height
+        )
+    }
+
+    package func transformationBounds(
         selection: CanvasSelection?,
         pixelData: Data,
         canvasWidth: Int,

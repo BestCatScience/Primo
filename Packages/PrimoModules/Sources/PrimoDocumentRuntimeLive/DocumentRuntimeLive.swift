@@ -620,9 +620,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     }
 
     public func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -634,8 +632,6 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     ) -> Data? {
         processor.transformedLayerPixels(
             source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
             selection: selection,
             translation: translation,
             scaleX: scaleX,
@@ -673,15 +669,11 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
 
     public func transformationBounds(
         selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
+        surface: RgbaSurface
     ) -> CGRect? {
         processor.transformationBounds(
             selection: selection,
-            pixelData: pixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+            surface: surface
         )
     }
 }

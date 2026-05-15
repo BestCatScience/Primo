@@ -120,10 +120,11 @@ public struct CanvasEditingWorkflowService: Sendable {
         }
         let canvasWidth = max(Int(context.canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(context.canvasSize.height.rounded()), 1)
+        guard let sourceSurface = RgbaSurface(width: canvasWidth, height: canvasHeight, data: source) else {
+            return .resetTransformPreview
+        }
         guard let transformed = layerTransformProcessor.transformedLayerPixels(
-            source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
+            source: sourceSurface,
             selection: context.selection,
             translation: translation,
             scaleX: context.transformPreviewScaleX,

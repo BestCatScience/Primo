@@ -769,9 +769,7 @@ public struct LayerEditingRuntime: Sendable {
 
     public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
     public func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
+        source: RgbaSurface,
         selection: CanvasSelection?,
         translation: CGSize,
         scaleX: CGFloat,
@@ -783,8 +781,6 @@ public struct LayerEditingRuntime: Sendable {
     ) -> Data? {
         layerTransformProcessor.transformedLayerPixels(
             source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
             selection: selection,
             translation: translation,
             scaleX: scaleX,
@@ -820,29 +816,27 @@ public struct LayerEditingRuntime: Sendable {
         )
     }
 
-    public func transformationBounds(selection: CanvasSelection?, pixelData: Data, canvasWidth: Int, canvasHeight: Int) -> CGRect? {
+    public func transformationBounds(selection: CanvasSelection?, surface: RgbaSurface) -> CGRect? {
         layerTransformProcessor.transformationBounds(
             selection: selection,
-            pixelData: pixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+            surface: surface
         )
     }
 
     public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
     public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
-    public func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? { selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) }
+    public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
     public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
     public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
     public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
     public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
-    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: Int, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
+    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
     public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
-    public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] { selectionWorkflow.expandedSelectionMask(source, width: width, height: height, expansion: expansion) }
-    public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] { selectionWorkflow.contractedSelectionMask(source, width: width, height: height, contraction: contraction) }
-    public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] { selectionWorkflow.featheredSelectionMask(source, width: width, height: height, radius: radius) }
-    public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] { selectionWorkflow.invertedSelectionMask(source) }
-    public func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, width: width, height: height, mode: mode) }
+    public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selectionWorkflow.expandedSelectionMask(source, expansion: expansion) }
+    public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface { selectionWorkflow.contractedSelectionMask(source, contraction: contraction) }
+    public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selectionWorkflow.featheredSelectionMask(source, radius: radius) }
+    public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selectionWorkflow.invertedSelectionMask(source) }
+    public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, mode: mode) }
     public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
 }
 
