@@ -4,6 +4,7 @@ import PrimoDocumentApplication
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 import PrimoWorkspaceApplication
 import PrimoWorkspaceRuntime
 

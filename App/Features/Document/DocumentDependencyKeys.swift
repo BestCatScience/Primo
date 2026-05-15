@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 import PrimoWorkspaceApplication
 
 private enum DocumentApplicationEnvironmentKey: DependencyKey {

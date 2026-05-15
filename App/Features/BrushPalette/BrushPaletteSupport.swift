@@ -3,6 +3,7 @@ import PrimoBrushFileFormats
 import PrimoBrushRuntimeContracts
 import PrimoDocumentDomain
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 import SwiftUI
 
 enum PhotoshopDynamicControl: String, CaseIterable, Identifiable {

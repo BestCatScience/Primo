@@ -115,13 +115,13 @@ struct DocumentPaperStyleAdapter: PaperStylePort {
     }
 }
 
-extension StrokeMutationSubmitting {
+extension StrokeEditingRuntime {
     func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult {
         blurStroke(
             command.samples,
             command.brush,
-            command.layer.layerIndex.rawValue,
-            command.clearSelectionAfterBlur
+            layerIndex: command.layer.layerIndex,
+            clearSelectionAfterBlur: command.clearSelectionAfterBlur
         )
     }
 
@@ -130,13 +130,17 @@ extension StrokeMutationSubmitting {
     }
 }
 
-extension LayerMutationSubmitting {
+extension LayerEditingRuntime {
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
-        revealLayerForEditing(command.layerIndex.rawValue)
+        revealLayerForEditing(command.existingLayerIndex)
     }
 
     func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
-        ensureLayerVisible(command.layerIndex.rawValue)
+        ensureLayerVisible(command.existingLayerIndex)
+    }
+
+    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        applyLayerSurfaceMutation(command.layerIndex, payload)
     }
 }
 
@@ -169,16 +173,16 @@ extension LayerEditingRuntime:
 struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisibilityPort {
     let service: DocumentLayerCommandService
 
-    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
-        service.revealLayerForEditing(index)
+    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        service.revealLayerForEditing(command.existingLayerIndex.rawValue)
     }
 
-    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
-        service.ensureLayerVisible(index)
+    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+        service.ensureLayerVisible(command.existingLayerIndex.rawValue)
     }
 
-    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        service.applyLayerSurfaceMutation(index, payload)
+    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        service.applyLayerSurfaceMutation(command.layerIndex.rawValue, payload)
     }
 }
 
@@ -187,15 +191,6 @@ struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting, StrokeC
 
     func cancelStroke() {
         service.cancelStroke()
-    }
-
-    func blurStroke(
-        _ samples: [StylusSample],
-        _ brush: BrushRuntimeSettings,
-        _ layerIndex: Int,
-        _ clearSelectionAfterBlur: Bool
-    ) -> DocumentMutationResult {
-        service.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
     }
 
     func endBlurStroke() -> DocumentMutationResult {
@@ -432,24 +427,16 @@ extension DocumentStrokeCommitAdapter {
 }
 
 extension DocumentLayerVisibilityAdapter {
-    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
-        runtime.revealLayerForEditing(index)
-    }
-
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
         runtime.revealLayerForEditing(command)
-    }
-
-    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult {
-        runtime.ensureLayerVisible(index)
     }
 
     func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
         runtime.ensureLayerVisible(command)
     }
 
-    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        runtime.applyLayerSurfaceMutation(index, payload)
+    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        runtime.applyLayerSurfaceMutation(command, payload)
     }
 }
 

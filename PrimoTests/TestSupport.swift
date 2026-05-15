@@ -13,6 +13,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
 @testable import Primo
@@ -706,7 +707,7 @@ extension DocumentApplicationRuntime {
         )
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: PrimoDocumentRuntime.GpuCanvasEyedropperSampler(),
+            eyedropperSampler: PrimoDocumentRuntimeLive.GpuCanvasEyedropperSampler(),
             selectionProcessor: selectionMaskProcessor
         )
         let renderingWorkflow = DocumentApplicationRuntimeFactory.liveWorkflows().presentation.renderingWorkflow
@@ -758,7 +759,7 @@ extension DocumentApplicationRuntime {
             export: DocumentExportRuntime(exportClient: exportClient),
             preview: CanvasPreviewRuntime(
                 canvasPreviewRenderer: canvasPreviewRenderer,
-                canvasEyedropperSampler: PrimoDocumentRuntime.GpuCanvasEyedropperSampler(),
+                canvasEyedropperSampler: PrimoDocumentRuntimeLive.GpuCanvasEyedropperSampler(),
                 selectionMaskProcessor: selectionMaskProcessor,
                 canvasPresentationEnvironment: canvasPresentationEnvironment
             )

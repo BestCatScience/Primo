@@ -10,7 +10,7 @@ extension AdjustmentWorkflowReducer {
         let documentMutationWorkflowService: any LayerMutationWorkflowSubmitting
 
         func applyLayerProcessing(
-            _ layerIndex: Int,
+            _ layerIndex: EditableLayerIndex,
             request: LayerProcessingRequest
         ) -> DocumentMutationResult {
             documentMutationWorkflowService.applyLayerProcessing(layerIndex, request: request)
@@ -140,14 +140,19 @@ extension AdjustmentWorkflowReducer {
         failureFeedback: ApplicationFeature.Feedback
     ) -> Effect<Action> {
         let activeLayerIndex = state.canvas.activeLayerIndex
+        let validationState = state
         return handleAdjustmentApplyUsingProcessing(
             state: &state,
             failureFeedback: failureFeedback
         ) {
-            adjustmentWorkflowService.applyLayerProcessing(
-                activeLayerIndex,
-                request: request
-            )
+            DocumentWorkflowCommandValidator()
+                .editableLayerIndex(activeLayerIndex, in: validationState)
+                .flatMap { layerIndex in
+                    adjustmentWorkflowService.applyLayerProcessing(
+                        layerIndex,
+                        request: request
+                    )
+                }
         }
     }
 }

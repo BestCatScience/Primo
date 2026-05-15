@@ -5,6 +5,7 @@ import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
+import PrimoDocumentRuntimeLive
 
 struct DocumentProjectPreviewLoaderTests {
     @Test

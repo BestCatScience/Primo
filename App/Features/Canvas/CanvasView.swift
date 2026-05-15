@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import PrimoCanvasPresentationDomain
+import PrimoCanvasPresentationRuntime
 import PrimoDocumentRuntime
 import PrimoDocumentDomain
 import SwiftUI

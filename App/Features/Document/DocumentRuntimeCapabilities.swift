@@ -85,12 +85,6 @@ protocol StrokePreviewPort: StrokePreviewLeasing, StrokePreviewResolving {}
 protocol StrokeMutationSubmitting: Sendable {
     func cancelStroke()
     func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult
-    func blurStroke(
-        _ samples: [StylusSample],
-        _ brush: BrushRuntimeSettings,
-        _ layerIndex: Int,
-        _ clearSelectionAfterBlur: Bool
-    ) -> DocumentMutationResult
     func endBlurStroke() -> DocumentMutationResult
     func cancelBlurStroke()
     func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult
@@ -107,45 +101,41 @@ protocol StrokeCommitPort: Sendable {
 
 protocol LayerMutationWorkflowSubmitting: Sendable {
     func addLayer(named name: String) -> DocumentIndexedMutationResult
-    func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult
-    func deleteFolder(_ folderID: Int) -> DocumentMutationResult
-    func deleteLayer(_ index: Int) -> DocumentMutationResult
-    func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult
-    func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult
-    func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult
-    func mergeLayerDown(_ index: Int) -> DocumentMutationResult
-    func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult
-    func setActiveLayer(_ index: Int) -> DocumentMutationResult
-    func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult
-    func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult
-    func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult
-    func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult
-    func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult
-    func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult
-    func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult
-    func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult
-    func setLayerName(_ index: Int, name: String) -> DocumentMutationResult
-    func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult
-    func clearLayer(_ index: Int) -> DocumentMutationResult
-    func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult
-    func clearLayerMask(_ index: Int) -> DocumentMutationResult
-    func applyLayerMask(_ index: Int) -> DocumentMutationResult
+    func createFolder(named name: String, afterLayerAt activeLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult
+    func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult
+    func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult
+    func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult
+    func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult
+    func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult
+    func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult
+    func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult
+    func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult
+    func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult
+    func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult
+    func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult
+    func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult
+    func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult
+    func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult
+    func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult
+    func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult
+    func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult
+    func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult
+    func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult
+    func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult
+    func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult
+    func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult
 }
 
 protocol LayerMutationSubmitting: Sendable {
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult
     func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult
-    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
 }
 
 protocol LayerVisibilityPort: Sendable {
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func revealLayerForEditing(_ index: Int) -> DocumentMutationResult
     func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func ensureLayerVisible(_ index: Int) -> DocumentMutationResult
-    func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
 }
 
 protocol LayerContentWorkflowSubmitting: Sendable {

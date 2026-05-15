@@ -4,6 +4,7 @@ import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 import PrimoDocumentMutationContracts
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 @testable import PrimoDocumentPresentationContracts
 @testable import PrimoDocumentRenderingContracts
 import Testing
@@ -24,7 +25,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func runtimePresentationObservationPublishesInitialAndMutationSnapshots() async throws {
-        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        let runtime = PrimoDocumentRuntimeLive.DocumentRuntimeFactory.live()
         var iterator = runtime.observePresentation().makeAsyncIterator()
 
         let initial = await iterator.next()
@@ -43,7 +44,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func runtimePresentationObservationPublishesInitialAndMutationSnapshotsToMultipleSubscribers() async throws {
-        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        let runtime = PrimoDocumentRuntimeLive.DocumentRuntimeFactory.live()
         var first = runtime.observePresentation().makeAsyncIterator()
         var second = runtime.observePresentation().makeAsyncIterator()
 
@@ -341,7 +342,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func presentationObservationStopsRecordingAfterCancellation() async throws {
-        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        let runtime = PrimoDocumentRuntimeLive.DocumentRuntimeFactory.live()
         let presentations = LockedValues<CGSize>()
 
         let consumer = Task {

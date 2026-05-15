@@ -131,6 +131,10 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentRuntime
       - package: PrimoModules
+        product: PrimoDocumentRuntimeLive
+      - package: PrimoModules
+        product: PrimoCanvasPresentationRuntime
+      - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
         product: PrimoAIImageDomain
@@ -202,6 +206,10 @@ targets:
         product: PrimoDocumentDomain
       - package: PrimoModules
         product: PrimoDocumentRuntime
+      - package: PrimoModules
+        product: PrimoDocumentRuntimeLive
+      - package: PrimoModules
+        product: PrimoCanvasPresentationRuntime
       - package: PrimoModules
         product: PrimoDocumentGPUContracts
       - package: PrimoModules

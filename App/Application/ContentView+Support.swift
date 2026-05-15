@@ -1,6 +1,7 @@
 import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
+import PrimoCanvasPresentationRuntime
 import PrimoDocumentRuntime
 import SwiftUI
 import UIKit

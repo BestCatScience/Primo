@@ -85,8 +85,15 @@ extension DocumentFeature {
                 brush: context.brush,
                 previewBrush: context.previewBrush
             )
+            let layerCommand: ValidatedDocumentLayerMutationCommand
+            switch DocumentWorkflowCommandValidator().editableLayerCommand(index: context.activeLayerIndex, in: state) {
+            case let .success(command):
+                layerCommand = command
+            case let .failure(failure):
+                return .failed(failure)
+            }
             if keepsSelectionCleared {
-                switch layerVisibility.ensureLayerVisible(context.activeLayerIndex) {
+                switch layerVisibility.ensureLayerVisible(layerCommand) {
                 case .success:
                     break
                 case let .failure(failure):
@@ -115,7 +122,7 @@ extension DocumentFeature {
                 ) else {
                     return .failed(.bridgeMutationFailed("GPU stroke commit invalid payload"))
                 }
-                switch layerVisibility.applyLayerSurfaceMutation(mutation.surface.layerIndex, payload) {
+                switch layerVisibility.applyLayerSurfaceMutation(layerCommand, payload) {
                 case .success:
                     break
                 case let .failure(failure):
@@ -233,9 +240,14 @@ extension DocumentFeature {
             state: inout DocumentEditingState,
             clearSelectionWithoutRefresh: (inout DocumentEditingState) -> Void
         ) -> DocumentMutationResult {
-            switch layerVisibility.ensureLayerVisible(state.canvas.activeLayerIndex) {
-            case .success:
-                break
+            switch DocumentWorkflowCommandValidator().editableLayerCommand(index: state.canvas.activeLayerIndex, in: state) {
+            case let .success(command):
+                switch layerVisibility.ensureLayerVisible(command) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    return .failure(failure)
+                }
             case let .failure(failure):
                 return .failure(failure)
             }

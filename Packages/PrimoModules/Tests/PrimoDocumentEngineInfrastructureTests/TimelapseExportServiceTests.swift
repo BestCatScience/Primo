@@ -11,6 +11,7 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
+import PrimoDocumentRuntimeLive
 
 struct TimelapseExportServiceTests {
     @Test

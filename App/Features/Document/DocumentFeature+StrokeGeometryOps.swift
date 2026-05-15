@@ -3,6 +3,7 @@ import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
+import PrimoDocumentRuntimeLive
 
 extension DocumentFeature {
     static func normalizedCommittedStrokeSamples(

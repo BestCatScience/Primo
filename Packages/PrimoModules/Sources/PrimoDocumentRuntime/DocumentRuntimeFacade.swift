@@ -2,63 +2,16 @@ import CoreGraphics
 import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoCanvasPresentationDomain
-import PrimoCanvasPresentationInfrastructure
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentDomain
-import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
-import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
-import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
-import PrimoDocumentStrokeInfrastructure
-import PrimoDocumentMetalStrokeInfrastructure
 
-private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable {
-    private let lock = NSLock()
-    private let currentPresentation: @Sendable () -> PaintDocumentPresentation
-    private var continuations: [UUID: AsyncStream<PaintDocumentPresentation>.Continuation] = [:]
-
-    init(currentPresentation: @escaping @Sendable () -> PaintDocumentPresentation) {
-        self.currentPresentation = currentPresentation
-    }
-
-    func stream() -> AsyncStream<PaintDocumentPresentation> {
-        AsyncStream { continuation in
-            let id = UUID()
-            lock.lock()
-            continuations[id] = continuation
-            lock.unlock()
-            continuation.yield(currentPresentation())
-            continuation.onTermination = { [weak self] _ in
-                self?.removeContinuation(id)
-            }
-        }
-    }
-
-    func publishLatest() {
-        publish(currentPresentation())
-    }
-
-    private func publish(_ presentation: PaintDocumentPresentation) {
-        lock.lock()
-        let activeContinuations = Array(continuations.values)
-        lock.unlock()
-        for continuation in activeContinuations {
-            continuation.yield(presentation)
-        }
-    }
-
-    private func removeContinuation(_ id: UUID) {
-        lock.lock()
-        continuations[id] = nil
-        lock.unlock()
-    }
-}
 
 package struct DocumentRuntimeComposition: Sendable {
     package let queryGateway: DocumentQueryGateway
@@ -117,27 +70,6 @@ package struct DocumentRuntimeComposition: Sendable {
         self.surfaceHandleReleaser = surfaceHandleReleaser
     }
 
-    package init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentRuntimeComposition) {
-        self.init(
-            queryGateway: infrastructure.queryGateway,
-            renderGateway: infrastructure.renderGateway,
-            dirtyUpdateQueue: infrastructure.dirtyUpdateQueue,
-            mutationGateway: infrastructure.mutationGateway,
-            strokeGateway: infrastructure.strokeGateway,
-            historyGateway: infrastructure.historyGateway,
-            persistenceGateway: infrastructure.persistenceGateway,
-            exportGateway: infrastructure.exportGateway,
-            textLayerGateway: infrastructure.textLayerGateway,
-            layerEffectsGateway: infrastructure.layerEffectsGateway,
-            editingGateway: infrastructure.editingGateway,
-            strokeSessionUseCase: infrastructure.strokeSessionUseCase,
-            canvasPreviewOperations: infrastructure.canvasPreviewOperations,
-            selectionMaskOperations: infrastructure.selectionMaskOperations,
-            layerTransformOperations: infrastructure.layerTransformOperations,
-            renderingOperations: infrastructure.renderingOperations,
-            surfaceHandleReleaser: infrastructure.surfaceHandleReleaser
-        )
-    }
 
     package func withOverrides(
         queryGateway: DocumentQueryGateway? = nil,
@@ -176,22 +108,6 @@ package struct DocumentRuntimeComposition: Sendable {
             layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
             renderingOperations: renderingOperations ?? self.renderingOperations,
             surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
-        )
-    }
-}
-
-package enum DocumentRuntimeCompositionFactory {
-    package static func live(
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
-    ) -> DocumentRuntimeComposition {
-        DocumentRuntimeComposition(
-            PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live(
-                fileClient: fileClient,
-                dateClient: dateClient,
-                uuidClient: uuidClient
-            )
         )
     }
 }
@@ -526,94 +442,72 @@ public struct DocumentRenderingWorkflow: Sendable {
 
 }
 
-private struct DocumentRuntimeServices: Sendable {
-    let canvasCommands: DocumentCanvasCommandService
-    let layerCommands: DocumentLayerCommandService
-    let strokeCommands: DocumentStrokeCommandService
-    let canvasStrokeInteractionService: CanvasStrokeInteractionService
-    let historyCommands: DocumentHistoryCommandService
-    let mutationWorkflow: DocumentMutationWorkflowService
-    let contentService: DocumentContentService
-    let canvasEditingWorkflow: CanvasEditingWorkflowService
-    let selectionWorkflow: SelectionWorkflowService
-    let canvasPreviewRenderer: any CanvasPreviewRendering
-    let layerTransformProcessor: any LayerTransformProcessing
-    let selectionMaskProcessor: any SelectionMaskProcessing
-    let canvasPresentationEnvironment: CanvasPresentationEnvironment
-    let presentationReader: DocumentPresentationReader
-    let renderingWorkflow: DocumentRenderingWorkflow
-    let textLayerService: DocumentTextLayerService
-    let exportClient: DocumentExportClient
-    let persistenceClient: DocumentPersistenceClient
 
-    init(composition: DocumentRuntimeComposition) {
-        self.canvasCommands = DocumentCanvasCommandService(
-            queryGateway: composition.queryGateway,
-            renderGateway: composition.renderGateway,
-            mutationGateway: composition.mutationGateway,
-            persistenceGateway: composition.persistenceGateway
-        )
-        self.layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
-        self.strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
-        self.canvasStrokeInteractionService = CanvasStrokeInteractionService(
-            sessionUseCase: composition.strokeSessionUseCase,
-            releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
-        )
-        self.historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
-        self.mutationWorkflow = DocumentMutationWorkflowService(
-            documentQueryGateway: composition.queryGateway,
-            documentEditingGateway: composition.editingGateway,
-            documentLayerEffectsGateway: composition.layerEffectsGateway
-        )
-        self.contentService = DocumentContentService(
-            documentQueryGateway: composition.queryGateway,
-            documentRenderGateway: composition.renderGateway,
-            documentEditingGateway: composition.editingGateway,
-            documentMutationGateway: composition.mutationGateway
-        )
-        self.canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
-        self.layerTransformProcessor = GpuLayerTransformProcessor(
-            layerTransformOperations: composition.layerTransformOperations,
-            selectionOperations: composition.selectionMaskOperations
-        )
-        self.selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
-        self.canvasEditingWorkflow = CanvasEditingWorkflowService(
-            documentContentService: contentService,
-            layerTransformProcessor: layerTransformProcessor
-        )
-        self.selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
-        self.canvasPresentationEnvironment = CanvasPresentationEnvironment(
-            previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: GpuCanvasEyedropperSampler(),
-            selectionProcessor: selectionMaskProcessor
-        )
-        self.presentationReader = DocumentPresentationReader(
-            lightweightPresentation: composition.queryGateway.lightweightPresentation,
-            presentation: composition.queryGateway.presentation
-        )
-        self.renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
-        self.textLayerService = DocumentTextLayerService(
-            textLayerData: composition.textLayerGateway.textLayerData,
-            setTextLayer: { index, textLayer in
-                composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
-                    .map { _ in () }
-            },
-            clearTextLayerData: composition.textLayerGateway.clearTextLayerData
-        )
-        self.persistenceClient = DocumentPersistenceClient(
-            saveProject: composition.persistenceGateway.saveProject,
-            loadProject: composition.persistenceGateway.loadProject,
-            setPaperStyle: composition.persistenceGateway.setPaperStyle,
-            newCanvas: composition.persistenceGateway.newCanvas,
-            prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources
-        )
-        self.exportClient = DocumentExportClient(
-            compositeSurface: composition.exportGateway.compositeSurface,
-            compositePNGData: composition.exportGateway.compositePNGData,
-            timelapseCapture: composition.exportGateway.timelapseCapture
-        )
+
+package struct DocumentRuntimeServices: Sendable {
+    package let canvasCommands: DocumentCanvasCommandService
+    package let layerCommands: DocumentLayerCommandService
+    package let strokeCommands: DocumentStrokeCommandService
+    package let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    package let historyCommands: DocumentHistoryCommandService
+    package let mutationWorkflow: DocumentMutationWorkflowService
+    package let contentService: DocumentContentService
+    package let canvasEditingWorkflow: CanvasEditingWorkflowService
+    package let selectionWorkflow: SelectionWorkflowService
+    package let canvasPreviewRenderer: any CanvasPreviewRendering
+    package let canvasEyedropperSampler: any CanvasEyedropperSampling
+    package let layerTransformProcessor: any LayerTransformProcessing
+    package let selectionMaskProcessor: any SelectionMaskProcessing
+    package let canvasPresentationEnvironment: CanvasPresentationEnvironment
+    package let presentationReader: DocumentPresentationReader
+    package let renderingWorkflow: DocumentRenderingWorkflow
+    package let textLayerService: DocumentTextLayerService
+    package let exportClient: DocumentExportClient
+    package let persistenceClient: DocumentPersistenceClient
+
+    package init(
+        canvasCommands: DocumentCanvasCommandService,
+        layerCommands: DocumentLayerCommandService,
+        strokeCommands: DocumentStrokeCommandService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService,
+        historyCommands: DocumentHistoryCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        canvasEditingWorkflow: CanvasEditingWorkflowService,
+        selectionWorkflow: SelectionWorkflowService,
+        canvasPreviewRenderer: any CanvasPreviewRendering,
+        canvasEyedropperSampler: any CanvasEyedropperSampling,
+        layerTransformProcessor: any LayerTransformProcessing,
+        selectionMaskProcessor: any SelectionMaskProcessing,
+        canvasPresentationEnvironment: CanvasPresentationEnvironment,
+        presentationReader: DocumentPresentationReader,
+        renderingWorkflow: DocumentRenderingWorkflow,
+        textLayerService: DocumentTextLayerService,
+        exportClient: DocumentExportClient,
+        persistenceClient: DocumentPersistenceClient
+    ) {
+        self.canvasCommands = canvasCommands
+        self.layerCommands = layerCommands
+        self.strokeCommands = strokeCommands
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+        self.historyCommands = historyCommands
+        self.mutationWorkflow = mutationWorkflow
+        self.contentService = contentService
+        self.canvasEditingWorkflow = canvasEditingWorkflow
+        self.selectionWorkflow = selectionWorkflow
+        self.canvasPreviewRenderer = canvasPreviewRenderer
+        self.canvasEyedropperSampler = canvasEyedropperSampler
+        self.layerTransformProcessor = layerTransformProcessor
+        self.selectionMaskProcessor = selectionMaskProcessor
+        self.canvasPresentationEnvironment = canvasPresentationEnvironment
+        self.presentationReader = presentationReader
+        self.renderingWorkflow = renderingWorkflow
+        self.textLayerService = textLayerService
+        self.exportClient = exportClient
+        self.persistenceClient = persistenceClient
     }
 }
+
 
 public struct DocumentPresentationRuntime: Sendable {
     private let presentationReader: DocumentPresentationReader
@@ -631,7 +525,7 @@ public struct DocumentPresentationRuntime: Sendable {
         self.renderingPipeline = renderingWorkflow
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.presentationReader = services.presentationReader
         self.renderingPipeline = services.renderingWorkflow
     }
@@ -758,7 +652,7 @@ public struct CanvasMutationRuntime: Sendable {
         self.historyCommands = historyCommands
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.canvasCommands = services.canvasCommands
         self.historyCommands = services.historyCommands
     }
@@ -845,7 +739,7 @@ public struct LayerEditingRuntime: Sendable {
         self.canvasEditingWorkflow = canvasEditingWorkflow
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
         self.contentService = services.contentService
@@ -857,6 +751,8 @@ public struct LayerEditingRuntime: Sendable {
     }
 
     public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue ?? -1) }
+    public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID.rawValue) }
     public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index.rawValue) }
     public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index.rawValue, named: duplicateName) }
     public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.moveLayer(index.rawValue, to: destinationIndex.rawValue) }
@@ -868,6 +764,9 @@ public struct LayerEditingRuntime: Sendable {
     public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index.rawValue, isLocked: isLocked) }
     public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index.rawValue, isAlphaLocked: isAlphaLocked) }
     public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index.rawValue, isClipped: isClipped) }
+    public func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID.rawValue, isExpanded: isExpanded) }
+    public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID.rawValue, visible: visible) }
+    public func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID.rawValue, name: name) }
     public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index.rawValue, blendMode: blendMode) }
     public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index.rawValue, name: name) }
     public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index.rawValue, request: request) }
@@ -877,69 +776,72 @@ public struct LayerEditingRuntime: Sendable {
     public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index.rawValue) }
     public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index.rawValue) }
 
-    @available(*, deprecated, message: "Use createFolder(named:afterLayerAt:) with ExistingLayerIndex once the caller has validated the layer index.")
-    public func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
+    @available(*, deprecated, message: "Use createFolder(named:afterLayerAt:) with LayerAnchorIndex once the caller has validated the layer index.")
+    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
     @available(*, deprecated, message: "Use deleteFolder(_:) with ExistingFolderID.")
-    public func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
+    package func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
     @available(*, deprecated, message: "Use deleteLayer(_:) with ExistingLayerIndex.")
-    public func deleteLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
+    package func deleteLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
     @available(*, deprecated, message: "Use duplicateLayer(_:named:) with ExistingLayerIndex.")
-    public func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
+    package func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
     @available(*, deprecated, message: "Use moveLayer(_:to:) with ExistingLayerIndex.")
-    public func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
+    package func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
     @available(*, deprecated, message: "Use assignLayer(_:toFolder:) with ExistingLayerIndex and ExistingFolderID.")
-    public func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
+    package func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
     @available(*, deprecated, message: "Use mergeLayerDown(_:) with ExistingLayerIndex.")
-    public func mergeLayerDown(_ index: Int) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
+    package func mergeLayerDown(_ index: Int) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
     @available(*, deprecated, message: "Use setLayerVisibility(_:visible:) with ExistingLayerIndex.")
-    public func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
+    package func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerVisibility(index, visible: visible) }
     @available(*, deprecated, message: "Use setActiveLayer(_:) with ExistingLayerIndex.")
-    public func setActiveLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index) }
+    package func setActiveLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.setActiveLayer(index) }
     @available(*, deprecated, message: "Use setLayerOpacity(_:opacity:) with ExistingLayerIndex and UnitInterval.")
-    public func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index, opacity: opacity) }
+    package func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult { mutationWorkflow.setLayerOpacity(index, opacity: opacity) }
     @available(*, deprecated, message: "Use setLayerLocked(_:isLocked:) with ExistingLayerIndex.")
-    public func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index, isLocked: isLocked) }
+    package func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerLocked(index, isLocked: isLocked) }
     @available(*, deprecated, message: "Use setLayerAlphaLocked(_:isAlphaLocked:) with ExistingLayerIndex.")
-    public func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
+    package func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
     @available(*, deprecated, message: "Use setLayerClipped(_:isClipped:) with ExistingLayerIndex.")
-    public func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index, isClipped: isClipped) }
-    public func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID, isExpanded: isExpanded) }
-    public func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID, visible: visible) }
-    public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
+    package func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult { mutationWorkflow.setLayerClipped(index, isClipped: isClipped) }
+    @available(*, deprecated, message: "Use setFolderExpanded(_:isExpanded:) with ExistingFolderID.")
+    package func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderExpanded(folderID, isExpanded: isExpanded) }
+    @available(*, deprecated, message: "Use setFolderVisibility(_:visible:) with ExistingFolderID.")
+    package func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult { mutationWorkflow.setFolderVisibility(folderID, visible: visible) }
+    @available(*, deprecated, message: "Use setFolderName(_:name:) with ExistingFolderID.")
+    package func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setFolderName(folderID, name: name) }
     @available(*, deprecated, message: "Use setLayerBlendMode(_:blendMode:) with ExistingLayerIndex.")
-    public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
+    package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
     @available(*, deprecated, message: "Use setLayerName(_:name:) with ExistingLayerIndex.")
-    public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
+    package func setLayerName(_ index: Int, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
     @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
-    public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
+    package func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerPixels(index, pixelData: pixelData) }
     @available(*, deprecated, message: "Use applyLayerProcessing(_:request:) with EditableLayerIndex.")
-    public func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
+    package func applyLayerProcessing(_ index: Int, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
     @available(*, deprecated, message: "Use setTextLayer(_:textLayer:) with EditableLayerIndex.")
-    public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
+    package func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
     @available(*, deprecated, message: "Use clearLayer(_:) with EditableLayerIndex.")
-    public func clearLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
+    package func clearLayer(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
     @available(*, deprecated, message: "Use replaceLayerMask(_:mask:) with EditableLayerIndex and LayerMaskData.")
-    public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, maskData: maskData) }
+    package func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, maskData: maskData) }
     @available(*, deprecated, message: "Use clearLayerMask(_:) with EditableLayerIndex.")
-    public func clearLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
+    package func clearLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
     @available(*, deprecated, message: "Use applyLayerMask(_:) with EditableLayerIndex.")
-    public func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
+    package func applyLayerMask(_ index: Int) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
     public func pixelDataForLayer(_ index: Int) -> Result<Data, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
     public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
     @available(*, deprecated, message: "Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.")
-    public func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
+    package func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult { contentService.replaceLayerPixels(index, pixelData) }
     public func applyPixels(_ pixelData: Data, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
     public func textLayerData(_ index: ExistingLayerIndex) -> TextLayerData? { textLayerService.textLayerData(index.rawValue) }
     public func clearTextLayerData(_ index: EditableLayerIndex) { textLayerService.clearTextLayerData(index.rawValue) }
     @available(*, deprecated, message: "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData.")
-    public func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
+    package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index, rect, pixelData) }
     @available(*, deprecated, message: "Use textLayerData(_:) with ExistingLayerIndex.")
-    public func textLayerData(_ index: Int) -> TextLayerData? { textLayerService.textLayerData(index) }
+    package func textLayerData(_ index: Int) -> TextLayerData? { textLayerService.textLayerData(index) }
     @available(*, deprecated, message: "Use clearTextLayerData(_:) with EditableLayerIndex.")
-    public func clearTextLayerData(_ index: Int) { textLayerService.clearTextLayerData(index) }
+    package func clearTextLayerData(_ index: Int) { textLayerService.clearTextLayerData(index) }
     public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
     public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
     public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index.rawValue) }
@@ -948,15 +850,15 @@ public struct LayerEditingRuntime: Sendable {
     public func applyLayerMutation(_ index: EditableLayerIndex, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index.rawValue, payload) }
     public func applyTextLayerMutation(_ index: EditableLayerIndex, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index.rawValue, textLayer, payload) }
     @available(*, deprecated, message: "Use revealLayerForEditing(_:) with ExistingLayerIndex.")
-    public func revealLayerForEditing(_ index: Int) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index) }
+    package func revealLayerForEditing(_ index: Int) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index) }
     @available(*, deprecated, message: "Use ensureLayerVisible(_:) with ExistingLayerIndex.")
-    public func ensureLayerVisible(_ index: Int) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index) }
+    package func ensureLayerVisible(_ index: Int) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index) }
     @available(*, deprecated, message: "Use applyLayerSurfaceMutation(_:_:) with EditableLayerIndex.")
-    public func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index, payload) }
+    package func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index, payload) }
     @available(*, deprecated, message: "Use applyLayerMutation(_:_:) with EditableLayerIndex.")
-    public func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index, payload) }
+    package func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index, payload) }
     @available(*, deprecated, message: "Use applyTextLayerMutation(_:_:_:) with EditableLayerIndex.")
-    public func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index, textLayer, payload) }
+    package func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index, textLayer, payload) }
 
     public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
     public func transformedLayerPixels(
@@ -1049,7 +951,7 @@ package struct CanvasStrokeRuntime: Sendable {
         self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.strokeCommands = services.strokeCommands
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }
@@ -1058,8 +960,12 @@ package struct CanvasStrokeRuntime: Sendable {
     public func appendStroke(_ sample: StylusSample) { strokeCommands.appendStroke(sample) }
     public func endStroke() -> DocumentMutationResult { strokeCommands.endStroke() }
     public func cancelStroke() { strokeCommands.cancelStroke() }
-    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex) }
-    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) }
+    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex.rawValue) }
+    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex.rawValue, clearSelectionAfterBlur) }
+    @available(*, deprecated, message: "Use applyGpuStrokeSurface(_:_:layerIndex:) with EditableLayerIndex.")
+    package func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult { strokeCommands.applyGpuStrokeSurface(samples, brush, layerIndex) }
+    @available(*, deprecated, message: "Use blurStroke(_:_:layerIndex:clearSelectionAfterBlur:) with EditableLayerIndex.")
+    package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult { strokeCommands.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) }
     public func endBlurStroke() -> DocumentMutationResult { strokeCommands.endBlurStroke() }
     public func cancelBlurStroke() { strokeCommands.cancelBlurStroke() }
     public func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult { strokeCommands.fill(sample, brush) }
@@ -1108,11 +1014,21 @@ public struct StrokeEditingRuntime: Sendable {
         strokeRuntime.cancelStroke()
     }
 
-    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult {
+    public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex) -> DocumentMutationResult {
+        strokeRuntime.applyGpuStrokeSurface(samples, brush, layerIndex: layerIndex)
+    }
+
+    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
+        strokeRuntime.blurStroke(samples, brush, layerIndex: layerIndex, clearSelectionAfterBlur: clearSelectionAfterBlur)
+    }
+
+    @available(*, deprecated, message: "Use applyGpuStrokeSurface(_:_:layerIndex:) with EditableLayerIndex.")
+    package func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult {
         strokeRuntime.applyGpuStrokeSurface(samples, brush, layerIndex)
     }
 
-    public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
+    @available(*, deprecated, message: "Use blurStroke(_:_:layerIndex:clearSelectionAfterBlur:) with EditableLayerIndex.")
+    package func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult {
         strokeRuntime.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
     }
 
@@ -1226,7 +1142,7 @@ public struct DocumentPersistenceRuntime: Sendable {
         self.persistenceClient = persistenceClient
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.persistenceClient = services.persistenceClient
     }
 
@@ -1244,7 +1160,7 @@ public struct DocumentExportRuntime: Sendable {
         self.exportClient = exportClient
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.exportClient = services.exportClient
     }
 
@@ -1271,9 +1187,9 @@ public struct CanvasPreviewRuntime: Sendable {
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
     }
 
-    fileprivate init(services: DocumentRuntimeServices) {
+    package init(services: DocumentRuntimeServices) {
         self.canvasPreviewRenderer = services.canvasPreviewRenderer
-        self.canvasEyedropperSampler = GpuCanvasEyedropperSampler()
+        self.canvasEyedropperSampler = services.canvasEyedropperSampler
         self.selectionMaskProcessor = services.selectionMaskProcessor
         self.canvasPresentationEnvironment = services.canvasPresentationEnvironment
     }
@@ -1388,18 +1304,6 @@ public struct DocumentApplicationRuntime: Sendable {
         self.preview = preview
     }
 
-    package init(composition: DocumentRuntimeComposition) {
-        let services = DocumentRuntimeServices(composition: composition)
-        self.init(
-            presentation: DocumentPresentationRuntime(services: services),
-            canvasMutation: CanvasMutationRuntime(services: services),
-            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: services)),
-            layerEditing: LayerEditingRuntime(services: services),
-            persistence: DocumentPersistenceRuntime(services: services),
-            export: DocumentExportRuntime(services: services),
-            preview: CanvasPreviewRuntime(services: services)
-        )
-    }
 }
 
 public struct DocumentApplicationWorkflowRuntime: Sendable {
@@ -1450,169 +1354,9 @@ public struct DocumentRuntime: Sendable {
         observePresentationHandler()
     }
 
-    package init(composition: DocumentRuntimeComposition) {
-        let services = DocumentRuntimeServices(composition: composition)
-        let presentationBroadcaster = DocumentRuntimePresentationBroadcaster {
-            composition.queryGateway.lightweightPresentation()
-        }
-        let mutationOutcome: @Sendable (
-            Result<DocumentMutationSuccess, DocumentMutationFailure>
-        ) -> DocumentCommandOutcome = { result in
-            if case .success = result {
-                presentationBroadcaster.publishLatest()
-            }
-            return .mutation(result)
-        }
-
-        let executeClosure: @Sendable (DocumentCommand) async -> DocumentCommandOutcome = { command in
-            switch command {
-            case let .presentation(request):
-                switch request {
-                case .lightweight:
-                    return .presentation(composition.queryGateway.lightweightPresentation())
-                case .full, .current:
-                    return .presentation(composition.queryGateway.presentation())
-                }
-            case let .canvas(command):
-                switch command {
-                case let .createSized(size):
-                    return mutationOutcome(services.canvasCommands.createCanvas(size.width, size.height).map { .completed })
-                case let .resizeSized(size):
-                    return mutationOutcome(services.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
-                case let .resizeExtentSized(size):
-                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
-                case let .create(width, height):
-                    return mutationOutcome(services.canvasCommands.createCanvas(width, height).map { .completed })
-                case let .resize(width, height):
-                    return mutationOutcome(services.canvasCommands.resizeCanvas(width, height).map { .completed })
-                case let .resizeExtent(width, height):
-                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(width, height).map { .completed })
-                case let .initializeImported(request, layerName):
-                    return mutationOutcome(services.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
-                case .compositeSurface:
-                    return .compositeSurface(services.canvasCommands.compositeSurface())
-                case let .setPaperStyle(style):
-                    composition.persistenceGateway.setPaperStyle(style)
-                    presentationBroadcaster.publishLatest()
-                    return .none
-                }
-            case let .layer(command):
-                switch command {
-                case let .edit(request):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(request)
-                            .map { _ in .completed }
-                    )
-                case let .mergeExistingLayerDown(index):
-                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index.rawValue).map { .completed })
-                case let .setEditableTextLayer(index, textLayer):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
-                            .map { _ in .completed }
-                    )
-                case let .applyEditableProcessing(index, request):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.applyProcessing(index: index.rawValue, request: request)))
-                            .map { _ in .completed }
-                    )
-                case let .mergeLayerDown(index):
-                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index).map { .completed })
-                case let .setTextLayer(index, textLayer):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.setTextLayer(index: index, textLayer: textLayer)))
-                            .map { _ in .completed }
-                    )
-                case let .applyProcessing(index, request):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(.content(.applyProcessing(index: index, request: request)))
-                            .map { _ in .completed }
-                    )
-                }
-            case let .stroke(command):
-                switch command {
-                case let .begin(sample, settings):
-                    composition.strokeGateway.beginStroke(sample, settings)
-                    return .none
-                case let .append(sample):
-                    composition.strokeGateway.appendStroke(sample)
-                    return .none
-                case .end:
-                    return mutationOutcome(composition.strokeGateway.endStroke().map { .completed })
-                case .cancel:
-                    composition.strokeGateway.cancelStroke()
-                    return .none
-                case let .fill(sample, settings):
-                    return mutationOutcome(composition.strokeGateway.fill(sample, settings).map { .completed })
-                }
-            case let .history(command):
-                switch command {
-                case .state:
-                    return .history(
-                        DocumentHistoryState(
-                            canUndo: composition.historyGateway.canUndo(),
-                            canRedo: composition.historyGateway.canRedo()
-                        )
-                    )
-                case .undo:
-                    return mutationOutcome(composition.historyGateway.undo().map { .completed })
-                case .redo:
-                    return mutationOutcome(composition.historyGateway.redo().map { .completed })
-                }
-            }
-        }
-
-        self.init(
-            execute: executeClosure,
-            observePresentation: {
-                presentationBroadcaster.stream()
-            }
-        )
-    }
 }
 
-public enum DocumentApplicationRuntimeFactory {
-    public static func live(
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
-    ) -> DocumentApplicationRuntime {
-        DocumentApplicationRuntime(
-            composition: DocumentRuntimeCompositionFactory.live(
-                fileClient: fileClient,
-                dateClient: dateClient,
-                uuidClient: uuidClient
-            )
-        )
-    }
 
-    public static func liveWorkflows(
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
-    ) -> DocumentApplicationWorkflowRuntime {
-        live(
-            fileClient: fileClient,
-            dateClient: dateClient,
-            uuidClient: uuidClient
-        ).workflows
-    }
-}
-
-public enum DocumentRuntimeFactory {
-    public static func live(
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
-    ) -> DocumentRuntime {
-        DocumentRuntime(
-            composition: DocumentRuntimeCompositionFactory.live(
-                fileClient: fileClient,
-                dateClient: dateClient,
-                uuidClient: uuidClient
-            )
-        )
-    }
-}
 
 public struct DocumentProjectPreview: Equatable, Sendable {
     public let canvasSize: CGSize
@@ -1629,31 +1373,6 @@ public struct DocumentProjectPreview: Equatable, Sendable {
         self.previewSurface = previewSurface
     }
 
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentProjectPreview) {
-        self.init(
-            canvasSize: infrastructure.canvasSize,
-            layerCount: infrastructure.layerCount,
-            previewSurface: infrastructure.previewSurface
-        )
-    }
-}
-
-public enum DocumentProjectPreviewLoader {
-    public static func loadPreview(
-        from url: URL,
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
-    ) throws -> DocumentProjectPreview {
-        try DocumentProjectPreview(
-            PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview(
-                from: url,
-                fileClient: fileClient,
-                dateClient: dateClient,
-                uuidClient: uuidClient
-            )
-        )
-    }
 }
 
 public struct TimelapseExportProgress: Equatable, Sendable {
@@ -1671,13 +1390,6 @@ public struct TimelapseExportProgress: Equatable, Sendable {
         self.previewImageData = previewImageData
     }
 
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.TimelapseExportProgress) {
-        self.init(
-            progress: infrastructure.progress,
-            previewSurface: infrastructure.previewSurface,
-            previewImageData: infrastructure.previewImageData
-        )
-    }
 }
 
 public struct TimelapseExportResult: Equatable, Sendable {
@@ -1687,9 +1399,6 @@ public struct TimelapseExportResult: Equatable, Sendable {
         self.url = url
     }
 
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.TimelapseExportResult) {
-        self.init(url: infrastructure.url)
-    }
 }
 
 public enum TimelapseExportError: Error {
@@ -1700,413 +1409,3 @@ public enum TimelapseExportError: Error {
     case exportFailed
     case cancelled
 }
-
-public enum TimelapseExportService {
-    public static func exportVideo(
-        from capture: TimelapseCapture,
-        to directory: URL,
-        fileClient: FileClient = .live,
-        dateClient: DateClient = .live,
-        progress: ((TimelapseExportProgress) -> Void)? = nil
-    ) throws -> TimelapseExportResult {
-        do {
-            return try TimelapseExportResult(
-                PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo(
-                    from: capture,
-                    to: directory,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    progress: progress.map { callback in
-                        { callback(TimelapseExportProgress($0)) }
-                    }
-                )
-            )
-        } catch let error as PrimoDocumentEngineInfrastructure.TimelapseExportError {
-            throw TimelapseExportError(error)
-        } catch {
-            throw error
-        }
-    }
-}
-
-private extension TimelapseExportError {
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.TimelapseExportError) {
-        switch infrastructure {
-        case .insufficientFrames:
-            self = .insufficientFrames
-        case .cannotAddWriterInput:
-            self = .cannotAddWriterInput
-        case .failedToStartWriting:
-            self = .failedToStartWriting
-        case .invalidFrameData:
-            self = .invalidFrameData
-        case .exportFailed:
-            self = .exportFailed
-        case .cancelled:
-            self = .cancelled
-        }
-    }
-}
-
-public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
-    private let renderer: PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer
-
-    public init() {
-        self.init(operations: DocumentGpuOperationGatewayFactory.live().canvasPreviewRenderingOperations)
-    }
-
-    package init(operations: DocumentCanvasPreviewRenderingOperations) {
-        self.renderer = PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer(operations: operations)
-    }
-
-    package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.init(operations: gpuOperations.canvasPreviewRenderingOperations)
-    }
-
-    public func eyedropperLoupeSurface(
-        sourcePixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
-        centerX: Int,
-        centerY: Int,
-        gridSize: Int,
-        paperStyle: CanvasPaperStyle,
-        blendWithPaper: Bool
-    ) -> DocumentCompositeSurface? {
-        renderer.eyedropperLoupeSurface(
-            sourcePixelData: sourcePixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            centerX: centerX,
-            centerY: centerY,
-            gridSize: gridSize,
-            paperStyle: paperStyle,
-            blendWithPaper: blendWithPaper
-        )
-    }
-
-    public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        renderer.selectionOverlaySurface(maskData: maskData, width: width, height: height)
-    }
-
-    public func compositePreviewImageData(
-        snapshot: MetalDocumentSnapshot,
-        activeLayerIndex: Int,
-        adjustedActiveLayerPixels: Data
-    ) -> Data? {
-        renderer.compositePreviewImageData(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: adjustedActiveLayerPixels
-        )
-    }
-
-    public func paperCompositeSurface(
-        pixelData: Data,
-        width: Int,
-        height: Int,
-        paperStyle: CanvasPaperStyle
-    ) -> DocumentCompositeSurface? {
-        renderer.paperCompositeSurface(pixelData: pixelData, width: width, height: height, paperStyle: paperStyle)
-    }
-
-    public func shapePreviewSurface(
-        stroke: Stroke,
-        style: PreviewStrokeStyle,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> DocumentCompositeSurface? {
-        renderer.shapePreviewSurface(stroke: stroke, style: style, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
-    }
-
-    public func transformedTextPreviewSurface(
-        textLayer: TextLayerData,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> DocumentCompositeSurface? {
-        renderer.transformedTextPreviewSurface(textLayer: textLayer, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
-    }
-
-    public func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
-        renderer.transformedTextLayoutRect(textLayer: textLayer, canvasSize: canvasSize)
-    }
-}
-
-public struct GpuCanvasEyedropperSampler: CanvasEyedropperSampling {
-    private let sampler = PrimoDocumentRenderingInfrastructure.GpuCanvasEyedropperSampler()
-
-    public init() {}
-
-    public func sampledColor(
-        snapshot: MetalDocumentSnapshot,
-        activeLayerIndex: Int,
-        source: EyedropperSamplingSource,
-        point: CGPoint,
-        paperStyle: CanvasPaperStyle
-    ) -> SampledColor? {
-        sampler.sampledColor(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            source: source,
-            point: point,
-            paperStyle: paperStyle
-        )
-    }
-}
-
-public struct GpuLayerTransformProcessor: LayerTransformProcessing {
-    private let processor: PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor
-
-    public init() {
-        let gpuOperations = DocumentGpuOperationGatewayFactory.live()
-        self.init(
-            layerTransformOperations: gpuOperations.layerTransformOperations,
-            selectionOperations: gpuOperations.selectionMaskOperations
-        )
-    }
-
-    package init(
-        layerTransformOperations: DocumentLayerTransformOperations,
-        selectionOperations: DocumentSelectionMaskOperations
-    ) {
-        self.processor = PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor(
-            layerTransformOperations: layerTransformOperations,
-            selectionOperations: selectionOperations
-        )
-    }
-
-    package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.init(
-            layerTransformOperations: gpuOperations.layerTransformOperations,
-            selectionOperations: gpuOperations.selectionMaskOperations
-        )
-    }
-
-    public func transformedLayerPixels(
-        source: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
-        selection: CanvasSelection?,
-        translation: CGSize,
-        scaleX: CGFloat,
-        scaleY: CGFloat,
-        rotationDegrees: Double,
-        pivot: CGPoint?,
-        mode: CanvasTransformMode,
-        quadOffsets: TransformQuadOffsets
-    ) -> Data? {
-        processor.transformedLayerPixels(
-            source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            selection: selection,
-            translation: translation,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: pivot,
-            mode: mode,
-            quadOffsets: quadOffsets
-        )
-    }
-
-    public func transformedSelection(
-        _ selection: CanvasSelection?,
-        translation: CGSize,
-        scaleX: CGFloat,
-        scaleY: CGFloat,
-        rotationDegrees: Double,
-        pivot: CGPoint?,
-        mode: CanvasTransformMode,
-        quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
-    ) -> CanvasSelection? {
-        processor.transformedSelection(
-            selection,
-            translation: translation,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: pivot,
-            mode: mode,
-            quadOffsets: quadOffsets,
-            canvasSize: canvasSize
-        )
-    }
-
-    public func transformationBounds(
-        selection: CanvasSelection?,
-        pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> CGRect? {
-        processor.transformationBounds(
-            selection: selection,
-            pixelData: pixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
-        )
-    }
-}
-
-public enum BrushStrokeKernel {
-    public static func taperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
-        PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.taperScale(
-            progress: progress,
-            taperIn: taperIn,
-            taperOut: taperOut
-        )
-    }
-
-    public static func taperScale(progress: Double, taperIn: Double, taperOut: Double) -> Double {
-        PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.taperScale(
-            progress: progress,
-            taperIn: taperIn,
-            taperOut: taperOut
-        )
-    }
-
-    public static func resolvedRadius(
-        for sample: StylusSample,
-        progress: CGFloat,
-        brush: BrushRuntimeSettings
-    ) -> CGFloat {
-        PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.resolvedRadius(
-            for: sample,
-            progress: progress,
-            brush: brush
-        )
-    }
-
-    public static func previewStampAlpha(
-        pressure: Double,
-        opacityJitter: Double,
-        opacity: Double,
-        flow: Double,
-        hardness: Double,
-        opacityPressureSensitivity: Double,
-        flowPressureSensitivity: Double,
-        hasCustomTip: Bool
-    ) -> Double {
-        PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.previewStampAlpha(
-            pressure: pressure,
-            opacityJitter: opacityJitter,
-            opacity: opacity,
-            flow: flow,
-            hardness: hardness,
-            opacityPressureSensitivity: opacityPressureSensitivity,
-            flowPressureSensitivity: flowPressureSensitivity,
-            hasCustomTip: hasCustomTip
-        )
-    }
-
-    public static func noise(x: CGFloat, y: CGFloat) -> CGFloat {
-        PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.noise(x: x, y: y)
-    }
-}
-
-public enum GpuRenderingSupport {
-    public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
-        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: brush)
-    }
-
-    public static func shouldUseGpuOnlyResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
-        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
-    }
-
-    public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
-        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.responsivePreviewBrush(from: brush)
-    }
-}
-
-public enum PrimoMetalSurfaceFiltering: Sendable {
-    case linear
-    case nearest
-}
-
-private extension PrimoDocumentMetalRuntimeInfrastructure.PrimoMetalSurfaceFiltering {
-    init(_ filtering: PrimoMetalSurfaceFiltering) {
-        switch filtering {
-        case .linear:
-            self = .linear
-        case .nearest:
-            self = .nearest
-        }
-    }
-}
-
-#if canImport(UIKit)
-import UIKit
-
-@MainActor
-public final class CanvasPresentationContainerView: UIView {
-    private let content: PrimoCanvasPresentationInfrastructure.CanvasPresentationContainerView
-
-    public var documentSize: CGSize {
-        get { content.documentSize }
-        set { content.documentSize = newValue }
-    }
-
-    public var actionSink: CanvasPresentationActionSink? {
-        get { content.actionSink }
-        set { content.actionSink = newValue }
-    }
-
-    public init(environment: CanvasPresentationEnvironment) {
-        self.content = PrimoCanvasPresentationInfrastructure.CanvasPresentationContainerView(environment: environment)
-        super.init(frame: .zero)
-        backgroundColor = .clear
-        clipsToBounds = true
-        addSubview(content)
-    }
-
-    @available(*, unavailable)
-    public required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    public override func layoutSubviews() {
-        super.layoutSubviews()
-        content.frame = bounds
-    }
-
-    public func update(_ state: CanvasPresentationState) {
-        content.update(state)
-    }
-}
-
-@MainActor
-public final class CanvasPixelSurfaceView: UIView {
-    private let content = PrimoCanvasPresentationInfrastructure.CanvasPixelSurfaceView()
-
-    public override init(frame: CGRect) {
-        super.init(frame: frame)
-        isUserInteractionEnabled = false
-        addSubview(content)
-    }
-
-    @available(*, unavailable)
-    public required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    public override func layoutSubviews() {
-        super.layoutSubviews()
-        content.frame = bounds
-    }
-
-    public func update(
-        surface: DocumentCompositeSurface?,
-        opacity: CGFloat = 1.0,
-        filtering: PrimoMetalSurfaceFiltering = .linear
-    ) {
-        content.update(
-            surface: surface,
-            opacity: opacity,
-            filtering: PrimoDocumentMetalRuntimeInfrastructure.PrimoMetalSurfaceFiltering(filtering)
-        )
-        isHidden = surface == nil
-    }
-}
-
-#endif

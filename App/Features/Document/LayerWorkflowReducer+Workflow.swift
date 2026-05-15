@@ -31,16 +31,44 @@ extension LayerWorkflowReducer {
         documentContentService
     }
 
+    private var commandValidator: DocumentWorkflowCommandValidator {
+        DocumentWorkflowCommandValidator()
+    }
+
+    private func existingLayer(
+        _ index: Int,
+        in state: State
+    ) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
+        commandValidator.existingLayerIndex(index, in: state)
+    }
+
+    private func editableLayer(
+        _ index: Int,
+        in state: State
+    ) -> Result<EditableLayerIndex, DocumentMutationFailure> {
+        commandValidator.editableLayerIndex(index, in: state)
+    }
+
+    private func existingFolder(
+        _ folderID: Int,
+        in state: State
+    ) -> Result<ExistingFolderID, DocumentMutationFailure> {
+        commandValidator.existingFolderID(folderID, in: state)
+    }
+
     func handleActiveLayerVisibilityToggle(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
-            layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
+            existingLayer(activeLayerIndex, in: validationState).flatMap {
+                layerWorkflowService.setLayerVisibility($0, visible: !layer.visible)
+            }
         }
     }
 
@@ -56,11 +84,14 @@ extension LayerWorkflowReducer {
             return .none
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
             mutation: {
-                layerWorkflowService.setActiveLayer(targetIndex)
+                existingLayer(targetIndex, in: validationState).flatMap {
+                    layerWorkflowService.setActiveLayer($0)
+                }
             },
             onSuccess: { _, state in
                 state.canvas.activateLayerForEditing(targetIndex)
@@ -73,11 +104,16 @@ extension LayerWorkflowReducer {
         index: Int,
         opacity: Double
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
-            layerWorkflowService.setLayerOpacity(index, opacity: opacity)
+            existingLayer(index, in: validationState).flatMap { layerIndex in
+                commandValidator.unitInterval(opacity).flatMap { typedOpacity in
+                    layerWorkflowService.setLayerOpacity(layerIndex, opacity: typedOpacity)
+                }
+            }
         }
     }
 
@@ -88,8 +124,11 @@ extension LayerWorkflowReducer {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(state: &state) {
-            layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerLocked($0, isLocked: !layer.isLocked)
+            }
         }
     }
 
@@ -100,8 +139,11 @@ extension LayerWorkflowReducer {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(state: &state) {
-            layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerAlphaLocked($0, isAlphaLocked: !layer.isAlphaLocked)
+            }
         }
     }
 
@@ -115,8 +157,11 @@ extension LayerWorkflowReducer {
         guard layer.isClipped || index > 0 else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(state: &state) {
-            layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerClipped($0, isClipped: !layer.isClipped)
+            }
         }
     }
 
@@ -124,11 +169,14 @@ extension LayerWorkflowReducer {
         state: inout State,
         index: Int
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
             mutation: {
-                layerWorkflowService.setActiveLayer(index)
+                existingLayer(index, in: validationState).flatMap {
+                    layerWorkflowService.setActiveLayer($0)
+                }
             },
             onSuccess: { _, state in
                 state.canvas.activateLayerForEditing(index)
@@ -143,11 +191,14 @@ extension LayerWorkflowReducer {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
-            layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerVisibility($0, visible: !layer.visible)
+            }
         }
     }
 
@@ -156,11 +207,14 @@ extension LayerWorkflowReducer {
         folderID: Int,
         isExpanded: Bool
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: .currentPresentation
         ) {
-            layerWorkflowService.setFolderExpanded(folderID, isExpanded: isExpanded)
+            existingFolder(folderID, in: validationState).flatMap {
+                layerWorkflowService.setFolderExpanded($0, isExpanded: isExpanded)
+            }
         }
     }
 
@@ -171,8 +225,11 @@ extension LayerWorkflowReducer {
         guard let folder = state.layerSidebar.folder(withID: folderID) else {
             return .none
         }
+        let validationState = state
         return performDocumentMutation(state: &state) {
-            layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
+            existingFolder(folderID, in: validationState).flatMap {
+                layerWorkflowService.setFolderVisibility($0, visible: !folder.visible)
+            }
         }
     }
 
@@ -181,8 +238,11 @@ extension LayerWorkflowReducer {
         folderID: Int,
         name: String
     ) -> Effect<Action> {
-        performDocumentMutation(state: &state) {
-            layerWorkflowService.setFolderName(folderID, name: name)
+        let validationState = state
+        return performDocumentMutation(state: &state) {
+            existingFolder(folderID, in: validationState).flatMap {
+                layerWorkflowService.setFolderName($0, name: name)
+            }
         }
     }
 
@@ -191,11 +251,14 @@ extension LayerWorkflowReducer {
         index: Int,
         blendMode: LayerBlendMode
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
-            layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerBlendMode($0, blendMode: blendMode)
+            }
         }
     }
 
@@ -204,8 +267,11 @@ extension LayerWorkflowReducer {
         index: Int,
         name: String
     ) -> Effect<Action> {
-        performDocumentMutation(state: &state) {
-            layerWorkflowService.setLayerName(index, name: name)
+        let validationState = state
+        return performDocumentMutation(state: &state) {
+            existingLayer(index, in: validationState).flatMap {
+                layerWorkflowService.setLayerName($0, name: name)
+            }
         }
     }
 
@@ -233,14 +299,17 @@ extension LayerWorkflowReducer {
         } + 1
         let folderName = namingPolicy.folderName(forOrdinal: nextFolderNumber)
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
             mutation: {
-                layerWorkflowService.createFolder(
-                    named: folderName,
-                    afterLayerAt: activeLayerIndex
-                )
+                commandValidator.layerAnchorIndex(activeLayerIndex, in: validationState).flatMap {
+                    layerWorkflowService.createFolder(
+                        named: folderName,
+                        afterLayerAt: $0
+                    )
+                }
             }
         )
     }
@@ -249,11 +318,14 @@ extension LayerWorkflowReducer {
         state: inout State,
         folderID: Int
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
             mutation: {
-                layerWorkflowService.deleteFolder(folderID)
+                existingFolder(folderID, in: validationState).flatMap {
+                    layerWorkflowService.deleteFolder($0)
+                }
             }
         )
     }
@@ -262,14 +334,17 @@ extension LayerWorkflowReducer {
         state: inout State,
         index: Int
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
                 canvasMutation: .clearSelection,
                 refresh: .current
             ),
             mutation: {
-                layerWorkflowService.deleteLayer(index)
+                existingLayer(index, in: validationState).flatMap {
+                    layerWorkflowService.deleteLayer($0)
+                }
             }
         )
     }
@@ -283,6 +358,7 @@ extension LayerWorkflowReducer {
         }
         let namingPolicy = DocumentNamingPolicy(language: appLanguageClient.load())
         let duplicateName = namingPolicy.duplicatedLayerName(for: layer.name)
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
@@ -290,7 +366,9 @@ extension LayerWorkflowReducer {
                 refresh: .current
             ),
             mutation: {
-                layerWorkflowService.duplicateLayer(index, named: duplicateName)
+                existingLayer(index, in: validationState).flatMap {
+                    layerWorkflowService.duplicateLayer($0, named: duplicateName)
+                }
             }
         )
     }
@@ -300,14 +378,19 @@ extension LayerWorkflowReducer {
         index: Int,
         destinationIndex: Int
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
                 canvasMutation: .clearSelection,
                 refresh: .current
             ),
             mutation: {
-                layerWorkflowService.moveLayer(index, to: destinationIndex)
+                existingLayer(index, in: validationState).flatMap { layerIndex in
+                    existingLayer(destinationIndex, in: validationState).flatMap { destinationLayerIndex in
+                        layerWorkflowService.moveLayer(layerIndex, to: destinationLayerIndex)
+                    }
+                }
             }
         )
     }
@@ -317,11 +400,16 @@ extension LayerWorkflowReducer {
         index: Int,
         folderID: Int?
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
             mutation: {
-                layerWorkflowService.assignLayer(index, toFolder: folderID)
+                existingLayer(index, in: validationState).flatMap { layerIndex in
+                    commandValidator.existingFolderID(folderID, in: validationState).flatMap { typedFolderID in
+                        layerWorkflowService.assignLayer(layerIndex, toFolder: typedFolderID)
+                    }
+                }
             }
         )
     }
@@ -330,14 +418,17 @@ extension LayerWorkflowReducer {
         state: inout State,
         index: Int
     ) -> Effect<Action> {
-        performDocumentMutation(
+        let validationState = state
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
                 canvasMutation: .clearSelection,
                 refresh: .current
             ),
             mutation: {
-                layerWorkflowService.mergeLayerDown(index)
+                existingLayer(index, in: validationState).flatMap {
+                    layerWorkflowService.mergeLayerDown($0)
+                }
             }
         )
     }
@@ -450,6 +541,7 @@ extension LayerWorkflowReducer {
         state.canvas.clearAdjustmentPreview()
         state.canvas.stagePendingCommittedSnapshot(nil)
         _ = canvasStrokeInteractionService.cancel()
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
@@ -461,7 +553,9 @@ extension LayerWorkflowReducer {
                 )
             ),
             mutation: {
-                layerWorkflowService.clearLayer(activeLayerIndex)
+                editableLayer(activeLayerIndex, in: validationState).flatMap {
+                    layerWorkflowService.clearLayer($0)
+                }
             }
         )
     }
@@ -475,27 +569,39 @@ extension LayerWorkflowReducer {
         ) else {
             return .send(.delegate(.documentMutationFeedback(.createLayerMaskNeedsSelection)))
         }
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             failureFeedback: .createLayerMaskFailed,
-            mutation: {
-                layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData)
+            mutation: { () -> DocumentMutationResult in
+                editableLayer(activeLayerIndex, in: validationState).flatMap { layerIndex in
+                    let width = Int(validationState.canvas.canvasSize.width.rounded())
+                    let height = Int(validationState.canvas.canvasSize.height.rounded())
+                    guard let typedMaskData = LayerMaskData(width: width, height: height, bytes: maskData) else {
+                        return .failure(.gpu(.invalidPayloadSize(operation: "replaceLayerMask", expected: width * height, actual: maskData.count)))
+                    }
+                    return layerWorkflowService.replaceLayerMask(layerIndex, mask: typedMaskData)
+                }
             }
         )
     }
 
     func handleClearLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             mutation: {
-                layerWorkflowService.clearLayerMask(activeLayerIndex)
+                editableLayer(activeLayerIndex, in: validationState).flatMap {
+                    layerWorkflowService.clearLayerMask($0)
+                }
             }
         )
     }
 
     func handleApplyLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
+        let validationState = state
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
@@ -508,7 +614,9 @@ extension LayerWorkflowReducer {
             ),
             failureFeedback: .applyLayerMaskFailed,
             mutation: {
-                layerWorkflowService.applyLayerMask(activeLayerIndex)
+                editableLayer(activeLayerIndex, in: validationState).flatMap {
+                    layerWorkflowService.applyLayerMask($0)
+                }
             }
         )
     }

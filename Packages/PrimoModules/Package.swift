@@ -16,7 +16,10 @@ let package = Package(
         .library(name: "PrimoDocumentGPUContracts", targets: ["PrimoDocumentGPUContracts"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
+        .library(name: "PrimoDocumentRuntimeContracts", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentRuntime", targets: ["PrimoDocumentRuntime"]),
+        .library(name: "PrimoDocumentRuntimeLive", targets: ["PrimoDocumentRuntimeLive"]),
+        .library(name: "PrimoCanvasPresentationRuntime", targets: ["PrimoCanvasPresentationRuntime"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoAIImageDomain", targets: ["PrimoAIImageDomain"]),
         .library(name: "PrimoAIImageApplication", targets: ["PrimoAIImageApplication"]),
@@ -244,13 +247,42 @@ let package = Package(
         .target(
             name: "PrimoDocumentRuntime",
             dependencies: [
-                "PrimoCanvasPresentationInfrastructure",
+                "PrimoBrushRuntimeContracts",
+                "PrimoCanvasPresentationDomain",
+                "PrimoCoreTypes",
+                "PrimoDocumentApplication",
+                "PrimoDocumentDomain",
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentMutationContracts",
+                "PrimoDocumentPersistenceContracts",
+                "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRenderingContracts",
+                "PrimoDocumentStrokeApplication",
+            ],
+            path: "Sources/PrimoDocumentRuntime"
+        ),
+        .target(
+            name: "PrimoDocumentRuntimeLive",
+            dependencies: [
+                "PrimoDocumentRuntime",
                 "PrimoDocumentEngineInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentMetalStrokeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
                 "PrimoDocumentStrokeInfrastructure",
             ],
-            path: "Sources/PrimoDocumentRuntime"
+            path: "Sources/PrimoDocumentRuntimeLive"
+        ),
+        .target(
+            name: "PrimoCanvasPresentationRuntime",
+            dependencies: [
+                "PrimoCanvasPresentationDomain",
+                "PrimoCanvasPresentationInfrastructure",
+                "PrimoDocumentDomain",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentPresentationContracts",
+            ],
+            path: "Sources/PrimoCanvasPresentationRuntime"
         ),
         .target(
             name: "PrimoBrushDomain"
@@ -414,6 +446,7 @@ let package = Package(
                 "PrimoDocumentApplication",
                 "PrimoDocumentContracts",
                 "PrimoDocumentRuntime",
+                "PrimoDocumentRuntimeLive",
                 "PrimoWorkspaceApplication",
                 "PrimoWorkspaceInfrastructure",
             ],
@@ -494,6 +527,8 @@ let package = Package(
                 "PrimoDocumentPresentationContracts",
                 "PrimoDocumentRenderingContracts",
                 "PrimoDocumentRuntime",
+                "PrimoDocumentRuntimeLive",
+                "PrimoCanvasPresentationRuntime",
                 "PrimoDocumentMetalRuntimeInfrastructure",
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
@@ -510,6 +545,7 @@ let package = Package(
                 "PrimoDocumentMetalStrokeInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
+                "PrimoDocumentRuntimeLive",
             ]
         ),
         .testTarget(

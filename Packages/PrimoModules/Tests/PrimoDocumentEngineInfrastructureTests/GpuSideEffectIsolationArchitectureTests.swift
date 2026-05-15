@@ -504,7 +504,9 @@ struct GpuSideEffectIsolationArchitectureTests {
             in: """
             // import PrimoDocumentEngineInfrastructure
             let example = "import PrimoDocumentRenderingInfrastructure"
-            @testable import PrimoDocumentRuntime
+            @testable import PrimoCanvasPresentationRuntime
+            import PrimoDocumentRuntime
+            import PrimoDocumentRuntimeLive
             @_exported import PrimoWorkspaceRuntime
             import struct Foundation.URL
             import PrimoDocumentApplication
@@ -512,7 +514,9 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         #expect(imports == Set([
+            "PrimoCanvasPresentationRuntime",
             "PrimoDocumentRuntime",
+            "PrimoDocumentRuntimeLive",
             "PrimoWorkspaceRuntime",
             "Foundation",
             "PrimoDocumentApplication"
@@ -702,14 +706,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             body.contains("public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult"),
             "LayerEditingRuntime should expose typed pixel replacement"
         )
-        #expect(
-            body.contains("@available(*, deprecated, message: \"Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.\")\n    public func replaceLayerPixels(_ index: Int, pixelData: Data)"),
-            "LayerEditingRuntime raw labeled pixel replacement should warn callers toward the typed command"
-        )
-        #expect(
-            body.contains("@available(*, deprecated, message: \"Use replaceLayerPixels(_:) with LayerPixelReplacementCommand.\")\n    public func replaceLayerPixels(_ index: Int, _ pixelData: Data)"),
-            "LayerEditingRuntime raw unlabeled pixel replacement should warn callers toward the typed command"
-        )
+        #expect(!body.contains("public func replaceLayerPixels(_ index: Int, pixelData: Data)"))
+        #expect(!body.contains("public func replaceLayerPixels(_ index: Int, _ pixelData: Data)"))
 
         let renderingWorkflowBody = try #require(Self.typeBody(named: "DocumentRenderingWorkflow", in: body))
         let publicRenderingInitializers = Self.initializerSignatures(accessLevel: "public", in: renderingWorkflowBody)
@@ -726,10 +724,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
         let expectedSymbols: Set<String> = [
             "DocumentRuntime",
-            "DocumentRuntimeFactory",
             "DocumentApplicationRuntime",
             "DocumentApplicationWorkflowRuntime",
-            "DocumentApplicationRuntimeFactory",
             "DocumentPresentationRuntime",
             "CanvasMutationRuntime",
             "StrokeEditingRuntime",
@@ -752,19 +748,9 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentPersistenceClient",
             "DocumentExportClient",
             "DocumentProjectPreview",
-            "DocumentProjectPreviewLoader",
             "TimelapseExportProgress",
             "TimelapseExportResult",
-            "TimelapseExportError",
-            "TimelapseExportService",
-            "GpuCanvasPreviewRenderer",
-            "GpuCanvasEyedropperSampler",
-            "GpuLayerTransformProcessor",
-            "BrushStrokeKernel",
-            "GpuRenderingSupport",
-            "PrimoMetalSurfaceFiltering",
-            "CanvasPresentationContainerView",
-            "CanvasPixelSurfaceView"
+            "TimelapseExportError"
         ]
         #expect(publicSymbols == expectedSymbols)
     }
@@ -789,10 +775,15 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func croppedSelectionMask(_ mask: MaskSurface)",
             "public func scaledPixelData(_ source: RgbaSurface, targetGeometry: PixelGeometry)",
             "public func translatedPixelData( _ source: RgbaSurface, targetGeometry: PixelGeometry, offsetX: Int, offsetY: Int )",
+            "public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex)",
+            "public func deleteFolder(_ folderID: ExistingFolderID)",
             "public func deleteLayer(_ index: ExistingLayerIndex)",
             "public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval)",
+            "public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool)",
             "public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData)",
-            "public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData)"
+            "public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData)",
+            "public func applyGpuStrokeSurface(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex)",
+            "public func blurStroke(_ samples: [StylusSample], _ brush: BrushRuntimeSettings, layerIndex: EditableLayerIndex, clearSelectionAfterBlur: Bool)"
         ]
         for signature in typedSignatures {
             #expect(signatures.contains(signature), "Missing typed public facade overload: \(signature)")
@@ -807,14 +798,77 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Use alphaMask(_:) with RgbaSurface.",
             "Use croppedSelectionMask(_:) with MaskSurface.",
             "Use scaledPixelData(_:targetGeometry:) with RgbaSurface and PixelGeometry.",
-            "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry.",
-            "Use deleteLayer(_:) with ExistingLayerIndex.",
-            "Use setLayerOpacity(_:opacity:) with ExistingLayerIndex and UnitInterval.",
-            "Use replaceLayerMask(_:mask:) with EditableLayerIndex and LayerMaskData.",
-            "Use replaceLayerPixelsInRect(_:_:_:) with EditableLayerIndex and LayerPixelData."
+            "Use translatedPixelData(_:targetGeometry:offsetX:offsetY:) with RgbaSurface and PixelGeometry."
         ]
         for replacement in deprecatedRawReplacements {
             #expect(body.contains("@available(*, deprecated, message: \"\(replacement)\")"))
+        }
+    }
+
+    @Test
+    func documentRuntimePublicMutationFacadeRejectsRawLayerIndexesAndPixelPayloads() throws {
+        let repoRoot = try Self.repoRoot()
+        let facade = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: facade, encoding: .utf8)
+        let layerEditingBody = try #require(Self.typeBody(named: "LayerEditingRuntime", in: body))
+        let strokeEditingBody = try #require(Self.typeBody(named: "StrokeEditingRuntime", in: body))
+
+        let layerMutationPrefixes = [
+            "public func createFolder(",
+            "public func deleteFolder(",
+            "public func deleteLayer(",
+            "public func duplicateLayer(",
+            "public func moveLayer(",
+            "public func assignLayer(",
+            "public func mergeLayerDown(",
+            "public func setLayer",
+            "public func setFolder",
+            "public func replaceLayerPixels(",
+            "public func applyLayerProcessing(",
+            "public func setTextLayer(",
+            "public func clearLayer(",
+            "public func replaceLayerMask(",
+            "public func clearLayerMask(",
+            "public func applyLayerMask(",
+            "public func revealLayerForEditing(",
+            "public func ensureLayerVisible(",
+            "public func applyLayerSurfaceMutation(",
+            "public func applyLayerMutation(",
+            "public func applyTextLayerMutation("
+        ]
+        let bannedRawIndexFragments = [
+            "_ index: Int",
+            "layerIndex: Int",
+            "activeLayerIndex: Int",
+            "destinationIndex: Int",
+            "folderID: Int"
+        ]
+        let bannedRawPayloadFragments = [
+            "pixelData: Data",
+            "_ pixelData: Data",
+            "maskData: Data"
+        ]
+
+        for signature in Self.functionSignatures(accessLevel: "public", in: layerEditingBody).map(Self.normalizedSignature)
+            where layerMutationPrefixes.contains(where: signature.hasPrefix)
+        {
+            for fragment in bannedRawIndexFragments {
+                #expect(!signature.contains(fragment), "\(signature) should use typed layer/folder value objects")
+            }
+            for fragment in bannedRawPayloadFragments {
+                #expect(!signature.contains(fragment), "\(signature) should use typed layer pixel/mask payloads")
+            }
+        }
+
+        for signature in Self.functionSignatures(accessLevel: "public", in: strokeEditingBody).map(Self.normalizedSignature)
+            where signature.hasPrefix("public func applyGpuStrokeSurface(") || signature.hasPrefix("public func blurStroke(")
+        {
+            #expect(!signature.contains("layerIndex: Int"))
+            #expect(!signature.contains("_ layerIndex: Int"))
+            #expect(signature.contains("EditableLayerIndex"))
         }
     }
 
@@ -1439,10 +1493,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(Self.functionSignatures(accessLevel: "public", in: editableLayerIndex).contains(where: { $0.hasPrefix("public static func validated(") }))
         #expect(Self.storedPropertyNames(accessLevel: "public", in: editableLayerIndex) == ["rawValue", "revision"])
         #expect(Self.initializerSignatures(accessLevel: "package", in: editableLayerIndex).contains("package init(_ rawValue: Int)"))
+        #expect(validation.contains("let existingLayerIndex: ExistingLayerIndex"))
         #expect(validation.contains("let layerIndex: EditableLayerIndex"))
         #expect(!validation.contains("let layerIndex: Int"))
-        #expect(adapters.contains("command.layer.layerIndex.rawValue"))
-        #expect(adapters.contains("command.layerIndex.rawValue"))
+        #expect(adapters.contains("layerIndex: command.layer.layerIndex"))
+        #expect(adapters.contains("command.existingLayerIndex"))
     }
 
     @Test
