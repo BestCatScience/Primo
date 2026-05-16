@@ -22,7 +22,7 @@ public struct CanvasEditingContext: Sendable {
     public let activeLayerIndex: Int
     public let activeTextLayer: TextLayerData?
     public let selection: CanvasSelection?
-    public let canvasSize: CGSize
+    public let canvasGeometry: PixelGeometry
 
     public init(
         transformHasPreview: Bool,
@@ -36,7 +36,7 @@ public struct CanvasEditingContext: Sendable {
         activeLayerIndex: Int,
         activeTextLayer: TextLayerData?,
         selection: CanvasSelection?,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) {
         self.transformHasPreview = transformHasPreview
         self.transformPreviewOffset = transformPreviewOffset
@@ -49,7 +49,7 @@ public struct CanvasEditingContext: Sendable {
         self.activeLayerIndex = activeLayerIndex
         self.activeTextLayer = activeTextLayer
         self.selection = selection
-        self.canvasSize = canvasSize
+        self.canvasGeometry = canvasGeometry
     }
 }
 
@@ -118,8 +118,8 @@ public struct CanvasEditingWorkflowService: Sendable {
         case let .failure(failure):
             return .failure(failure)
         }
-        let canvasWidth = max(Int(context.canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(context.canvasSize.height.rounded()), 1)
+        let canvasWidth = context.canvasGeometry.width
+        let canvasHeight = context.canvasGeometry.height
         guard let sourceSurface = RgbaSurface(width: canvasWidth, height: canvasHeight, data: source) else {
             return .resetTransformPreview
         }
@@ -146,7 +146,7 @@ public struct CanvasEditingWorkflowService: Sendable {
             pivot: context.transformPivot,
             mode: context.transformMode,
             quadOffsets: context.transformQuadOffsets,
-            canvasSize: context.canvasSize
+            canvasGeometry: context.canvasGeometry
         )
 
         switch documentContentService.replaceLayerPixels(context.activeLayerIndex, transformed) {

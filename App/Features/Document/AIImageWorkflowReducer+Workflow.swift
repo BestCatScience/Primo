@@ -32,11 +32,14 @@ extension AIImageWorkflowReducer {
             else {
                 return .failure(AIImageValidationFailure(feedback: .aiImagePrepareLayerFailed))
             }
+            guard let canvasGeometry = PixelGeometry(width: snapshot.width, height: snapshot.height) else {
+                return .failure(AIImageValidationFailure(feedback: .aiImagePrepareLayerFailed))
+            }
 
             let adjustedSelection = command.descriptor.editScope == .selectedArea
                 ? selectionWorkflow.adjustedSelection(
                     state.canvas.selection,
-                    canvasSize: state.canvas.canvasSize,
+                    canvasGeometry: canvasGeometry,
                     expansion: command.descriptor.maskSettings.expansion,
                     isInverted: command.descriptor.maskSettings.isInverted
                 )
@@ -58,7 +61,6 @@ extension AIImageWorkflowReducer {
             let selectionRegion: AIImageSelectionRegion?
             if let adjustedSelection {
                 guard
-                    let canvasGeometry = PixelGeometry(width: snapshot.width, height: snapshot.height),
                     let expandedMask = selectionWorkflow.expandedMask(
                         from: adjustedSelection,
                         canvasGeometry: canvasGeometry

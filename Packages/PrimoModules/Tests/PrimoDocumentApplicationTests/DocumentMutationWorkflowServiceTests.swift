@@ -66,51 +66,13 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func layerContentCommandsRejectInvalidProcessingTransformBeforeMutationGateways() throws {
-        let recorder = MutationRecorder()
-        let service = DocumentMutationWorkflowService(
-            documentQueryGateway: queryGateway(layerCount: 1),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused
-        )
-
-        let index = try #require(editableLayerIndex(0, layerCount: 1))
-        let result = service.applyLayerProcessing(
-            index,
-            request: .transform(
-                translation: .zero,
-                scale: 0,
-                rotationDegrees: 0,
-                selection: nil
-            )
-        )
-
-        expectFailure(result, .invalidLayerProcessingRequest("transform"))
-        #expect(recorder.events.isEmpty)
+    func layerProcessingTransformRequestRejectsInvalidScaleAtConstruction() {
+        #expect(TransformScale(0) == nil)
     }
 
     @Test
-    func layerContentCommandsRejectNonFiniteProcessingTransformBeforeMutationGateways() throws {
-        let recorder = MutationRecorder()
-        let service = DocumentMutationWorkflowService(
-            documentQueryGateway: queryGateway(layerCount: 1),
-            documentEditingGateway: .failing,
-            documentLayerEffectsGateway: .unused
-        )
-
-        let index = try #require(editableLayerIndex(0, layerCount: 1))
-        let result = service.applyLayerProcessing(
-            index,
-            request: .transform(
-                translation: CGSize(width: CGFloat.nan, height: 0),
-                scale: 1,
-                rotationDegrees: 0,
-                selection: nil
-            )
-        )
-
-        expectFailure(result, .invalidLayerProcessingRequest("transform"))
-        #expect(recorder.events.isEmpty)
+    func layerProcessingTransformRequestRejectsNonFiniteTranslationAtConstruction() {
+        #expect(FiniteTranslation(CGSize(width: CGFloat.nan, height: 0)) == nil)
     }
 
     @Test
@@ -133,10 +95,7 @@ struct DocumentMutationWorkflowServiceTests {
         let result = service.applyLayerProcessing(
             index,
             request: .transform(
-                translation: .zero,
-                scale: 1,
-                rotationDegrees: 0,
-                selection: selection
+                try #require(layerTransformRequest(selection: selection))
             )
         )
 
@@ -589,6 +548,20 @@ private func anchorLayerIndex(
         isLayerLocked: { _ in false }
     )
     .anchorLayerIndex(rawValue)
+}
+
+private func layerTransformRequest(selection: CanvasSelection?) -> LayerTransformProcessingRequest? {
+    guard let translation = FiniteTranslation(.zero),
+          let scale = TransformScale(1),
+          let rotationDegrees = RotationDegrees(0) else {
+        return nil
+    }
+    return LayerTransformProcessingRequest(
+        translation: translation,
+        scale: scale,
+        rotationDegrees: rotationDegrees,
+        selection: selection
+    )
 }
 
 private func presentation(

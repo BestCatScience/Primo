@@ -597,7 +597,7 @@ private struct TestLayerTransformProcessor: LayerTransformProcessing {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         nil
     }

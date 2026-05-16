@@ -225,6 +225,25 @@ public struct RotationDegrees: Equatable, Sendable {
     }
 }
 
+public struct LayerTransformProcessingRequest: Equatable, Sendable {
+    public let translation: FiniteTranslation
+    public let scale: TransformScale
+    public let rotationDegrees: RotationDegrees
+    public let selection: CanvasSelection?
+
+    public init(
+        translation: FiniteTranslation,
+        scale: TransformScale,
+        rotationDegrees: RotationDegrees,
+        selection: CanvasSelection?
+    ) {
+        self.translation = translation
+        self.scale = scale
+        self.rotationDegrees = rotationDegrees
+        self.selection = selection
+    }
+}
+
 public struct AdjustmentOffset: Equatable, Sendable {
     public let rawValue: Double
 
@@ -627,7 +646,7 @@ public enum LayerProcessingRequest: Equatable, Sendable {
     case threshold(ThresholdSettings)
     case posterize(PosterizeSettings)
     case luminanceToAlpha
-    case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
+    case transform(LayerTransformProcessingRequest)
 }
 
 package struct DocumentMutationGateway: Sendable {

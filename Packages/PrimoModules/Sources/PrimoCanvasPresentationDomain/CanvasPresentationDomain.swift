@@ -291,7 +291,7 @@ public protocol LayerTransformProcessing: Sendable {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection?
 
     func transformationBounds(

@@ -106,7 +106,7 @@ extension DocumentCanvasTransformAdapter {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         transformRuntime.transformedSelection(
             selection,
@@ -117,7 +117,7 @@ extension DocumentCanvasTransformAdapter {
             pivot: pivot,
             mode: mode,
             quadOffsets: quadOffsets,
-            canvasSize: canvasSize
+            canvasGeometry: canvasGeometry
         )
     }
 

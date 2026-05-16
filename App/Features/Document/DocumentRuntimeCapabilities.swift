@@ -164,13 +164,13 @@ protocol CanvasEditingExecuting: Sendable {
 protocol CanvasTransformPort: CanvasEditingExecuting, LayerTransformProcessing {}
 
 protocol SelectionWorkflowRequesting: Sendable {
-    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection?
-    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection?
-    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection?
+    func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode) -> CanvasSelection?
+    func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool) -> CanvasSelection?
+    func featheredSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, radius: Int) -> CanvasSelection?
     func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection?
-    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection?
-    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection?
-    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection?
+    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasGeometry: PixelGeometry) -> CanvasSelection?
+    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasGeometry: PixelGeometry) -> CanvasSelection?
+    func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry) -> CanvasSelection?
     func makeAutoSelection(
         at point: CGPoint,
         snapshot: MetalDocumentSnapshot?,

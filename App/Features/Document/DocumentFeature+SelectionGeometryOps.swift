@@ -8,14 +8,11 @@ import PrimoDocumentRuntime
 extension DocumentFeature {
     static func layerMaskData(
         from selection: CanvasSelection?,
-        canvasSize: CGSize,
+        canvasGeometry: PixelGeometry,
         selectionWorkflow: any SelectionWorkflowRequesting
     ) -> Data? {
         guard let selection else { return nil }
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
         guard
-            let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
             let mask = selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry)
         else {
             return nil

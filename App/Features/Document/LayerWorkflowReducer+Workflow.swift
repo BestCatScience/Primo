@@ -580,9 +580,18 @@ extension LayerWorkflowReducer {
 
     func handleCreateLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
+        let canvasGeometry = state.canvas.renderSnapshot
+            .flatMap { PixelGeometry(width: $0.width, height: $0.height) }
+            ?? PixelGeometry(
+                width: max(Int(state.canvas.canvasSize.width.rounded()), 1),
+                height: max(Int(state.canvas.canvasSize.height.rounded()), 1)
+            )
+        guard let canvasGeometry else {
+            return .send(.delegate(.documentMutationFeedback(.createLayerMaskNeedsSelection)))
+        }
         guard let maskData = DocumentFeature.layerMaskData(
             from: state.canvas.selection,
-            canvasSize: state.canvas.canvasSize,
+            canvasGeometry: canvasGeometry,
             selectionWorkflow: selectionWorkflowService
         ) else {
             return .send(.delegate(.documentMutationFeedback(.createLayerMaskNeedsSelection)))
@@ -593,8 +602,8 @@ extension LayerWorkflowReducer {
             failureFeedback: .createLayerMaskFailed,
             mutation: { () -> DocumentMutationResult in
                 editableLayer(activeLayerIndex, in: validationState).flatMap { layerIndex in
-                    let width = Int(validationState.canvas.canvasSize.width.rounded())
-                    let height = Int(validationState.canvas.canvasSize.height.rounded())
+                    let width = canvasGeometry.width
+                    let height = canvasGeometry.height
                     guard let typedMaskData = LayerMaskData(width: width, height: height, bytes: maskData) else {
                         return .failure(.gpu(.invalidPayloadSize(operation: "replaceLayerMask", expected: width * height, actual: maskData.count)))
                     }

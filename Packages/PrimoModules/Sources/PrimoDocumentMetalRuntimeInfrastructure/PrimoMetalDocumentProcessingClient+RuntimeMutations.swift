@@ -529,15 +529,12 @@ extension PrimoMetalDocumentProcessingClient {
         }
 
         switch request {
-        case let .transform(translation, scale, rotationDegrees, selection):
+        case let .transform(transform):
             return processLayerTransform(
                 pixelData: pixelData,
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
-                translation: translation,
-                scale: scale,
-                rotationDegrees: rotationDegrees,
-                selection: selection,
+                request: transform,
                 commandQueue: commandQueue
             )
 
@@ -1248,12 +1245,13 @@ extension PrimoMetalDocumentProcessingClient {
         pixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int,
-        translation: CGSize,
-        scale: CGFloat,
-        rotationDegrees: Double,
-        selection: CanvasSelection?,
+        request: LayerTransformProcessingRequest,
         commandQueue: MTLCommandQueue
     ) -> DocumentLayerMutationPayload? {
+        let translation = request.translation.rawValue
+        let scale = request.scale.rawValue
+        let rotationDegrees = request.rotationDegrees.rawValue
+        let selection = request.selection
         guard
             let pipeline = layerTransformPipeline,
             let sourceBuffer = makeBuffer(pixelData),

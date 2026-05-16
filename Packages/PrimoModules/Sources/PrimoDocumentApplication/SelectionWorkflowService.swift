@@ -60,7 +60,7 @@ public struct SelectionWorkflowService: Sendable {
         existing: CanvasSelection?,
         incoming: CanvasSelection?,
         mode: SelectionCombineMode,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         switch mode {
         case .replace:
@@ -71,7 +71,6 @@ public struct SelectionWorkflowService: Sendable {
                 return mode == .add ? incoming : nil
             }
 
-            guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
             let canvasWidth = canvasGeometry.width
             let canvasHeight = canvasGeometry.height
             guard
@@ -95,9 +94,8 @@ public struct SelectionWorkflowService: Sendable {
     public func makeRectangleSelection(
         from startPoint: CGPoint,
         to endPoint: CGPoint,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
-        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
         let minX = min(startPoint.x, endPoint.x)
@@ -155,12 +153,11 @@ public struct SelectionWorkflowService: Sendable {
 
     public func adjustedSelection(
         _ selection: CanvasSelection?,
-        canvasSize: CGSize,
+        canvasGeometry: PixelGeometry,
         expansion: Int,
         isInverted: Bool
     ) -> CanvasSelection? {
         guard let selection else { return nil }
-        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
         guard var mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
@@ -182,17 +179,16 @@ public struct SelectionWorkflowService: Sendable {
 
     public func invertedSelection(
         _ selection: CanvasSelection?,
-        canvasSize: CGSize,
+        canvasGeometry: PixelGeometry,
         mode: SelectionToolMode
     ) -> CanvasSelection? {
-        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
 
         if let selection {
             return adjustedSelection(
                 selection,
-                canvasSize: canvasSize,
+                canvasGeometry: canvasGeometry,
                 expansion: 0,
                 isInverted: true
             )
@@ -204,11 +200,10 @@ public struct SelectionWorkflowService: Sendable {
 
     public func featheredSelection(
         _ selection: CanvasSelection?,
-        canvasSize: CGSize,
+        canvasGeometry: PixelGeometry,
         radius: Int
     ) -> CanvasSelection? {
         guard let selection else { return nil }
-        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
         guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
@@ -218,13 +213,12 @@ public struct SelectionWorkflowService: Sendable {
         return croppedSelection(from: featheredMask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
     }
 
-    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
+    public func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry) -> CanvasSelection? {
         guard points.count >= 3 else { return nil }
 
-        let polygon = closedPolygon(simplifiedLassoPoints(points), canvasSize: canvasSize)
+        let polygon = closedPolygon(simplifiedLassoPoints(points), canvasGeometry: canvasGeometry)
         guard polygon.count >= 3 else { return nil }
 
-        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
         guard let mask = lassoSelectionHandler(polygon, canvasWidth, canvasHeight).value else {
@@ -411,11 +405,13 @@ public struct SelectionWorkflowService: Sendable {
         )
     }
 
-    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] {
+    public func closedPolygon(_ points: [CGPoint], canvasGeometry: PixelGeometry) -> [CGPoint] {
+        let maxX = CGFloat(max(canvasGeometry.width - 1, 0))
+        let maxY = CGFloat(max(canvasGeometry.height - 1, 0))
         let clamped = points.map {
             CGPoint(
-                x: min(max($0.x, 0), max(canvasSize.width - 1, 0)),
-                y: min(max($0.y, 0), max(canvasSize.height - 1, 0))
+                x: min(max($0.x, 0), maxX),
+                y: min(max($0.y, 0), maxY)
             )
         }
         guard let first = clamped.first, let last = clamped.last else { return [] }
@@ -423,12 +419,6 @@ public struct SelectionWorkflowService: Sendable {
             return clamped
         }
         return clamped + [first]
-    }
-
-    private func canvasGeometry(from canvasSize: CGSize) -> PixelGeometry? {
-        let width = Int(canvasSize.width.rounded())
-        let height = Int(canvasSize.height.rounded())
-        return PixelGeometry(width: width, height: height)
     }
 
     private func simplifiedLassoPoints(_ points: [CGPoint]) -> [CGPoint] {

@@ -179,32 +179,32 @@ extension DocumentLayerContentAdapter {
 }
 
 extension DocumentSelectionProcessingAdapter {
-    func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? {
-        runtime.invertedSelection(selection, canvasSize: canvasSize, mode: mode)
+    func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode) -> CanvasSelection? {
+        runtime.invertedSelection(selection, canvasGeometry: canvasGeometry, mode: mode)
     }
 
-    func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? {
-        runtime.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted)
+    func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool) -> CanvasSelection? {
+        runtime.adjustedSelection(selection, canvasGeometry: canvasGeometry, expansion: expansion, isInverted: isInverted)
     }
 
-    func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? {
-        runtime.featheredSelection(selection, canvasSize: canvasSize, radius: radius)
+    func featheredSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, radius: Int) -> CanvasSelection? {
+        runtime.featheredSelection(selection, canvasGeometry: canvasGeometry, radius: radius)
     }
 
     func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? {
         runtime.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode)
     }
 
-    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? {
-        runtime.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize)
+    func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasGeometry: PixelGeometry) -> CanvasSelection? {
+        runtime.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasGeometry: canvasGeometry)
     }
 
-    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? {
-        runtime.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize)
+    func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasGeometry: PixelGeometry) -> CanvasSelection? {
+        runtime.makeRectangleSelection(from: startPoint, to: endPoint, canvasGeometry: canvasGeometry)
     }
 
-    func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
-        runtime.makeLassoSelection(from: points, canvasSize: canvasSize)
+    func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry) -> CanvasSelection? {
+        runtime.makeLassoSelection(from: points, canvasGeometry: canvasGeometry)
     }
 
     func makeAutoSelection(

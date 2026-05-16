@@ -120,7 +120,7 @@ struct DocumentContentServiceTests {
                 activeLayerIndex: 7,
                 activeTextLayer: nil,
                 selection: nil,
-                canvasSize: CGSize(width: 2, height: 2)
+                canvasGeometry: PixelGeometry(width: 2, height: 2)!
             )
         )
 
@@ -471,7 +471,7 @@ private final class RecordingLayerTransformProcessor: LayerTransformProcessing, 
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         selection
     }

@@ -58,12 +58,9 @@ public struct ValidatedLayerProcessingRequest: Equatable, Sendable {
         canvasGeometry: PixelGeometry? = nil
     ) -> String? {
         switch request {
-        case let .transform(translation, scale, rotationDegrees, selection):
+        case let .transform(request):
             guard let boundedRequest = CanvasBoundedTransformRequest(
-                translation: translation,
-                scale: scale,
-                rotationDegrees: rotationDegrees,
-                selection: selection,
+                request,
                 canvasGeometry: canvasGeometry
             ) else {
                 return "transform"
@@ -83,22 +80,16 @@ public struct CanvasBoundedTransformRequest: Equatable, Sendable {
     public let selection: CanvasSelection?
 
     package init?(
-        translation: CGSize,
-        scale: CGFloat,
-        rotationDegrees: Double,
-        selection: CanvasSelection?,
+        _ request: LayerTransformProcessingRequest,
         canvasGeometry: PixelGeometry?
     ) {
-        guard let translation = FiniteTranslation(translation),
-              let scale = TransformScale(scale),
-              let rotationDegrees = RotationDegrees(rotationDegrees),
-              Self.isValid(selection: selection, canvasGeometry: canvasGeometry) else {
+        guard Self.isValid(selection: request.selection, canvasGeometry: canvasGeometry) else {
             return nil
         }
-        self.translation = translation
-        self.scale = scale
-        self.rotationDegrees = rotationDegrees
-        self.selection = selection
+        self.translation = request.translation
+        self.scale = request.scale
+        self.rotationDegrees = request.rotationDegrees
+        self.selection = request.selection
     }
 
     private static func isValid(selection: CanvasSelection?, canvasGeometry: PixelGeometry?) -> Bool {

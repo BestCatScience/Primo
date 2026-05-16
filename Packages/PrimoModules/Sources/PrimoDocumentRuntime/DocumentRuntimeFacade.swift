@@ -720,13 +720,13 @@ public struct LayerSelectionEditingRuntime: Sendable {
         self.selectionWorkflow = services.selectionWorkflow
     }
 
-    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
-    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
+    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasGeometry: PixelGeometry) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasGeometry: canvasGeometry) }
+    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasGeometry: PixelGeometry) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasGeometry: canvasGeometry) }
     public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
-    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
-    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
-    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
-    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
+    public func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasGeometry: canvasGeometry, expansion: expansion, isInverted: isInverted) }
+    public func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasGeometry: canvasGeometry, mode: mode) }
+    public func featheredSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasGeometry: canvasGeometry, radius: radius) }
+    public func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasGeometry: canvasGeometry) }
     public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
     public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
     public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selectionWorkflow.expandedSelectionMask(source, expansion: expansion) }
@@ -734,7 +734,7 @@ public struct LayerSelectionEditingRuntime: Sendable {
     public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selectionWorkflow.featheredSelectionMask(source, radius: radius) }
     public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selectionWorkflow.invertedSelectionMask(source) }
     public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, mode: mode) }
-    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
+    public func closedPolygon(_ points: [CGPoint], canvasGeometry: PixelGeometry) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasGeometry: canvasGeometry) }
 }
 
 public struct LayerTransformEditingRuntime: Sendable {
@@ -781,7 +781,7 @@ public struct LayerTransformEditingRuntime: Sendable {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         layerTransformProcessor.transformedSelection(
             selection,
@@ -792,7 +792,7 @@ public struct LayerTransformEditingRuntime: Sendable {
             pivot: pivot,
             mode: mode,
             quadOffsets: quadOffsets,
-            canvasSize: canvasSize
+            canvasGeometry: canvasGeometry
         )
     }
 
@@ -952,7 +952,7 @@ public struct LayerEditingRuntime: Sendable {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         transform.transformedSelection(
             selection,
@@ -963,20 +963,20 @@ public struct LayerEditingRuntime: Sendable {
             pivot: pivot,
             mode: mode,
             quadOffsets: quadOffsets,
-            canvasSize: canvasSize
+            canvasGeometry: canvasGeometry
         )
     }
 
     public func transformationBounds(selection: CanvasSelection?, surface: RgbaSurface) -> CGRect? {
         transform.transformationBounds(selection: selection, surface: surface)
     }
-    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selection.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
-    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selection.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
+    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasGeometry: PixelGeometry) -> CanvasSelection? { selection.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasGeometry: canvasGeometry) }
+    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasGeometry: PixelGeometry) -> CanvasSelection? { selection.makeRectangleSelection(from: startPoint, to: endPoint, canvasGeometry: canvasGeometry) }
     public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { self.selection.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
-    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { self.selection.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
-    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { self.selection.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
-    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { self.selection.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
-    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selection.makeLassoSelection(from: points, canvasSize: canvasSize) }
+    public func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool) -> CanvasSelection? { self.selection.adjustedSelection(selection, canvasGeometry: canvasGeometry, expansion: expansion, isInverted: isInverted) }
+    public func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode) -> CanvasSelection? { self.selection.invertedSelection(selection, canvasGeometry: canvasGeometry, mode: mode) }
+    public func featheredSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, radius: Int) -> CanvasSelection? { self.selection.featheredSelection(selection, canvasGeometry: canvasGeometry, radius: radius) }
+    public func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry) -> CanvasSelection? { selection.makeLassoSelection(from: points, canvasGeometry: canvasGeometry) }
     public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selection.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
     public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selection.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
     public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selection.expandedSelectionMask(source, expansion: expansion) }
@@ -984,7 +984,7 @@ public struct LayerEditingRuntime: Sendable {
     public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selection.featheredSelectionMask(source, radius: radius) }
     public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selection.invertedSelectionMask(source) }
     public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selection.croppedSelection(from: source, mode: mode) }
-    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selection.closedPolygon(points, canvasSize: canvasSize) }
+    public func closedPolygon(_ points: [CGPoint], canvasGeometry: PixelGeometry) -> [CGPoint] { selection.closedPolygon(points, canvasGeometry: canvasGeometry) }
 }
 
 package struct CanvasStrokeRuntime: Sendable {

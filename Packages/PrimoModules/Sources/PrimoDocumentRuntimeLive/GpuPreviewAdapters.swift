@@ -60,7 +60,7 @@ package struct GpuLayerTransformProcessor: LayerTransformProcessing {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         processor.transformedSelection(
             selection,
@@ -71,7 +71,7 @@ package struct GpuLayerTransformProcessor: LayerTransformProcessing {
             pivot: pivot,
             mode: mode,
             quadOffsets: quadOffsets,
-            canvasSize: canvasSize
+            canvasGeometry: canvasGeometry
         )
     }
 

@@ -8,10 +8,11 @@ import PrimoDocumentRuntime
 
 extension CanvasEditingWorkflowReducer {
     func handleInvertSelection(state: inout State) {
+        guard let canvasGeometry = canvasGeometry(in: state) else { return }
         state.canvas.replaceSelection(
             selectionWorkflowService.invertedSelection(
                 state.canvas.selection,
-                canvasSize: state.canvas.canvasSize,
+                canvasGeometry: canvasGeometry,
                 mode: state.canvas.selectionMode
             )
         )
@@ -22,10 +23,11 @@ extension CanvasEditingWorkflowReducer {
         expansion: Int
     ) {
         guard state.canvas.selection != nil else { return }
+        guard let canvasGeometry = canvasGeometry(in: state) else { return }
         state.canvas.replaceSelection(
             selectionWorkflowService.adjustedSelection(
                 state.canvas.selection,
-                canvasSize: state.canvas.canvasSize,
+                canvasGeometry: canvasGeometry,
                 expansion: expansion,
                 isInverted: false
             )
@@ -37,10 +39,11 @@ extension CanvasEditingWorkflowReducer {
         radius: Int
     ) {
         guard state.canvas.selection != nil else { return }
+        guard let canvasGeometry = canvasGeometry(in: state) else { return }
         state.canvas.replaceSelection(
             selectionWorkflowService.featheredSelection(
                 state.canvas.selection,
-                canvasSize: state.canvas.canvasSize,
+                canvasGeometry: canvasGeometry,
                 radius: radius
             )
         )
@@ -51,6 +54,7 @@ extension CanvasEditingWorkflowReducer {
         request: ColorRangeSelectionRequest
     ) -> Effect<Action> {
         guard
+            let canvasGeometry = canvasGeometry(in: state),
             case let .success(activeLayerIndex) = documentWorkflowCommandValidator.existingLayerIndex(
                 state.canvas.activeLayerIndex,
                 in: state
@@ -68,7 +72,7 @@ extension CanvasEditingWorkflowReducer {
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasGeometry: canvasGeometry
         )
         state.canvas.replaceSelection(selection)
         return .none
@@ -78,6 +82,7 @@ extension CanvasEditingWorkflowReducer {
         state: inout State,
         points: [CGPoint]
     ) -> Effect<Action> {
+        guard let canvasGeometry = canvasGeometry(in: state) else { return .none }
         let incomingSelection: CanvasSelection?
         switch state.canvas.selectionMode {
         case .rectangle:
@@ -85,12 +90,12 @@ extension CanvasEditingWorkflowReducer {
             incomingSelection = selectionWorkflowService.makeRectangleSelection(
                 from: startPoint,
                 to: endPoint,
-                canvasSize: state.canvas.canvasSize
+                canvasGeometry: canvasGeometry
             )
         case .lasso:
             incomingSelection = selectionWorkflowService.makeLassoSelection(
                 from: points,
-                canvasSize: state.canvas.canvasSize
+                canvasGeometry: canvasGeometry
             )
         case .auto:
             incomingSelection = nil
@@ -99,7 +104,7 @@ extension CanvasEditingWorkflowReducer {
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasGeometry: canvasGeometry
         )
         state.canvas.replaceSelection(selection)
         return .none
@@ -110,6 +115,7 @@ extension CanvasEditingWorkflowReducer {
         sample: StylusSample
     ) -> Effect<Action> {
         guard
+            let canvasGeometry = canvasGeometry(in: state),
             case let .success(activeLayerIndex) = documentWorkflowCommandValidator.existingLayerIndex(
                 state.canvas.activeLayerIndex,
                 in: state
@@ -130,10 +136,20 @@ extension CanvasEditingWorkflowReducer {
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasGeometry: canvasGeometry
         )
         state.canvas.replaceSelection(selection)
         return .none
+    }
+
+    func canvasGeometry(in state: State) -> PixelGeometry? {
+        if let snapshot = state.canvas.renderSnapshot,
+           let geometry = PixelGeometry(width: snapshot.width, height: snapshot.height) {
+            return geometry
+        }
+        let width = max(Int(state.canvas.canvasSize.width.rounded()), 1)
+        let height = max(Int(state.canvas.canvasSize.height.rounded()), 1)
+        return PixelGeometry(width: width, height: height)
     }
 
     func handlePreviewSelectionMove(

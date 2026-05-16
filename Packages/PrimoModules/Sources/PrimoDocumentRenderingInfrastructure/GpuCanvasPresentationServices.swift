@@ -407,11 +407,11 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasGeometry: PixelGeometry
     ) -> CanvasSelection? {
         guard let selection else { return nil }
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
         let selectionWorkflow = SelectionWorkflowService(operations: selectionOperations)
         guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil

@@ -1230,8 +1230,15 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func setTextLayer(_ index: EditableLayerIndex, _ textLayer: TextLayerData)",
             "public func clearTextLayerData(_ index: EditableLayerIndex)",
             "public func transformedLayerPixels( source: RgbaSurface, selection: CanvasSelection?, translation: CGSize, scaleX: CGFloat, scaleY: CGFloat, rotationDegrees: Double, pivot: CGPoint?, mode: CanvasTransformMode, quadOffsets: TransformQuadOffsets )",
+            "public func transformedSelection( _ selection: CanvasSelection?, translation: CGSize, scaleX: CGFloat, scaleY: CGFloat, rotationDegrees: Double, pivot: CGPoint?, mode: CanvasTransformMode, quadOffsets: TransformQuadOffsets, canvasGeometry: PixelGeometry )",
             "public func transformationBounds(selection: CanvasSelection?, surface: RgbaSurface)",
+            "public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasGeometry: PixelGeometry)",
+            "public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasGeometry: PixelGeometry)",
             "public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry)",
+            "public func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool)",
+            "public func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode)",
+            "public func featheredSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, radius: Int)",
+            "public func makeLassoSelection(from points: [CGPoint], canvasGeometry: PixelGeometry)",
             "public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int)",
             "public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode)",
             "public func expandedSelectionMask(_ source: MaskSurface, expansion: Int)",
@@ -1292,6 +1299,25 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(
             !renderingWorkflowBody.contains("(MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>"),
             "DocumentRenderingWorkflow should store typed composited preview handlers and bridge raw rendering operations at construction"
+        )
+        let rasterSelectionFunctionNames: Set<String> = [
+            "combinedSelection",
+            "makeRectangleSelection",
+            "adjustedSelection",
+            "invertedSelection",
+            "featheredSelection",
+            "makeLassoSelection",
+            "closedPolygon",
+            "transformedSelection"
+        ]
+        let publicSelectionCGSizeFunctions = publicCallables.filter { callable in
+            callable.kind == "func" &&
+                rasterSelectionFunctionNames.contains(callable.name) &&
+                callable.hasParameter(named: "canvasSize", type: "CGSize")
+        }
+        #expect(
+            publicSelectionCGSizeFunctions.isEmpty,
+            "Public raster selection APIs should accept PixelGeometry instead of presentation CGSize: \(publicSelectionCGSizeFunctions.map(\.signature))"
         )
         #expect(
             renderingWorkflowBody.contains("(MetalDocumentSnapshot, ExistingLayerIndex, RgbaSurface) -> DocumentRenderingResult<Data>"),
@@ -2061,6 +2087,27 @@ struct GpuSideEffectIsolationArchitectureTests {
         for token in banned {
             #expect(!body.contains(token), "Runtime contract type \(token) should live in a narrow contract target")
         }
+    }
+
+    @Test
+    func layerProcessingTransformRequestUsesTypedValueObjectsAtPublicBoundary() throws {
+        let repoRoot = try Self.repoRoot()
+        let mutationContracts = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: mutationContracts, encoding: .utf8)
+        let processingRequest = try #require(Self.typeBody(named: "LayerProcessingRequest", in: body))
+        let transformRequest = try #require(Self.typeBody(named: "LayerTransformProcessingRequest", in: body))
+
+        #expect(processingRequest.contains("case transform(LayerTransformProcessingRequest)"))
+        #expect(!processingRequest.contains("case transform(translation: CGSize"))
+        #expect(transformRequest.contains("public let translation: FiniteTranslation"))
+        #expect(transformRequest.contains("public let scale: TransformScale"))
+        #expect(transformRequest.contains("public let rotationDegrees: RotationDegrees"))
+        #expect(!transformRequest.contains("public let translation: CGSize"))
+        #expect(!transformRequest.contains("public let scale: CGFloat"))
+        #expect(!transformRequest.contains("public let rotationDegrees: Double"))
     }
 
     @Test

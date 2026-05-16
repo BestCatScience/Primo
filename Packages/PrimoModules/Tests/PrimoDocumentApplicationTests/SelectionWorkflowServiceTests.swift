@@ -23,7 +23,7 @@ struct SelectionWorkflowServiceTests {
             existing: nil,
             incoming: incoming,
             mode: .replace,
-            canvasSize: CGSize(width: 1, height: 1)
+            canvasGeometry: PixelGeometry(width: 1, height: 1)!
         )
 
         #expect(result == incoming)
@@ -35,7 +35,7 @@ struct SelectionWorkflowServiceTests {
 
         let result = service.makeLassoSelection(
             from: [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 1)],
-            canvasSize: CGSize(width: 4, height: 4)
+            canvasGeometry: PixelGeometry(width: 4, height: 4)!
         )
 
         #expect(result == nil)
@@ -53,7 +53,7 @@ struct SelectionWorkflowServiceTests {
                     CGPoint(x: 4, y: 4),
                     CGPoint(x: 1, y: 4)
                 ],
-                canvasSize: CGSize(width: 6, height: 6)
+                canvasGeometry: PixelGeometry(width: 6, height: 6)!
             )
         )
 
@@ -70,7 +70,7 @@ struct SelectionWorkflowServiceTests {
             service.makeRectangleSelection(
                 from: CGPoint(x: -2, y: 1),
                 to: CGPoint(x: 3, y: 4),
-                canvasSize: CGSize(width: 5, height: 5)
+                canvasGeometry: PixelGeometry(width: 5, height: 5)!
             )
         )
 
@@ -88,7 +88,7 @@ struct SelectionWorkflowServiceTests {
         let selection = service.makeRectangleSelection(
             from: CGPoint(x: 2, y: 2),
             to: CGPoint(x: 2, y: 5),
-            canvasSize: CGSize(width: 6, height: 6)
+            canvasGeometry: PixelGeometry(width: 6, height: 6)!
         )
 
         #expect(selection == nil)
@@ -101,7 +101,7 @@ struct SelectionWorkflowServiceTests {
         let selection = try #require(
             service.invertedSelection(
                 nil,
-                canvasSize: CGSize(width: 2, height: 2),
+                canvasGeometry: PixelGeometry(width: 2, height: 2)!,
                 mode: .auto
             )
         )

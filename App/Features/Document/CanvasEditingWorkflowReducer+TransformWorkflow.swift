@@ -59,6 +59,10 @@ extension CanvasEditingWorkflowReducer {
             state.canvas.resetStrokePreview()
             return .none
         }
+        guard let canvasGeometry = canvasGeometry(in: state) else {
+            state.canvas.resetStrokePreview()
+            return .none
+        }
         let selection = state.canvas.selectionMoveSourceSelection ?? state.canvas.selection
 
         let outcome = canvasEditingWorkflowService.execute(
@@ -75,7 +79,7 @@ extension CanvasEditingWorkflowReducer {
                 activeLayerIndex: state.canvas.activeLayerIndex,
                 activeTextLayer: state.canvas.activeTextLayer,
                 selection: selection,
-                canvasSize: state.canvas.canvasSize
+                canvasGeometry: canvasGeometry
             )
         )
 
