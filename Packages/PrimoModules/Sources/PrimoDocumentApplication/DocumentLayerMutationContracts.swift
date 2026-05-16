@@ -32,10 +32,44 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
 
 public struct DocumentLayerMutationContext: Sendable {
     public let revision: DocumentRevision
-    public let layerCount: Int
+    public let layerIndexes: LayerIndexSet
     public let folderIDs: Set<Int>
     public let canvasGeometry: PixelGeometry?
     public let isLayerLocked: @Sendable (Int) -> Bool
+
+    public var layerCount: Int {
+        layerIndexes.count
+    }
+
+    public init(
+        revision: DocumentRevision = .initial,
+        layerIndexes: LayerIndexSet,
+        folderIDs: Set<Int>,
+        canvasGeometry: PixelGeometry? = nil,
+        isLayerLocked: @escaping @Sendable (Int) -> Bool
+    ) {
+        self.revision = revision
+        self.layerIndexes = layerIndexes
+        self.folderIDs = folderIDs
+        self.canvasGeometry = canvasGeometry
+        self.isLayerLocked = isLayerLocked
+    }
+
+    public init<S: Sequence>(
+        revision: DocumentRevision = .initial,
+        layerIndexes: S,
+        folderIDs: Set<Int>,
+        canvasGeometry: PixelGeometry? = nil,
+        isLayerLocked: @escaping @Sendable (Int) -> Bool
+    ) where S.Element == Int {
+        self.init(
+            revision: revision,
+            layerIndexes: LayerIndexSet(layerIndexes),
+            folderIDs: folderIDs,
+            canvasGeometry: canvasGeometry,
+            isLayerLocked: isLayerLocked
+        )
+    }
 
     public init(
         revision: DocumentRevision = .initial,
@@ -44,11 +78,13 @@ public struct DocumentLayerMutationContext: Sendable {
         canvasGeometry: PixelGeometry? = nil,
         isLayerLocked: @escaping @Sendable (Int) -> Bool
     ) {
-        self.revision = revision
-        self.layerCount = layerCount
-        self.folderIDs = folderIDs
-        self.canvasGeometry = canvasGeometry
-        self.isLayerLocked = isLayerLocked
+        self.init(
+            revision: revision,
+            layerIndexes: .contiguous(count: layerCount),
+            folderIDs: folderIDs,
+            canvasGeometry: canvasGeometry,
+            isLayerLocked: isLayerLocked
+        )
     }
 
     public init(
@@ -66,8 +102,12 @@ public struct DocumentLayerMutationContext: Sendable {
         )
     }
 
+    public func containsLayerIndex(_ rawValue: Int) -> Bool {
+        layerIndexes.contains(rawValue)
+    }
+
     public func existingLayerIndex(_ rawValue: Int) -> ExistingLayerIndex? {
-        guard (0..<layerCount).contains(rawValue) else { return nil }
+        guard containsLayerIndex(rawValue) else { return nil }
         return ExistingLayerIndex(rawValue, revision: revision)
     }
 
@@ -75,7 +115,7 @@ public struct DocumentLayerMutationContext: Sendable {
         EditableLayerIndex.validated(
             rawValue,
             revision: revision,
-            layerCount: layerCount,
+            layerIndexes: layerIndexes,
             isLayerLocked: isLayerLocked
         )
     }

@@ -228,7 +228,9 @@ struct GpuSideEffectIsolationArchitectureTests {
         let repoRoot = try Self.repoRoot()
         let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
         let documentFeature = documentRoot.appendingPathComponent("DocumentFeature.swift", isDirectory: false)
+        let documentEditingRouter = documentRoot.appendingPathComponent("DocumentEditingRouter.swift", isDirectory: false)
         let body = try String(contentsOf: documentFeature, encoding: .utf8)
+        let routerBody = try String(contentsOf: documentEditingRouter, encoding: .utf8)
         let workflowReducers = [
             ("PresentationRefreshReducer", "presentation"),
             ("DocumentLifecycleReducer", "lifecycle"),
@@ -249,6 +251,14 @@ struct GpuSideEffectIsolationArchitectureTests {
             body.contains("Scope(state: \\.self, action: \\.aiImageWorkflow)") && body.contains("AIImageWorkflowReducer()"),
             "AIImageWorkflowReducer should remain the only parent-state workflow while it owns job identity"
         )
+        #expect(body.contains("DocumentEditingRouter()"), "DocumentFeature should delegate editing action fan-out to DocumentEditingRouter")
+        #expect(routerBody.contains("struct DocumentEditingRouter: Reducer"), "DocumentEditingRouter should own parent-level routing")
+        #expect(routerBody.contains(".send(.canvasEditing(.brushPalette(brushPaletteAction)))"))
+        #expect(routerBody.contains(".send(.layerWorkflow(.brushPalette(brushPaletteAction)))"))
+        #expect(routerBody.contains(".send(.canvasEditing(.layerSidebar(layerSidebarAction)))"))
+        #expect(routerBody.contains(".send(.layerWorkflow(.layerSidebar(layerSidebarAction)))"))
+        #expect(!body.contains(".send(.canvasEditing(.brushPalette("), "DocumentFeature should not own brush palette fan-out")
+        #expect(!body.contains(".send(.layerWorkflow(.brushPalette("), "DocumentFeature should not own brush palette fan-out")
 
         #expect(Self.dependencyKeys(in: body).isEmpty, "DocumentFeature.swift should not own workflow dependencies")
         #expect(!body.contains("DocumentFeature()"), "DocumentFeature.swift should not instantiate itself as a workflow shell")
@@ -942,6 +952,199 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func nonDocumentRuntimeFacadesKeepInfrastructureOutOfPublicSurface() throws {
+        let repoRoot = try Self.repoRoot()
+        let runtimeSources = [
+            "Packages/PrimoModules/Sources/PrimoAIImageRuntime/AIImageRuntimeFacade.swift",
+            "Packages/PrimoModules/Sources/PrimoWorkspaceRuntime/WorkspaceRuntimeFacade.swift",
+            "Packages/PrimoModules/Sources/PrimoBrushRuntime/BrushRuntimeFacade.swift"
+        ]
+        let leakedImplementationTokens = [
+            "PrimoAIImageInfrastructure",
+            "PrimoBrushInfrastructure",
+            "PrimoWorkspaceInfrastructure",
+            "PrimoDocumentRuntimeLive"
+        ]
+
+        for relativePath in runtimeSources {
+            let body = try String(
+                contentsOf: repoRoot.appendingPathComponent(relativePath, isDirectory: false),
+                encoding: .utf8
+            )
+            #expect(Self.exportedImports(in: body).isEmpty, "\(relativePath) should not re-export implementation modules")
+            #expect(Self.publicTopLevelTypealiases(in: body).isEmpty, "\(relativePath) should not publish typealiases to implementation types")
+
+            let publicSurface = Self.callables(accessLevel: "public", in: body).map(\.signature) +
+                Self.storedProperties(accessLevel: "public", in: body).compactMap(\.type)
+            for token in leakedImplementationTokens {
+                #expect(
+                    publicSurface.allSatisfy { !$0.contains(token) },
+                    "\(relativePath) public signatures and stored properties should not expose \(token)"
+                )
+            }
+        }
+    }
+
+    @Test
+    func nonDocumentRuntimeFacadesOwnTheirLiveWiringBoundaries() throws {
+        let repoRoot = try Self.repoRoot()
+        let graph = try Self.packageTargetGraph()
+        let runtimeExpectations = [
+            (
+                target: "PrimoAIImageRuntime",
+                sourcePath: "Packages/PrimoModules/Sources/PrimoAIImageRuntime/AIImageRuntimeFacade.swift",
+                expectedDependencies: Set(["PrimoAIImageApplication", "PrimoAIImageInfrastructure"]),
+                allowedImplementationImports: Set(["PrimoAIImageInfrastructure"]),
+                liveTokens: [
+                    "AIImageRuntimeFactory.settingsClient(",
+                    "AIImageRuntimeFactory.commerceClient(",
+                    "AIImageRuntimeFactory.remoteEditClient("
+                ]
+            ),
+            (
+                target: "PrimoWorkspaceRuntime",
+                sourcePath: "Packages/PrimoModules/Sources/PrimoWorkspaceRuntime/WorkspaceRuntimeFacade.swift",
+                expectedDependencies: Set(["PrimoWorkspaceApplication", "PrimoWorkspaceInfrastructure", "PrimoDocumentRuntime", "PrimoDocumentRuntimeLive"]),
+                allowedImplementationImports: Set(["PrimoWorkspaceInfrastructure", "PrimoDocumentRuntimeLive"]),
+                liveTokens: [
+                    "DocumentWorkspaceClient.infrastructureLive(",
+                    "DocumentImportClient.infrastructureLive(",
+                    "DocumentProjectPreviewLoader.loadPreview(",
+                    "WorkspaceApplicationServices("
+                ]
+            ),
+            (
+                target: "PrimoBrushRuntime",
+                sourcePath: "Packages/PrimoModules/Sources/PrimoBrushRuntime/BrushRuntimeFacade.swift",
+                expectedDependencies: Set(["PrimoBrushRuntimeContracts", "PrimoBrushInfrastructure", "PrimoBrushFileFormats"]),
+                allowedImplementationImports: Set(["PrimoBrushInfrastructure", "PrimoBrushFileFormats"]),
+                liveTokens: [
+                    "PrimoBrushInfrastructure.BrushTipLibraryClient.live(",
+                    "PrimoBrushInfrastructure.TextFontLibraryClient.live(",
+                    "PrimoBrushInfrastructure.BrushImportService.live("
+                ]
+            )
+        ]
+        let allImplementationModules: Set<String> = [
+            "PrimoAIImageInfrastructure",
+            "PrimoBrushInfrastructure",
+            "PrimoBrushFileFormats",
+            "PrimoDocumentRuntimeLive",
+            "PrimoWorkspaceInfrastructure"
+        ]
+
+        for expectation in runtimeExpectations {
+            let dependencies = try #require(graph[expectation.target])
+            for dependency in expectation.expectedDependencies {
+                #expect(
+                    dependencies.contains(dependency),
+                    "\(expectation.target) should own the live boundary dependency on \(dependency)"
+                )
+            }
+            #expect(
+                dependencies.intersection(allImplementationModules).isSubset(of: expectation.allowedImplementationImports),
+                "\(expectation.target) should not reach unrelated implementation modules"
+            )
+
+            let body = try String(
+                contentsOf: repoRoot.appendingPathComponent(expectation.sourcePath, isDirectory: false),
+                encoding: .utf8
+            )
+            let imports = Self.swiftImports(in: body)
+            #expect(
+                imports.intersection(allImplementationModules) == expectation.allowedImplementationImports,
+                "\(expectation.sourcePath) should make its implementation imports explicit and local"
+            )
+            let semanticBody = Self.swiftCodeWithCommentsAndStringsBlanked(in: body)
+            for token in expectation.liveTokens {
+                #expect(semanticBody.contains(token), "\(expectation.sourcePath) should own live wiring token \(token)")
+            }
+        }
+    }
+
+    @Test
+    func appUsesAIWorkspaceAndBrushRuntimeFacadesInsteadOfConcreteInfrastructure() throws {
+        let repoRoot = try Self.repoRoot()
+        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
+        let appSources = try Self.swiftSources(under: appRoot)
+        let appBodies = try appSources.map { try String(contentsOf: $0, encoding: .utf8) }
+        let appImports = Set(appBodies.flatMap(Self.swiftImports(in:)))
+        let requiredRuntimeFacades: Set<String> = [
+            "PrimoAIImageRuntime",
+            "PrimoBrushRuntime",
+            "PrimoWorkspaceRuntime"
+        ]
+        let bannedImplementationImports: Set<String> = [
+            "PrimoAIImageInfrastructure",
+            "PrimoBrushInfrastructure",
+            "PrimoWorkspaceInfrastructure",
+            "PrimoDocumentRuntimeLive"
+        ]
+
+        #expect(
+            requiredRuntimeFacades.isSubset(of: appImports),
+            "App should import non-document runtime facades for live AI image, workspace, and brush dependencies"
+        )
+        #expect(
+            appImports.isDisjoint(with: bannedImplementationImports),
+            "App should not import concrete AI image, workspace, brush, or document live infrastructure"
+        )
+
+        let requiredRuntimeCallSites = [
+            (
+                path: "App/Features/Document/AIImageDependencies.swift",
+                imports: Set(["PrimoAIImageRuntime"]),
+                tokens: [
+                    "AIImageSettingsClient.live(",
+                    "AIImageCommerceClient.live(",
+                    "AIImageRemoteEditClient.live("
+                ]
+            ),
+            (
+                path: "App/Features/Document/DocumentWorkspaceClient.swift",
+                imports: Set(["PrimoWorkspaceRuntime"]),
+                tokens: [
+                    "static var liveValue: DocumentWorkspaceClient",
+                    "return .live("
+                ]
+            ),
+            (
+                path: "App/Support/DocumentImportClient.swift",
+                imports: Set(["PrimoWorkspaceRuntime"]),
+                tokens: [
+                    "static var liveValue: DocumentImportClient",
+                    "return .live("
+                ]
+            ),
+            (
+                path: "App/Support/BrushTipFile.swift",
+                imports: Set(["PrimoBrushRuntime"]),
+                tokens: [
+                    "PrimoBrushRuntime.BrushTipLibraryClient.live("
+                ]
+            ),
+            (
+                path: "App/Support/BrushImportClient.swift",
+                imports: Set(["PrimoBrushRuntime"]),
+                tokens: [
+                    "PrimoBrushRuntime.BrushImportService.live("
+                ]
+            )
+        ]
+        for callSite in requiredRuntimeCallSites {
+            let body = try String(
+                contentsOf: repoRoot.appendingPathComponent(callSite.path, isDirectory: false),
+                encoding: .utf8
+            )
+            let imports = Self.swiftImports(in: body)
+            #expect(callSite.imports.isSubset(of: imports), "\(callSite.path) should import its runtime facade")
+            for token in callSite.tokens {
+                #expect(body.contains(token), "\(callSite.path) should route live dependency construction through \(token)")
+            }
+        }
+    }
+
+    @Test
     func publicGpuPreviewAdaptersRequireInjectedOperations() throws {
         let repoRoot = try Self.repoRoot()
         let checkedFiles = [
@@ -1513,6 +1716,30 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
 
         #expect(body.contains("struct DocumentApplicationEnvironment: Sendable"))
+        #expect(body.contains("struct PresentationEnvironment: Sendable"))
+        #expect(body.contains("struct CanvasEditingEnvironment: Sendable"))
+        #expect(body.contains("struct LayerWorkflowEnvironment: Sendable"))
+        #expect(body.contains("struct PersistenceEnvironment: Sendable"))
+        let applicationEnvironmentBody = try #require(Self.typeBody(named: "DocumentApplicationEnvironment", in: applicationEnvironment))
+        #expect(applicationEnvironmentBody.contains("let presentationEnvironment: PresentationEnvironment"))
+        #expect(applicationEnvironmentBody.contains("let canvasEditingEnvironment: CanvasEditingEnvironment"))
+        #expect(applicationEnvironmentBody.contains("let layerWorkflowEnvironment: LayerWorkflowEnvironment"))
+        #expect(applicationEnvironmentBody.contains("let persistenceEnvironment: PersistenceEnvironment"))
+        for directCapability in [
+            "let strokePreviewPort",
+            "let strokeCommitPort",
+            "let layerVisibilityPort",
+            "let layerContentPort",
+            "let selectionProcessingPort",
+            "let canvasTransformPort",
+            "let canvasEditingPresentationPort",
+            "let paperStylePort",
+            "let exportCapability",
+            "let persistenceCapability",
+            "let previewRenderingCapability"
+        ] {
+            #expect(!applicationEnvironmentBody.contains(directCapability), "DocumentApplicationEnvironment should store feature environments instead of \(directCapability)")
+        }
         #expect(body.contains("protocol SelectionWorkflowRequesting: Sendable"))
         #expect(body.contains("protocol StrokePreviewPort"))
         #expect(body.contains("protocol CanvasEditingPresentationPort"))
@@ -1978,10 +2205,17 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         #expect(Self.storedPropertyNames(accessLevel: "public", in: editableLayerIndex) == ["rawValue", "revision"])
         #expect(Self.initializerSignatures(accessLevel: "package", in: editableLayerIndex).contains("package init(_ rawValue: Int)"))
-        #expect(validation.contains("let existingLayerIndex: ExistingLayerIndex"))
-        #expect(validation.contains("let layerIndex: EditableLayerIndex"))
+        let layerEditAuthorization = try #require(Self.declarationBody(named: "LayerEditAuthorization", in: validation))
+        let validatedCommand = try #require(Self.declarationBody(named: "ValidatedDocumentLayerMutationCommand", in: validation))
+        #expect(layerEditAuthorization.contains("let existingLayerIndex: ExistingLayerIndex"))
+        #expect(layerEditAuthorization.contains("let editableLayerIndex: EditableLayerIndex"))
+        #expect(layerEditAuthorization.contains("existingLayerIndex.rawValue == editableLayerIndex.rawValue"))
+        #expect(layerEditAuthorization.contains("existingLayerIndex.revision == editableLayerIndex.revision"))
+        #expect(validatedCommand.contains("let layer: LayerEditAuthorization"))
+        #expect(!validatedCommand.contains("let existingLayerIndex: ExistingLayerIndex"))
+        #expect(!validatedCommand.contains("let layerIndex: EditableLayerIndex"))
         #expect(!validation.contains("let layerIndex: Int"))
-        #expect(adapters.contains("layerIndex: command.layer.layerIndex"))
+        #expect(adapters.contains("layerIndex: command.layer.editableLayerIndex"))
         #expect(adapters.contains("command.existingLayerIndex"))
     }
 
@@ -2676,6 +2910,74 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func layerMutationContextsValidateAgainstLayerIndexSetInsteadOfLayerCountRange() throws {
+        let repoRoot = try Self.repoRoot()
+        let mutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let layerContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let validationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let workflowValidation = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/DocumentWorkflowValidation.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let engineLive = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        let layerIndexSet = try #require(Self.declarationBody(named: "LayerIndexSet", in: mutationContracts))
+        #expect(layerIndexSet.contains("public let rawValues: Set<Int>"))
+        #expect(layerIndexSet.contains("public static func contiguous(count: Int) -> LayerIndexSet"))
+        #expect(layerIndexSet.contains("public func contains(_ rawValue: Int) -> Bool"))
+
+        let editableLayerIndex = try #require(Self.declarationBody(named: "EditableLayerIndex", in: mutationContracts))
+        #expect(editableLayerIndex.contains("layerIndexes: LayerIndexSet"))
+        #expect(editableLayerIndex.contains("layerIndexes.contains(rawValue)"))
+        #expect(!editableLayerIndex.contains("(0..<layerCount).contains(rawValue)"))
+
+        let layerContext = try #require(Self.declarationBody(named: "DocumentLayerMutationContext", in: layerContracts))
+        #expect(layerContext.contains("public let layerIndexes: LayerIndexSet"))
+        #expect(layerContext.contains("public var layerCount: Int"))
+        #expect(layerContext.contains("public func containsLayerIndex(_ rawValue: Int) -> Bool"))
+        #expect(layerContext.contains("guard containsLayerIndex(rawValue) else"))
+        #expect(layerContext.contains("layerIndexes: layerIndexes"))
+        #expect(!layerContext.contains("(0..<layerCount).contains(rawValue)"))
+
+        let validationContext = try #require(Self.declarationBody(named: "DocumentMutationValidationContext", in: validationContracts))
+        #expect(validationContext.contains("public let layerIndexes: LayerIndexSet"))
+        #expect(validationContext.contains("public func containsLayerIndex(_ rawValue: Int) -> Bool"))
+        #expect(validationContracts.contains("guard context.containsLayerIndex(target.index)"))
+        #expect(validationContracts.contains("anchor.index < 0 || context.containsLayerIndex(anchor.index)"))
+        #expect(!validationContracts.contains("(0..<context.layerCount).contains"))
+
+        #expect(workflowValidation.contains("layerIndexes: state.layerSidebar.layers.map(\\.index)"))
+        #expect(engineLive.contains("layerIndexes: presentation.layerRows.map(\\.index)"))
+    }
+
+    @Test
     func noPublicRawIntLayerMutationMethods() throws {
         let repoRoot = try Self.repoRoot()
         let checkedFiles = [
@@ -3086,6 +3388,14 @@ struct GpuSideEffectIsolationArchitectureTests {
         ArchitectureSourceInspector(source: source).properties
             .filter { $0.accessLevel == accessLevel && $0.isStored }
             .map(\.name)
+    }
+
+    private static func storedProperties(
+        accessLevel: String,
+        in source: String
+    ) -> [ArchitectureSourceInspector.Property] {
+        ArchitectureSourceInspector(source: source).properties
+            .filter { $0.accessLevel == accessLevel && $0.isStored }
     }
 
     private static func computedPropertyNames(accessLevel: String, in source: String) -> Set<String> {

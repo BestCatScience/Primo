@@ -382,7 +382,7 @@ public struct DocumentContentService: Sendable {
             context = mutationContext
         }
         guard let index = context.editableLayerIndex(rawValue) else {
-            if (0..<context.layerCount).contains(rawValue), context.isLayerLocked(rawValue) {
+            if context.containsLayerIndex(rawValue), context.isLayerLocked(rawValue) {
                 return .failure(.layerLocked(rawValue))
             }
             return .failure(.invalidLayerIndex(rawValue))
@@ -408,7 +408,7 @@ public struct DocumentContentService: Sendable {
             )
         }
         guard let validated = context.editableLayerIndex(index.rawValue) else {
-            if (0..<context.layerCount).contains(index.rawValue), context.isLayerLocked(index.rawValue) {
+            if context.containsLayerIndex(index.rawValue), context.isLayerLocked(index.rawValue) {
                 return .failure(.layerLocked(index.rawValue))
             }
             return .failure(.invalidLayerIndex(index.rawValue))
@@ -426,7 +426,7 @@ public struct DocumentContentService: Sendable {
         }
         return .success(DocumentLayerMutationContext(
             revision: presentation.revision,
-            layerCount: presentation.layerRows.count,
+            layerIndexes: presentation.layerRows.map(\.index),
             folderIDs: Set(
                 presentation.layerSidebarRows.compactMap { row in
                     guard case let .folder(folder) = row else { return nil }

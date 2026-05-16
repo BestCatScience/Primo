@@ -44,7 +44,7 @@ extension LayerStructureEditingRuntime {
     }
 
     func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        applyLayerSurfaceMutation(command.layerIndex, payload)
+        applyLayerSurfaceMutation(command.editableLayerIndex, payload)
     }
 }
 
@@ -52,7 +52,7 @@ extension LayerContentSubmitting {
     func replaceLayerPixels(_ command: ValidatedLayerContentReplacementCommand) -> DocumentMutationResult {
         replaceLayerPixels(
             LayerPixelReplacementCommand(
-                index: command.layer.layerIndex,
+                index: command.layer.editableLayerIndex,
                 pixelData: command.pixelData
             )
         )
@@ -88,7 +88,7 @@ struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisi
     }
 
     func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        service.applyLayerSurfaceMutation(command.layerIndex.rawValue, payload)
+        service.applyLayerSurfaceMutation(command.editableLayerIndex.rawValue, payload)
     }
 }
 

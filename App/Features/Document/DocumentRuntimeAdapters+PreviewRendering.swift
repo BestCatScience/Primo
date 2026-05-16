@@ -47,7 +47,7 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
             let geometry = PixelGeometry(width: snapshot.width, height: snapshot.height),
             let layerIndex = DocumentLayerMutationContext(
                 revision: DocumentRevision(snapshot.revision),
-                layerCount: snapshot.layers.count,
+                layerIndexes: snapshot.layers.map(\.index),
                 folderIDs: [],
                 isLayerLocked: { _ in false }
             ).existingLayerIndex(activeLayerIndex),
@@ -96,7 +96,7 @@ private struct CanvasPreviewRuntimeEyedropperSampler: CanvasEyedropperSampling {
     ) -> SampledColor? {
         guard let layerIndex = DocumentLayerMutationContext(
             revision: DocumentRevision(snapshot.revision),
-            layerCount: snapshot.layers.count,
+            layerIndexes: snapshot.layers.map(\.index),
             folderIDs: [],
             isLayerLocked: { _ in false }
         ).existingLayerIndex(activeLayerIndex) else {

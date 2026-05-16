@@ -310,7 +310,7 @@ public struct DocumentMutationWorkflowService: Sendable {
                 )
             }
             guard let currentIndex = context.editableLayerIndex(index.rawValue) else {
-                if (0..<context.layerCount).contains(index.rawValue), context.isLayerLocked(index.rawValue) {
+                if context.containsLayerIndex(index.rawValue), context.isLayerLocked(index.rawValue) {
                     return .failure(.layerLocked(index.rawValue))
                 }
                 return .failure(.invalidLayerIndex(index.rawValue))
@@ -388,7 +388,7 @@ public struct DocumentMutationWorkflowService: Sendable {
         case let .success(presentation):
             return .success(DocumentLayerMutationContext(
                 revision: presentation.revision,
-                layerCount: presentation.layerRows.count,
+                layerIndexes: presentation.layerRows.map(\.index),
                 folderIDs: Set(
                     presentation.layerSidebarRows.compactMap { row in
                         guard case let .folder(folder) = row else { return nil }

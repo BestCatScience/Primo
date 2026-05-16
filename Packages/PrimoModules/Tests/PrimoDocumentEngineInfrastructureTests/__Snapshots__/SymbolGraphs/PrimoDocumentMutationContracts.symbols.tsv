@@ -43,6 +43,8 @@ swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO9tone
 swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO9transformyACSo6CGSizeV_14CoreFoundation7CGFloatVSd0ab12PresentationD015CanvasSelectionVSgtcACmF	LayerProcessingRequest.transform(translation:scale:rotationDegrees:selection:)	LayerProcessingRequest.transform(translation:scale:rotationDegrees:selection:)	case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 swift.init	s:30PrimoDocumentMutationContracts0B14HistoryGatewayV7canUndo0G4Redo4undo4redo21trimForMemoryPressureACs6ResultOySbAA0bC7FailureOGyYbc_AMyYbcAJyytALGyYbcANyYbcyyYbctcfc	DocumentHistoryGateway.init(canUndo:canRedo:undo:redo:trimForMemoryPressure:)	init(canUndo:canRedo:undo:redo:trimForMemoryPressure:)	init(canUndo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>, canRedo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>, undo: @escaping @Sendable () -> DocumentMutationResult, redo: @escaping @Sendable () -> DocumentMutationResult, trimForMemoryPressure: @escaping @Sendable () -> Void = {})
 swift.init	s:30PrimoDocumentMutationContracts0B19LayerEffectsGatewayV05mergeE4DownACs6ResultOyytAA0bC7FailureOGSiYbc_tcfc	DocumentLayerEffectsGateway.init(mergeLayerDown:)	init(mergeLayerDown:)	init(mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult)
+swift.init	s:30PrimoDocumentMutationContracts13LayerIndexSetVyACShySiGcfc	LayerIndexSet.init(_:)	init(_:)	init(_ rawValues: Set<Int>)
+swift.init	s:30PrimoDocumentMutationContracts13LayerIndexSetVyACxcSTRzSi7ElementRtzlufc	LayerIndexSet.init(_:)	init(_:)	init<S>(_ rawValues: S) where S : Sequence, S.Element == Int
 swift.init	s:30PrimoDocumentMutationContracts14ThresholdValueV8clampingACSd_tcfc	ThresholdValue.init(clamping:)	init(clamping:)	init(clamping rawValue: Double)
 swift.init	s:30PrimoDocumentMutationContracts14ThresholdValueVyACSgSdcfc	ThresholdValue.init(_:)	init(_:)	init?(_ rawValue: Double)
 swift.init	s:30PrimoDocumentMutationContracts14TransformScaleVyACSg14CoreFoundation7CGFloatVcfc	TransformScale.init(_:)	init(_:)	init?(_ rawValue: CGFloat)
@@ -87,12 +89,15 @@ swift.init	s:30PrimoDocumentMutationContracts26BrightnessContrastSettingsV10brig
 swift.init	s:30PrimoDocumentMutationContracts26BrightnessContrastSettingsV10brightness8contrastAcA16AdjustmentOffsetV_AA0J5ScaleVtcfc	BrightnessContrastSettings.init(brightness:contrast:)	init(brightness:contrast:)	init(brightness: AdjustmentOffset, contrast: AdjustmentScale)
 swift.init	s:30PrimoDocumentMutationContracts31HueSaturationBrightnessSettingsV10hueDegrees10saturation10brightnessACSd_S2dtcfc	HueSaturationBrightnessSettings.init(hueDegrees:saturation:brightness:)	init(hueDegrees:saturation:brightness:)	init(hueDegrees: Double = 0, saturation: Double = 1, brightness: Double = 0)
 swift.init	s:30PrimoDocumentMutationContracts31HueSaturationBrightnessSettingsV10hueDegrees10saturation10brightnessAcA0e10AdjustmentJ0V_AA0M5ScaleVAA0M6OffsetVtcfc	HueSaturationBrightnessSettings.init(hueDegrees:saturation:brightness:)	init(hueDegrees:saturation:brightness:)	init(hueDegrees: HueAdjustmentDegrees, saturation: AdjustmentScale, brightness: AdjustmentOffset)
+swift.method	s:30PrimoDocumentMutationContracts13LayerIndexSetV8containsySbSiF	LayerIndexSet.contains(_:)	contains(_:)	func contains(_ rawValue: Int) -> Bool
 swift.method	s:30PrimoDocumentMutationContracts23GradientMapStopSettingsV12withPositionyACSdF	GradientMapStopSettings.withPosition(_:)	withPosition(_:)	func withPosition(_ position: Double) -> GradientMapStopSettings
 swift.method	s:30PrimoDocumentMutationContracts23GradientMapStopSettingsV12withPositionyAcA0egJ0VF	GradientMapStopSettings.withPosition(_:)	withPosition(_:)	func withPosition(_ position: GradientStopPosition) -> GradientMapStopSettings
 swift.method	s:30PrimoDocumentMutationContracts23GradientMapStopSettingsV9withColoryAC0aB6Domain06CanvasJ0VF	GradientMapStopSettings.withColor(_:)	withColor(_:)	func withColor(_ color: CanvasColor) -> GradientMapStopSettings
 swift.property	s:30PrimoDocumentMutationContracts0B15CreatedFolderIDV8rawValueSivp	DocumentCreatedFolderID.rawValue	rawValue	let rawValue: Int
 swift.property	s:30PrimoDocumentMutationContracts0B17CreatedLayerIndexV8rawValueSivp	DocumentCreatedLayerIndex.rawValue	rawValue	let rawValue: Int
 swift.property	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO14displayMessageSSvp	DocumentGpuMutationFailure.displayMessage	displayMessage	var displayMessage: String { get }
+swift.property	s:30PrimoDocumentMutationContracts13LayerIndexSetV5countSivp	LayerIndexSet.count	count	var count: Int { get }
+swift.property	s:30PrimoDocumentMutationContracts13LayerIndexSetV9rawValuesShySiGvp	LayerIndexSet.rawValues	rawValues	let rawValues: Set<Int>
 swift.property	s:30PrimoDocumentMutationContracts14ThresholdValueV03rawF0Sdvp	ThresholdValue.rawValue	rawValue	let rawValue: Double
 swift.property	s:30PrimoDocumentMutationContracts14TransformScaleV8rawValue14CoreFoundation7CGFloatVvp	TransformScale.rawValue	rawValue	let rawValue: CGFloat
 swift.property	s:30PrimoDocumentMutationContracts15AdjustmentScaleV8rawValueSdvp	AdjustmentScale.rawValue	rawValue	let rawValue: Double
@@ -153,6 +158,7 @@ swift.struct	s:30PrimoDocumentMutationContracts0B14HistoryGatewayV	DocumentHisto
 swift.struct	s:30PrimoDocumentMutationContracts0B15CreatedFolderIDV	DocumentCreatedFolderID	DocumentCreatedFolderID	struct DocumentCreatedFolderID
 swift.struct	s:30PrimoDocumentMutationContracts0B17CreatedLayerIndexV	DocumentCreatedLayerIndex	DocumentCreatedLayerIndex	struct DocumentCreatedLayerIndex
 swift.struct	s:30PrimoDocumentMutationContracts0B19LayerEffectsGatewayV	DocumentLayerEffectsGateway	DocumentLayerEffectsGateway	struct DocumentLayerEffectsGateway
+swift.struct	s:30PrimoDocumentMutationContracts13LayerIndexSetV	LayerIndexSet	LayerIndexSet	struct LayerIndexSet
 swift.struct	s:30PrimoDocumentMutationContracts14ThresholdValueV	ThresholdValue	ThresholdValue	struct ThresholdValue
 swift.struct	s:30PrimoDocumentMutationContracts14TransformScaleV	TransformScale	TransformScale	struct TransformScale
 swift.struct	s:30PrimoDocumentMutationContracts15AdjustmentScaleV	AdjustmentScale	AdjustmentScale	struct AdjustmentScale
@@ -174,6 +180,7 @@ swift.struct	s:30PrimoDocumentMutationContracts23GradientMapStopSettingsV	Gradie
 swift.struct	s:30PrimoDocumentMutationContracts24LevelsAdjustmentSettingsV	LevelsAdjustmentSettings	LevelsAdjustmentSettings	struct LevelsAdjustmentSettings
 swift.struct	s:30PrimoDocumentMutationContracts26BrightnessContrastSettingsV	BrightnessContrastSettings	BrightnessContrastSettings	struct BrightnessContrastSettings
 swift.struct	s:30PrimoDocumentMutationContracts31HueSaturationBrightnessSettingsV	HueSaturationBrightnessSettings	HueSaturationBrightnessSettings	struct HueSaturationBrightnessSettings
+swift.type.method	s:30PrimoDocumentMutationContracts13LayerIndexSetV10contiguous5countACSi_tFZ	LayerIndexSet.contiguous(count:)	contiguous(count:)	static func contiguous(count: Int) -> LayerIndexSet
 swift.type.property	s:30PrimoDocumentMutationContracts15PosterizeLevelsV12allowedRangeSNySiGvpZ	PosterizeLevels.allowedRange	allowedRange	static let allowedRange: ClosedRange<Int>
 swift.typealias	s:30PrimoDocumentMutationContracts0b12CreatedLayerC6Resulta	DocumentCreatedLayerMutationResult	DocumentCreatedLayerMutationResult	typealias DocumentCreatedLayerMutationResult = Result<DocumentCreatedLayerIndex, DocumentMutationFailure>
 swift.typealias	s:30PrimoDocumentMutationContracts0b13CreatedFolderC6Resulta	DocumentCreatedFolderMutationResult	DocumentCreatedFolderMutationResult	typealias DocumentCreatedFolderMutationResult = Result<DocumentCreatedFolderID, DocumentMutationFailure>

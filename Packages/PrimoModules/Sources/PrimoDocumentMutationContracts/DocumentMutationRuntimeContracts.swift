@@ -25,6 +25,30 @@ public struct DocumentCreatedFolderID: Equatable, Sendable {
     }
 }
 
+public struct LayerIndexSet: Equatable, Sendable {
+    public let rawValues: Set<Int>
+
+    public init(_ rawValues: Set<Int>) {
+        self.rawValues = rawValues
+    }
+
+    public init<S: Sequence>(_ rawValues: S) where S.Element == Int {
+        self.rawValues = Set(rawValues)
+    }
+
+    public static func contiguous(count: Int) -> LayerIndexSet {
+        LayerIndexSet(Set(0..<max(0, count)))
+    }
+
+    public var count: Int {
+        rawValues.count
+    }
+
+    public func contains(_ rawValue: Int) -> Bool {
+        rawValues.contains(rawValue)
+    }
+}
+
 public struct EditableLayerIndex: Equatable, Sendable {
     public let rawValue: Int
     public let revision: DocumentRevision
@@ -32,15 +56,42 @@ public struct EditableLayerIndex: Equatable, Sendable {
     package static func validated(
         _ rawValue: Int,
         revision: DocumentRevision = .initial,
-        layerCount: Int,
+        layerIndexes: LayerIndexSet,
         isLayerLocked: (Int) -> Bool
     ) -> EditableLayerIndex? {
         EditableLayerIndex(
             validating: rawValue,
             revision: revision,
-            layerCount: layerCount,
+            layerIndexes: layerIndexes,
             isLayerLocked: isLayerLocked
         )
+    }
+
+    package static func validated(
+        _ rawValue: Int,
+        revision: DocumentRevision = .initial,
+        layerCount: Int,
+        isLayerLocked: (Int) -> Bool
+    ) -> EditableLayerIndex? {
+        validated(
+            rawValue,
+            revision: revision,
+            layerIndexes: .contiguous(count: layerCount),
+            isLayerLocked: isLayerLocked
+        )
+    }
+
+    package init?(
+        validating rawValue: Int,
+        revision: DocumentRevision = .initial,
+        layerIndexes: LayerIndexSet,
+        isLayerLocked: (Int) -> Bool
+    ) {
+        guard layerIndexes.contains(rawValue), !isLayerLocked(rawValue) else {
+            return nil
+        }
+        self.rawValue = rawValue
+        self.revision = revision
     }
 
     package init?(
@@ -49,11 +100,12 @@ public struct EditableLayerIndex: Equatable, Sendable {
         layerCount: Int,
         isLayerLocked: (Int) -> Bool
     ) {
-        guard (0..<layerCount).contains(rawValue), !isLayerLocked(rawValue) else {
-            return nil
-        }
-        self.rawValue = rawValue
-        self.revision = revision
+        self.init(
+            validating: rawValue,
+            revision: revision,
+            layerIndexes: .contiguous(count: layerCount),
+            isLayerLocked: isLayerLocked
+        )
     }
 
     package init(_ rawValue: Int) {

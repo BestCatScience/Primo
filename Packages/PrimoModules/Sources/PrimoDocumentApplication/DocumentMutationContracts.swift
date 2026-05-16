@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentMutationContracts
 
 public struct LayerMutationTarget: Equatable, Sendable {
     public let index: Int
@@ -49,18 +50,50 @@ public enum DocumentMutationValidationIssue: Error, Equatable, Sendable {
 }
 
 public struct DocumentMutationValidationContext: Sendable {
-    public let layerCount: Int
+    public let layerIndexes: LayerIndexSet
     public let folderIDs: Set<Int>
     public let isLayerLocked: @Sendable (Int) -> Bool
+
+    public var layerCount: Int {
+        layerIndexes.count
+    }
+
+    public init(
+        layerIndexes: LayerIndexSet,
+        folderIDs: Set<Int>,
+        isLayerLocked: @escaping @Sendable (Int) -> Bool
+    ) {
+        self.layerIndexes = layerIndexes
+        self.folderIDs = folderIDs
+        self.isLayerLocked = isLayerLocked
+    }
+
+    public init<S: Sequence>(
+        layerIndexes: S,
+        folderIDs: Set<Int>,
+        isLayerLocked: @escaping @Sendable (Int) -> Bool
+    ) where S.Element == Int {
+        self.init(
+            layerIndexes: LayerIndexSet(layerIndexes),
+            folderIDs: folderIDs,
+            isLayerLocked: isLayerLocked
+        )
+    }
 
     public init(
         layerCount: Int,
         folderIDs: Set<Int>,
         isLayerLocked: @escaping @Sendable (Int) -> Bool
     ) {
-        self.layerCount = layerCount
-        self.folderIDs = folderIDs
-        self.isLayerLocked = isLayerLocked
+        self.init(
+            layerIndexes: .contiguous(count: layerCount),
+            folderIDs: folderIDs,
+            isLayerLocked: isLayerLocked
+        )
+    }
+
+    public func containsLayerIndex(_ rawValue: Int) -> Bool {
+        layerIndexes.contains(rawValue)
     }
 }
 
@@ -73,7 +106,7 @@ public struct DocumentMutationValidator: Sendable {
     ) -> DocumentMutationValidationIssue? {
         switch command {
         case let .layer(target, requiresUnlocked):
-            guard (0..<context.layerCount).contains(target.index) else {
+            guard context.containsLayerIndex(target.index) else {
                 return .invalidLayerIndex(target.index)
             }
             if requiresUnlocked, context.isLayerLocked(target.index) {
@@ -88,7 +121,7 @@ public struct DocumentMutationValidator: Sendable {
             return nil
 
         case let .layerAnchor(anchor):
-            guard anchor.index < 0 || (0..<context.layerCount).contains(anchor.index) else {
+            guard anchor.index < 0 || context.containsLayerIndex(anchor.index) else {
                 return .invalidLayerIndex(anchor.index)
             }
             return nil

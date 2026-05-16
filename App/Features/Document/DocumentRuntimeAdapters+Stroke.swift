@@ -30,7 +30,7 @@ extension StrokeEditingRuntime {
         blurStroke(
             command.samples,
             command.brush,
-            layerIndex: command.layer.layerIndex,
+            layerIndex: command.layer.editableLayerIndex,
             clearSelectionAfterBlur: command.clearSelectionAfterBlur
         )
     }
@@ -63,7 +63,7 @@ struct DocumentStrokeCommandMutationSubmitter: StrokeMutationSubmitting, StrokeC
         service.blurStroke(
             command.samples,
             command.brush,
-            command.layer.layerIndex.rawValue,
+            command.layer.editableLayerIndex.rawValue,
             command.clearSelectionAfterBlur
         )
     }

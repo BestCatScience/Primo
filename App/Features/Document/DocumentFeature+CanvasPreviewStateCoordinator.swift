@@ -43,7 +43,7 @@ extension DocumentFeature {
             guard
                 let validatedActiveLayerIndex = DocumentLayerMutationContext(
                     revision: DocumentRevision(baseSnapshot.revision),
-                    layerCount: baseSnapshot.layers.count,
+                    layerIndexes: baseSnapshot.layers.map(\.index),
                     folderIDs: [],
                     isLayerLocked: { _ in false }
                 ).existingLayerIndex(activeLayerIndex),

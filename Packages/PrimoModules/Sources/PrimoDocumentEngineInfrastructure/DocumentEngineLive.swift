@@ -160,7 +160,7 @@ package enum DocumentEngineFactory {
                 let presentation = runtime.lightweightPresentation()
                 let context = DocumentLayerMutationContext(
                     revision: presentation.revision,
-                    layerCount: presentation.layerRows.count,
+                    layerIndexes: presentation.layerRows.map(\.index),
                     folderIDs: Set(
                         presentation.layerSidebarRows.compactMap { row in
                             guard case let .folder(folder) = row else { return nil }

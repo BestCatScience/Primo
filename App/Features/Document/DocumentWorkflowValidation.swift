@@ -8,15 +8,39 @@ import PrimoDocumentPresentationContracts
 // App workflow validation is a preflight / fast feedback layer built from
 // DocumentEditingState. The UI snapshot can be stale, so this capability is
 // not the final contract; application and runtime validation must re-check it.
+struct LayerEditAuthorization: Equatable, Sendable {
+    let existingLayerIndex: ExistingLayerIndex
+    let editableLayerIndex: EditableLayerIndex
+
+    init?(
+        existingLayerIndex: ExistingLayerIndex,
+        editableLayerIndex: EditableLayerIndex
+    ) {
+        guard existingLayerIndex.rawValue == editableLayerIndex.rawValue,
+              existingLayerIndex.revision == editableLayerIndex.revision
+        else {
+            return nil
+        }
+        self.existingLayerIndex = existingLayerIndex
+        self.editableLayerIndex = editableLayerIndex
+    }
+}
+
 struct ValidatedDocumentLayerMutationCommand: Equatable, Sendable {
     let command: DocumentMutationCommand
-    let existingLayerIndex: ExistingLayerIndex
-    let layerIndex: EditableLayerIndex
+    let layer: LayerEditAuthorization
 
-    init(command: DocumentMutationCommand, existingLayerIndex: ExistingLayerIndex, layerIndex: EditableLayerIndex) {
+    init(command: DocumentMutationCommand, layer: LayerEditAuthorization) {
         self.command = command
-        self.existingLayerIndex = existingLayerIndex
-        self.layerIndex = layerIndex
+        self.layer = layer
+    }
+
+    var existingLayerIndex: ExistingLayerIndex {
+        layer.existingLayerIndex
+    }
+
+    var editableLayerIndex: EditableLayerIndex {
+        layer.editableLayerIndex
     }
 }
 
@@ -54,14 +78,19 @@ struct DocumentWorkflowCommandValidator: Sendable {
         guard let existingLayerIndex = layerMutationContext.existingLayerIndex(index) else {
             return .failure(.invalidLayerIndex(index))
         }
-        guard let layerIndex = layerMutationContext.editableLayerIndex(index) else {
+        guard let editableLayerIndex = layerMutationContext.editableLayerIndex(index) else {
+            return .failure(.invalidLayerIndex(index))
+        }
+        guard let authorization = LayerEditAuthorization(
+            existingLayerIndex: existingLayerIndex,
+            editableLayerIndex: editableLayerIndex
+        ) else {
             return .failure(.invalidLayerIndex(index))
         }
         return .success(
             ValidatedDocumentLayerMutationCommand(
                 command: command,
-                existingLayerIndex: existingLayerIndex,
-                layerIndex: layerIndex
+                layer: authorization
             )
         )
     }
@@ -84,7 +113,7 @@ struct DocumentWorkflowCommandValidator: Sendable {
         _ index: Int,
         in state: DocumentEditingState
     ) -> Result<EditableLayerIndex, DocumentMutationFailure> {
-        editableLayerCommand(index: index, in: state).map(\.layerIndex)
+        editableLayerCommand(index: index, in: state).map(\.editableLayerIndex)
     }
 
     func existingFolderID(
@@ -172,7 +201,7 @@ struct DocumentWorkflowCommandValidator: Sendable {
                 .map(\.index)
         )
         return DocumentMutationValidationContext(
-            layerCount: state.layerSidebar.layers.count,
+            layerIndexes: state.layerSidebar.layers.map(\.index),
             folderIDs: Set(
                 state.layerSidebar.rows.compactMap { row in
                     if case let .folder(folder) = row {
@@ -194,7 +223,7 @@ struct DocumentWorkflowCommandValidator: Sendable {
                 .map(\.index)
         )
         return DocumentLayerMutationContext(
-            layerCount: state.layerSidebar.layers.count,
+            layerIndexes: state.layerSidebar.layers.map(\.index),
             folderIDs: Set(
                 state.layerSidebar.rows.compactMap { row in
                     if case let .folder(folder) = row {

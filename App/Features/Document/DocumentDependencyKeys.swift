@@ -30,15 +30,15 @@ extension DependencyValues {
     }
 
     var presentationWorkflowAccess: any PresentationWorkflowAccess {
-        documentApplicationEnvironment.presentationWorkflowAccess
+        documentApplicationEnvironment.presentationEnvironment.presentationWorkflowAccess
     }
 
     var documentCanvasMutationCapability: DocumentCanvasMutationCapability {
-        documentApplicationEnvironment.canvasMutationCapability
+        documentApplicationEnvironment.presentationEnvironment.canvasMutationCapability
     }
 
     var documentLayerMutationCapability: DocumentLayerMutationCapability {
-        documentApplicationEnvironment.layerMutationCapability
+        documentApplicationEnvironment.presentationEnvironment.layerMutationCapability
     }
 
     var layerWorkflowEnvironment: LayerWorkflowEnvironment {
@@ -46,47 +46,47 @@ extension DependencyValues {
     }
 
     var strokePreviewPort: any StrokePreviewPort {
-        documentApplicationEnvironment.strokePreviewPort
+        documentApplicationEnvironment.canvasEditingEnvironment.strokePreviewPort
     }
 
     var strokeCommitPort: any StrokeCommitPort {
-        documentApplicationEnvironment.strokeCommitPort
+        documentApplicationEnvironment.canvasEditingEnvironment.strokeCommitPort
     }
 
     var layerVisibilityPort: any LayerVisibilityPort {
-        documentApplicationEnvironment.layerVisibilityPort
+        documentApplicationEnvironment.canvasEditingEnvironment.layerVisibilityPort
     }
 
     var layerContentPort: any LayerContentPort {
-        documentApplicationEnvironment.layerContentPort
+        documentApplicationEnvironment.canvasEditingEnvironment.layerContentPort
     }
 
     var selectionProcessingPort: any SelectionProcessingPort {
-        documentApplicationEnvironment.selectionProcessingPort
+        documentApplicationEnvironment.canvasEditingEnvironment.selectionProcessingPort
     }
 
     var canvasTransformPort: any CanvasTransformPort {
-        documentApplicationEnvironment.canvasTransformPort
+        documentApplicationEnvironment.canvasEditingEnvironment.canvasTransformPort
     }
 
     var canvasEditingPresentationPort: any CanvasEditingPresentationPort {
-        documentApplicationEnvironment.canvasEditingPresentationPort
+        documentApplicationEnvironment.canvasEditingEnvironment.canvasEditingPresentationPort
     }
 
     var paperStylePort: any PaperStylePort {
-        documentApplicationEnvironment.paperStylePort
+        documentApplicationEnvironment.canvasEditingEnvironment.paperStylePort
     }
 
     var documentExportCapability: DocumentExportCapability {
-        documentApplicationEnvironment.exportCapability
+        documentApplicationEnvironment.persistenceEnvironment.exportCapability
     }
 
     var documentPersistenceCapability: DocumentPersistenceCapability {
-        documentApplicationEnvironment.persistenceCapability
+        documentApplicationEnvironment.persistenceEnvironment.persistenceCapability
     }
 
     var documentPreviewRenderingCapability: DocumentPreviewRenderingCapability {
-        documentApplicationEnvironment.previewRenderingCapability
+        documentApplicationEnvironment.persistenceEnvironment.previewRenderingCapability
     }
 
     var workspaceApplicationWorkflowService: WorkspaceApplicationWorkflowService {

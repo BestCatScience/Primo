@@ -212,7 +212,7 @@ package struct LayerContentMutationCommandValidator: Sendable {
         in context: DocumentLayerMutationContext
     ) -> Result<EditableLayerIndex, DocumentLayerMutationFailure> {
         guard let index = context.editableLayerIndex(rawValue) else {
-            if (0..<context.layerCount).contains(rawValue), context.isLayerLocked(rawValue) {
+            if context.containsLayerIndex(rawValue), context.isLayerLocked(rawValue) {
                 return .failure(.layerLocked(rawValue))
             }
             return .failure(.invalidLayerIndex(rawValue))
