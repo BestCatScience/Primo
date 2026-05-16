@@ -620,22 +620,34 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         let gatewayBody = try #require(Self.declarationBody(named: "DocumentMutationGateway", in: contract))
         #expect(
+            !Self.publicTopLevelSymbols(in: contract).contains("DocumentMutationGateway"),
+            "DocumentMutationGateway is raw mutation authority and should not be public API"
+        )
+        #expect(
+            Self.initializerSignatures(accessLevel: "public", in: gatewayBody).isEmpty,
+            "DocumentMutationGateway should not expose public raw closure initializers"
+        )
+        #expect(
             Self.storedPropertyNames(accessLevel: "public", in: gatewayBody).isEmpty,
             "DocumentMutationGateway raw closure storage should not be public API"
         )
-        let packageStoredProperties = Set(Self.storedPropertyNames(accessLevel: "package", in: gatewayBody))
-        let rawMutationClosures: Set<String> = [
-            "deleteLayer",
-            "setActiveLayer",
-            "replaceLayerPixels",
-            "replaceLayerPixelsInRect",
-            "applyLayerProcessing",
-            "clearLayer",
-            "replaceLayerMask"
+        #expect(
+            Self.storedPropertyNames(accessLevel: "package", in: gatewayBody).isEmpty,
+            "DocumentMutationGateway raw closure storage should be private, not package API"
+        )
+        let packageMethods = Set(Self.functionSignatures(accessLevel: "package", in: gatewayBody).map(Self.normalizedSignature))
+        let rawMutationMethods: Set<String> = [
+            "package func deleteLayer(_ index: Int)",
+            "package func setActiveLayer(_ index: Int)",
+            "package func replaceLayerPixels(_ index: Int, _ pixelData: Data)",
+            "package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data)",
+            "package func applyLayerProcessing(_ index: Int, _ request: LayerProcessingRequest)",
+            "package func clearLayer(_ index: Int)",
+            "package func replaceLayerMask(_ index: Int, _ mask: Data)"
         ]
         #expect(
-            rawMutationClosures.isSubset(of: packageStoredProperties),
-            "DocumentMutationGateway raw mutation closures should stay package-scoped fields"
+            rawMutationMethods.isSubset(of: packageMethods),
+            "DocumentMutationGateway raw operations should be exposed only as package methods"
         )
 
         let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)

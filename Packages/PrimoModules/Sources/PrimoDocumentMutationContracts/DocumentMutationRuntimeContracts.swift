@@ -560,25 +560,25 @@ public enum LayerProcessingRequest: Equatable, Sendable {
     case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 }
 
-public struct DocumentMutationGateway: Sendable {
-    package let resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
-    package let resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
-    package let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
-    package let deleteLayer: @Sendable (Int) -> DocumentMutationResult
-    package let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
-    package let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
-    package let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    package let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
-    package let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
-    package let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
-    package let applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
-    package let applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
-    package let applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
-    package let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
-    package let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
-    package let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
-    package let clearLayer: @Sendable (Int) -> DocumentMutationResult
-    package let applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
+package struct DocumentMutationGateway: Sendable {
+    private let resizeCanvasHandler: @Sendable (Int, Int) -> DocumentMutationResult
+    private let resizeCanvasExtentHandler: @Sendable (Int, Int) -> DocumentMutationResult
+    private let addLayerHandler: @Sendable (String) -> DocumentIndexedMutationResult
+    private let deleteLayerHandler: @Sendable (Int) -> DocumentMutationResult
+    private let setActiveLayerHandler: @Sendable (Int) -> DocumentMutationResult
+    private let setLayerNameHandler: @Sendable (Int, String) -> DocumentMutationResult
+    private let setLayerVisibilityHandler: @Sendable (Int, Bool) -> DocumentMutationResult
+    private let revealLayerForEditingHandler: @Sendable (Int) -> DocumentMutationResult
+    private let replaceLayerPixelsHandler: @Sendable (Int, Data) -> DocumentMutationResult
+    private let replaceLayerPixelsInRectHandler: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
+    private let applyLayerSurfaceMutationHandler: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
+    private let applyLayerMutationHandler: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
+    private let applyTextLayerMutationHandler: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
+    private let replaceLayerMaskHandler: @Sendable (Int, Data) -> DocumentMutationResult
+    private let clearLayerMaskHandler: @Sendable (Int) -> DocumentMutationResult
+    private let applyLayerMaskHandler: @Sendable (Int) -> DocumentMutationResult
+    private let clearLayerHandler: @Sendable (Int) -> DocumentMutationResult
+    private let applyLayerProcessingHandler: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
 
     package init(
         resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
@@ -600,24 +600,96 @@ public struct DocumentMutationGateway: Sendable {
         clearLayer: @escaping @Sendable (Int) -> DocumentMutationResult,
         applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
     ) {
-        self.resizeCanvas = resizeCanvas
-        self.resizeCanvasExtent = resizeCanvasExtent
-        self.addLayer = addLayer
-        self.deleteLayer = deleteLayer
-        self.setActiveLayer = setActiveLayer
-        self.setLayerName = setLayerName
-        self.setLayerVisibility = setLayerVisibility
-        self.revealLayerForEditing = revealLayerForEditing
-        self.replaceLayerPixels = replaceLayerPixels
-        self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
-        self.applyLayerSurfaceMutation = applyLayerSurfaceMutation
-        self.applyLayerMutation = applyLayerMutation
-        self.applyTextLayerMutation = applyTextLayerMutation
-        self.replaceLayerMask = replaceLayerMask
-        self.clearLayerMask = clearLayerMask
-        self.applyLayerMask = applyLayerMask
-        self.clearLayer = clearLayer
-        self.applyLayerProcessing = applyLayerProcessing
+        self.resizeCanvasHandler = resizeCanvas
+        self.resizeCanvasExtentHandler = resizeCanvasExtent
+        self.addLayerHandler = addLayer
+        self.deleteLayerHandler = deleteLayer
+        self.setActiveLayerHandler = setActiveLayer
+        self.setLayerNameHandler = setLayerName
+        self.setLayerVisibilityHandler = setLayerVisibility
+        self.revealLayerForEditingHandler = revealLayerForEditing
+        self.replaceLayerPixelsHandler = replaceLayerPixels
+        self.replaceLayerPixelsInRectHandler = replaceLayerPixelsInRect
+        self.applyLayerSurfaceMutationHandler = applyLayerSurfaceMutation
+        self.applyLayerMutationHandler = applyLayerMutation
+        self.applyTextLayerMutationHandler = applyTextLayerMutation
+        self.replaceLayerMaskHandler = replaceLayerMask
+        self.clearLayerMaskHandler = clearLayerMask
+        self.applyLayerMaskHandler = applyLayerMask
+        self.clearLayerHandler = clearLayer
+        self.applyLayerProcessingHandler = applyLayerProcessing
+    }
+
+    package func resizeCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        resizeCanvasHandler(width, height)
+    }
+
+    package func resizeCanvasExtent(_ width: Int, _ height: Int) -> DocumentMutationResult {
+        resizeCanvasExtentHandler(width, height)
+    }
+
+    package func addLayer(_ name: String) -> DocumentIndexedMutationResult {
+        addLayerHandler(name)
+    }
+
+    package func deleteLayer(_ index: Int) -> DocumentMutationResult {
+        deleteLayerHandler(index)
+    }
+
+    package func setActiveLayer(_ index: Int) -> DocumentMutationResult {
+        setActiveLayerHandler(index)
+    }
+
+    package func setLayerName(_ index: Int, _ name: String) -> DocumentMutationResult {
+        setLayerNameHandler(index, name)
+    }
+
+    package func setLayerVisibility(_ index: Int, _ visible: Bool) -> DocumentMutationResult {
+        setLayerVisibilityHandler(index, visible)
+    }
+
+    package func revealLayerForEditing(_ index: Int) -> DocumentMutationResult {
+        revealLayerForEditingHandler(index)
+    }
+
+    package func replaceLayerPixels(_ index: Int, _ pixelData: Data) -> DocumentMutationResult {
+        replaceLayerPixelsHandler(index, pixelData)
+    }
+
+    package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult {
+        replaceLayerPixelsInRectHandler(index, rect, pixelData)
+    }
+
+    package func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        applyLayerSurfaceMutationHandler(index, payload)
+    }
+
+    package func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
+        applyLayerMutationHandler(index, payload)
+    }
+
+    package func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
+        applyTextLayerMutationHandler(index, textLayer, payload)
+    }
+
+    package func replaceLayerMask(_ index: Int, _ mask: Data) -> DocumentMutationResult {
+        replaceLayerMaskHandler(index, mask)
+    }
+
+    package func clearLayerMask(_ index: Int) -> DocumentMutationResult {
+        clearLayerMaskHandler(index)
+    }
+
+    package func applyLayerMask(_ index: Int) -> DocumentMutationResult {
+        applyLayerMaskHandler(index)
+    }
+
+    package func clearLayer(_ index: Int) -> DocumentMutationResult {
+        clearLayerHandler(index)
+    }
+
+    package func applyLayerProcessing(_ index: Int, _ request: LayerProcessingRequest) -> DocumentMutationResult {
+        applyLayerProcessingHandler(index, request)
     }
 }
 

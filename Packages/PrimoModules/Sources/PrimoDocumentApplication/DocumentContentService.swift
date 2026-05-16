@@ -36,7 +36,7 @@ public struct DocumentContentService: Sendable {
     package let documentEditingGateway: DocumentEditingGateway
     package let documentMutationGateway: DocumentMutationGateway
 
-    public init(
+    package init(
         documentQueryGateway: DocumentQueryGateway,
         documentRenderGateway: DocumentRenderGateway,
         documentEditingGateway: DocumentEditingGateway,

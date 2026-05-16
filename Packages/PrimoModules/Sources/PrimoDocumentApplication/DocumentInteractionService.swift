@@ -100,7 +100,7 @@ public struct DocumentCanvasCommandService: Sendable {
         rawResizeCanvasExtent(width, height)
     }
 
-    public init(
+    package init(
         queryGateway: DocumentQueryGateway,
         renderGateway: DocumentRenderGateway,
         mutationGateway: DocumentMutationGateway,
@@ -198,7 +198,7 @@ public struct DocumentLayerCommandService: Sendable {
         self.revealLayerForEditing = revealLayerForEditing
     }
 
-    public init(mutationGateway: DocumentMutationGateway) {
+    package init(mutationGateway: DocumentMutationGateway) {
         self.init(
             ensureLayerVisible: { mutationGateway.setLayerVisibility($0, true) },
             replaceLayerPixels: mutationGateway.replaceLayerPixels,
