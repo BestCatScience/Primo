@@ -79,7 +79,7 @@ struct DocumentCommandServiceTests {
             ImportedCanvasRequest(
                 width: 48,
                 height: 32,
-                pixelData: Data([0xAA, 0xBB])
+                pixelData: Data(repeating: 0xAA, count: 48 * 32 * 4)
             ),
             "Imported"
         )
@@ -91,11 +91,40 @@ struct DocumentCommandServiceTests {
             recorder.values == [
                 "newCanvas:48x32",
                 "prewarmDrawingResources",
-                "replaceLayerPixels:0:2",
+                "replaceLayerPixels:0:6144",
                 "setLayerName:0:Imported",
                 "setActiveLayer:0",
             ]
         )
+    }
+
+    @Test
+    func initializeImportedCanvasRejectsInvalidPixelDataBeforeCreatingCanvas() {
+        let recorder = CallRecorder()
+        let service = DocumentCanvasCommandService(
+            queryGateway: queryGateway(),
+            renderGateway: renderGateway(),
+            mutationGateway: mutationGateway(recorder: recorder),
+            persistenceGateway: persistenceGateway(recorder: recorder)
+        )
+
+        let result = service.initializeImportedCanvas(
+            ImportedCanvasRequest(
+                width: 48,
+                height: 32,
+                pixelData: Data([0xAA, 0xBB])
+            ),
+            "Imported"
+        )
+
+        guard case let .failure(.gpu(.invalidPayloadSize(operation, expected, actual))) = result else {
+            Issue.record("Expected invalid imported canvas payload size failure")
+            return
+        }
+        #expect(operation == "initializeImportedCanvas")
+        #expect(expected == 48 * 32 * 4)
+        #expect(actual == 2)
+        #expect(recorder.values.isEmpty)
     }
 
     @Test

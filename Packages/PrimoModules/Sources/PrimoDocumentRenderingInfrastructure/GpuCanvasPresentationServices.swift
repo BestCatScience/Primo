@@ -11,9 +11,7 @@ import simd
 public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskProcessing {
     private let operations: DocumentCanvasPreviewRenderingOperations
 
-    public init(
-        operations: DocumentCanvasPreviewRenderingOperations = DocumentGpuOperationGatewayFactory.live().canvasPreviewRenderingOperations
-    ) {
+    public init(operations: DocumentCanvasPreviewRenderingOperations) {
         self.operations = operations
     }
 
@@ -256,8 +254,8 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     private let selectionOperations: DocumentSelectionMaskOperations
 
     public init(
-        layerTransformOperations: DocumentLayerTransformOperations = DocumentGpuOperationGatewayFactory.live().layerTransformOperations,
-        selectionOperations: DocumentSelectionMaskOperations = DocumentGpuOperationGatewayFactory.live().selectionMaskOperations
+        layerTransformOperations: DocumentLayerTransformOperations,
+        selectionOperations: DocumentSelectionMaskOperations
     ) {
         self.layerTransformOperations = layerTransformOperations
         self.selectionOperations = selectionOperations

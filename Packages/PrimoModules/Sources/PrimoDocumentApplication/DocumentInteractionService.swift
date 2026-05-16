@@ -20,6 +20,10 @@ public struct ImportedCanvasRequest: Equatable, Sendable {
     public var validatedSize: ValidCanvasSize? {
         ValidCanvasSize(width, height)
     }
+
+    package var validatedPixelData: LayerPixelData? {
+        LayerPixelData(width: width, height: height, rgba: pixelData)
+    }
 }
 
 public struct DocumentCanvasCommandService: Sendable {
@@ -132,6 +136,18 @@ public struct DocumentCanvasCommandService: Sendable {
                 guard let layerName = NonEmptyLayerName(layerName) else {
                     return .failure(.emptyInput)
                 }
+                guard let pixelData = request.validatedPixelData else {
+                    let geometry = PixelGeometry(width: size.width, height: size.height)
+                    return .failure(
+                        .gpu(
+                            .invalidPayloadSize(
+                                operation: "initializeImportedCanvas",
+                                expected: geometry?.rgbaByteCount ?? 0,
+                                actual: request.pixelData.count
+                            )
+                        )
+                    )
+                }
                 switch persistenceGateway.newCanvas(size.width, size.height) {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
@@ -140,7 +156,7 @@ public struct DocumentCanvasCommandService: Sendable {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
                 }
-                switch mutationGateway.replaceLayerPixels(0, request.pixelData) {
+                switch mutationGateway.replaceLayerPixels(0, pixelData.rgba) {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
                 }

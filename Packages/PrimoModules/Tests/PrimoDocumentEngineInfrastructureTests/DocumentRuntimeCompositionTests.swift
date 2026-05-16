@@ -7,6 +7,7 @@ import PrimoDocumentRuntime
 import PrimoDocumentRuntimeLive
 @testable import PrimoDocumentPresentationContracts
 @testable import PrimoDocumentRenderingContracts
+@testable import PrimoDocumentRenderingInfrastructure
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
@@ -113,7 +114,9 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func editingGatewayExecutesLayerRequestsThroughSharedRuntime() throws {
-        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
+            gpuOperations: DocumentGpuOperationGatewayFactory.live()
+        )
 
         let addResult = runtime.editingGateway.execute(
             .structure(.addLayer(name: "Foreground"))
@@ -138,7 +141,9 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func compositionOverridesReturnNewBoundaryWhilePreservingSharedRuntime() throws {
-        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
+            gpuOperations: DocumentGpuOperationGatewayFactory.live()
+        )
         let overridden = runtime.withOverrides(
             historyGateway: DocumentHistoryGateway(
                 canUndo: { .success(false) },
@@ -567,7 +572,7 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let sourceURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift"
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimePresentationBroadcaster.swift"
         )
         let body = try String(contentsOf: sourceURL, encoding: .utf8)
         let terminationRange = try #require(body.range(of: "continuation.onTermination ="))
@@ -579,7 +584,9 @@ struct DocumentRuntimeCompositionTests {
     @Test
     func runtimeFacadesReleasePreviewLeasesThroughSharedSurfaceBoundary() {
         let releasedHandles = LockedValues<MetalBufferHandle?>()
-        let composition = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live()
+        let composition = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
+            gpuOperations: DocumentGpuOperationGatewayFactory.live()
+        )
             .withOverrides(
                 surfaceHandleReleaser: DocumentSurfaceHandleReleaser { handle in
                     releasedHandles.append(handle)

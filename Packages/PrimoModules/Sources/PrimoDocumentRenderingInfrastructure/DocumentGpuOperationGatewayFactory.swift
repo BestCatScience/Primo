@@ -2,7 +2,7 @@ import Foundation
 import PrimoDocumentRenderingContracts
 
 public enum DocumentGpuOperationGatewayFactory {
-    public static func live() -> DocumentGpuOperationGateway {
+    package static func live() -> DocumentGpuOperationGateway {
         gateway(backend: MetalDocumentGpuOperationBackendFactory.live())
     }
 

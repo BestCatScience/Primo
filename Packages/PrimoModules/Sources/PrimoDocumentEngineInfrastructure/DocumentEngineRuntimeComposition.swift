@@ -112,7 +112,8 @@ package enum DocumentEngineRuntimeCompositionFactory {
     package static func live(
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
-        uuidClient: PrimoCoreTypes.UUIDClient = .live
+        uuidClient: PrimoCoreTypes.UUIDClient = .live,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> DocumentEngineRuntimeComposition {
         let runtime = DocumentEngineFactory.live(
             fileClient: fileClient,
@@ -120,8 +121,6 @@ package enum DocumentEngineRuntimeCompositionFactory {
             uuidClient: uuidClient
         )
         let strokeUseCases = DocumentStrokeUseCasesLive.live()
-
-        let gpuOperations = DocumentGpuOperationGatewayFactory.live()
 
         return DocumentEngineRuntimeComposition(
             queryGateway: runtime.queryGateway,
@@ -152,4 +151,3 @@ extension DocumentEngineLive {
         editingGateway
     }
 }
-

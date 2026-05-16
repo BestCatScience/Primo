@@ -864,12 +864,15 @@ struct GpuSideEffectIsolationArchitectureTests {
     @Test
     func documentRuntimeLiveOwnsLiveFactoriesAndInfrastructureWrappers() throws {
         let repoRoot = try Self.repoRoot()
-        let liveURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift",
-            isDirectory: false
+        let liveRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive",
+            isDirectory: true
         )
-        let liveBody = try String(contentsOf: liveURL, encoding: .utf8)
-        let liveImports = Self.swiftImports(in: liveBody)
+        let liveBodies = try Self.swiftSources(under: liveRoot).map {
+            try String(contentsOf: $0, encoding: .utf8)
+        }
+        let liveBody = liveBodies.joined(separator: "\n")
+        let liveImports = Set(liveBodies.flatMap(Self.swiftImports(in:)))
         let expectedInfrastructureImports: Set<String> = [
             "PrimoDocumentEngineInfrastructure",
             "PrimoDocumentMetalRuntimeInfrastructure",
@@ -903,7 +906,53 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo("))
         #expect(liveBody.contains("package init(gpuOperations: DocumentGpuOperationGateway)"))
-        #expect(liveBody.contains("DocumentGpuOperationGatewayFactory.live()"))
+        #expect(liveBody.contains("DocumentEngineRuntimeCompositionFactory.live("))
+    }
+
+    @Test
+    func publicGpuPreviewAdaptersRequireInjectedOperations() throws {
+        let repoRoot = try Self.repoRoot()
+        let checkedFiles = [
+            (
+                path: "Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/GpuCanvasPresentationServices.swift",
+                accessLevel: "public"
+            ),
+            (
+                path: "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/GpuPreviewAdapters.swift",
+                accessLevel: "package"
+            )
+        ]
+        let adapterNames = [
+            "GpuCanvasPreviewRenderer",
+            "GpuLayerTransformProcessor"
+        ]
+        var checkedAdapterCount = 0
+
+        for file in checkedFiles {
+            let source = try String(
+                contentsOf: repoRoot.appendingPathComponent(file.path, isDirectory: false),
+                encoding: .utf8
+            )
+            for adapterName in adapterNames {
+                guard let body = Self.declarationBody(named: adapterName, in: source) else { continue }
+                checkedAdapterCount += 1
+                let injectedInitializers = Self.initializerDeclarations(accessLevel: file.accessLevel, in: body)
+                    .map(Self.normalizedSignature)
+                #expect(!injectedInitializers.isEmpty, "\(file.path) should expose explicit injection initializers for \(adapterName)")
+                #expect(
+                    injectedInitializers.allSatisfy { signature in
+                        signature != "\(file.accessLevel) init()" &&
+                            !signature.contains(" = ") &&
+                            !signature.contains("DocumentGpuOperationGatewayFactory.live")
+                    },
+                    "\(file.path) should require explicit GPU operation dependencies for \(adapterName)"
+                )
+                let publicInitializers = Self.initializerDeclarations(accessLevel: "public", in: body)
+                    .map(Self.normalizedSignature)
+                #expect(!publicInitializers.contains("public init()"), "\(file.path) should not expose a public default initializer for \(adapterName)")
+            }
+        }
+        #expect(checkedAdapterCount == 4, "GPU preview adapter guard should cover infrastructure and RuntimeLive adapters")
     }
 
     @Test
@@ -2538,7 +2587,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift:PrimoMetalDocumentProcessingClient",
             "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift:PreviewStrokeStyle",
             "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift:PreviewStrokeTrack",
-            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift:DocumentRuntimePresentationBroadcaster"
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimePresentationBroadcaster.swift:DocumentRuntimePresentationBroadcaster"
         ]
 
         var actual: Set<String> = []
@@ -2878,6 +2927,18 @@ struct GpuSideEffectIsolationArchitectureTests {
     private static func initializerSignatures(accessLevel: String, in source: String) -> [String] {
         ArchitectureSourceInspector(source: source).initializerSignatures
             .filter { $0.hasPrefix("\(accessLevel) init") }
+    }
+
+    private static func initializerDeclarations(accessLevel: String, in source: String) -> [String] {
+        let prefix = "\(accessLevel) init"
+        var declarations: [String] = []
+        var searchStart = source.startIndex
+        while let range = source.range(of: prefix, range: searchStart..<source.endIndex) {
+            guard let openingBrace = source[range.lowerBound...].firstIndex(of: "{") else { break }
+            declarations.append(String(source[range.lowerBound..<openingBrace]))
+            searchStart = openingBrace
+        }
+        return declarations
     }
 
     private static func functionSignatures(accessLevel: String? = nil, in source: String) -> [String] {
