@@ -29,7 +29,7 @@ package extension PrimoDocumentRuntime.DocumentRuntimeComposition {
     }
 }
 
-package enum DocumentEngineRuntimeCompositionFactory {
+package enum DocumentRuntimeLiveCompositionFactory {
     package static func live(
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,

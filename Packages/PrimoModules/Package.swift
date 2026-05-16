@@ -113,7 +113,6 @@ let package = Package(
             name: "PrimoDocumentStrokeApplication",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentApplication",
@@ -441,7 +440,6 @@ let package = Package(
             name: "PrimoWorkspaceApplication",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
@@ -484,7 +482,7 @@ let package = Package(
             dependencies: [
                 "PrimoBrushDomain",
                 "PrimoCoreTypes",
-                "PrimoSystemClients",
+                "PrimoSystemContracts",
                 "PrimoDocumentDomain",
             ]
         ),

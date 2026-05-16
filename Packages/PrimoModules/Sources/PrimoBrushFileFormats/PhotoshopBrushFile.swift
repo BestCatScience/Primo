@@ -2,7 +2,7 @@ import Foundation
 import PrimoBrushDomain
 import PrimoCoreTypes
 import PrimoDocumentDomain
-import PrimoSystemClients
+import PrimoSystemContracts
 
 public struct ImportedPhotoshopBrushSample: Equatable, Sendable {
     public let name: String
@@ -17,10 +17,6 @@ public struct ImportedPhotoshopBrushSample: Equatable, Sendable {
 public enum PhotoshopBrushFile {
     public static let maxABRBytes = 64 * 1024 * 1024
     public static let maxBrushSamples = 4096
-
-    public static func importABR(from sourceURL: URL) throws -> [ImportedPhotoshopBrushSample] {
-        try importABR(from: sourceURL, fileClient: .live)
-    }
 
     public static func importABR(
         from sourceURL: URL,

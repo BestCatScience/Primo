@@ -901,12 +901,12 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(publicLiveSymbols.contains("DocumentRuntimeFactory"))
         #expect(publicLiveSymbols.contains("DocumentProjectPreviewLoader"))
         #expect(publicLiveSymbols.contains("TimelapseExportService"))
-        #expect(liveBody.contains("package enum DocumentEngineRuntimeCompositionFactory"))
+        #expect(liveBody.contains("package enum DocumentRuntimeLiveCompositionFactory"))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.DocumentProjectPreviewLoader.loadPreview("))
         #expect(liveBody.contains("PrimoDocumentEngineInfrastructure.TimelapseExportService.exportVideo("))
         #expect(liveBody.contains("package init(gpuOperations: DocumentGpuOperationGateway)"))
-        #expect(liveBody.contains("DocumentEngineRuntimeCompositionFactory.live("))
+        #expect(liveBody.contains("DocumentRuntimeLiveCompositionFactory.live("))
     }
 
     @Test
@@ -2449,8 +2449,47 @@ struct GpuSideEffectIsolationArchitectureTests {
                     !dependency.contains("Infrastructure"),
                     "\(target) must not depend on concrete infrastructure target \(dependency)"
                 )
+                #expect(
+                    !Self.isForbiddenContractBoundaryDependency(dependency),
+                    "\(target) must not depend on \(dependency); keep infrastructure, system clients, and file-format parsers behind runtime/application facades"
+                )
             }
         }
+    }
+
+    @Test
+    func stableLayersDoNotReachInfrastructureSystemClientsOrFileFormatsTransitively() throws {
+        let graph = try Self.packageTargetGraph()
+
+        for target in graph.keys {
+            let isStableLayer = target.hasSuffix("Domain") ||
+                target.hasSuffix("Application") ||
+                target.hasSuffix("Contracts")
+            guard isStableLayer else { continue }
+
+            for dependency in Self.transitiveDependencies(of: target, in: graph) {
+                #expect(
+                    !Self.isForbiddenContractBoundaryDependency(dependency),
+                    "\(target) must not transitively reach \(dependency); route live/file-format concerns through runtime or infrastructure assembly"
+                )
+            }
+        }
+    }
+
+    @Test
+    func brushFileFormatsDoNotOwnLiveSystemClients() throws {
+        let repoRoot = try Self.repoRoot()
+        let source = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoBrushFileFormats/PhotoshopBrushFile.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let body = Self.swiftCodeWithCommentsAndStringsBlanked(in: source)
+
+        #expect(!body.contains("import PrimoSystemClients"))
+        #expect(!body.contains(".live"))
     }
 
     @Test
@@ -3031,6 +3070,21 @@ struct GpuSideEffectIsolationArchitectureTests {
         dependency.contains("Infrastructure") ||
             dependency == "PrimoSystemClients" ||
             dependency.hasSuffix("FileFormats")
+    }
+
+    private static func transitiveDependencies(
+        of target: String,
+        in graph: [String: Set<String>]
+    ) -> Set<String> {
+        var visited: Set<String> = []
+        var stack = Array(graph[target] ?? [])
+
+        while let dependency = stack.popLast() {
+            guard visited.insert(dependency).inserted else { continue }
+            stack.append(contentsOf: graph[dependency] ?? [])
+        }
+
+        return visited
     }
 
     private static func uncheckedSendableDeclarations(in source: String) -> [String] {
