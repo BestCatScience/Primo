@@ -410,7 +410,11 @@ public struct DocumentMutationWorkflowService: Sendable {
     private func executeCreatedLayer(_ request: DocumentEditingRequest) -> DocumentCreatedLayerMutationResult {
         documentEditingGateway.execute(request).flatMap { result in
             guard case let .structure(plan) = result, let index = plan.resultingIndex else {
-                return .failure(.bridgeMutationFailed("documentEditingGateway"))
+                return .failure(.unexpectedGatewayResult(
+                    operation: "documentEditingGateway.createLayer",
+                    expected: "structure result with resulting layer index",
+                    actual: String(describing: result)
+                ))
             }
             return .success(DocumentCreatedLayerIndex(index))
         }
@@ -419,7 +423,11 @@ public struct DocumentMutationWorkflowService: Sendable {
     private func executeCreatedFolder(_ request: DocumentEditingRequest) -> DocumentCreatedFolderMutationResult {
         documentEditingGateway.execute(request).flatMap { result in
             guard case let .structure(plan) = result, let folderID = plan.resultingIndex else {
-                return .failure(.bridgeMutationFailed("documentEditingGateway"))
+                return .failure(.unexpectedGatewayResult(
+                    operation: "documentEditingGateway.createFolder",
+                    expected: "structure result with resulting folder ID",
+                    actual: String(describing: result)
+                ))
             }
             return .success(DocumentCreatedFolderID(folderID))
         }

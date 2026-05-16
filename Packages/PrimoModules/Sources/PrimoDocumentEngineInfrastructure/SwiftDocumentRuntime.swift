@@ -212,7 +212,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(failure)
         }
         guard store.restore(previous) else {
-            return .failure(.bridgeMutationFailed("undoInvalidSnapshot"))
+            return .failure(.inconsistentComposition(operation: "undo", reason: "invalid snapshot"))
         }
         presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
@@ -221,7 +221,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.revision = max(currentRevision, $0.revision) + 1
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("undoRevisionUpdate"))
+            return .failure(.inconsistentComposition(operation: "undo", reason: "revision update failed"))
         }
         captureDirtyUpdate()
         return .success(())
@@ -237,7 +237,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(failure)
         }
         guard store.restore(next) else {
-            return .failure(.bridgeMutationFailed("redoInvalidSnapshot"))
+            return .failure(.inconsistentComposition(operation: "redo", reason: "invalid snapshot"))
         }
         presentationBuilder.clearThumbnailSurfaces()
         releaseLayerBufferHandles()
@@ -246,7 +246,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.revision = max(currentRevision, $0.revision) + 1
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("redoRevisionUpdate"))
+            return .failure(.inconsistentComposition(operation: "redo", reason: "revision update failed"))
         }
         captureDirtyUpdate()
         return .success(())
@@ -264,7 +264,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         case let .success(plan):
             guard let plan else { return .success(()) }
             guard let layers = plan.resizedLayers() else {
-                return .failure(.bridgeMutationFailed("resizeCanvas"))
+                return .failure(.rawAPIUnavailable(operation: "resizeCanvas"))
             }
             return applyResizeCanvasPlan(plan, layers: layers)
         }
@@ -277,7 +277,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         case let .success(plan):
             guard let plan else { return .success(()) }
             guard let layers = plan.resizedLayers() else {
-                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+                return .failure(.rawAPIUnavailable(operation: "resizeCanvasExtent"))
             }
             return applyResizeCanvasPlan(plan, layers: layers)
         }
@@ -343,7 +343,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             pixelData: Data(count: geometry.rgbaByteCount),
             maskData: nil
               ) else {
-            return .failure(.bridgeMutationFailed("addLayerInvalidStoreGeometry"))
+            return .failure(.inconsistentComposition(operation: "addLayer", reason: "invalid store geometry"))
         }
         var insertedIndex: Int?
         guard store.update({ snapshot in
@@ -353,7 +353,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             insertedIndex = index
             return true
         }), let index = insertedIndex else {
-            return .failure(.bridgeMutationFailed("addLayer"))
+            return .failure(.rawAPIUnavailable(operation: "addLayer"))
         }
         materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
@@ -369,7 +369,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.activeLayerIndex = index
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setActiveLayer"))
+            return .failure(.rawAPIUnavailable(operation: "setActiveLayer"))
         }
         return .success(())
     }
@@ -381,7 +381,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].name = name
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerName"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerName"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerName(index: .unchecked(index), name: name))
         return .success(())
@@ -397,7 +397,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].visible = isVisible
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerVisibility"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerVisibility"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
         return .success(())
@@ -537,17 +537,17 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard !data.isEmpty else { return .failure(.emptyInput) }
         guard data.count == store.snapshot.canvasWidth * store.snapshot.canvasHeight else {
-            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+            return .failure(.rawAPIUnavailable(operation: "replaceLayerMask"))
         }
         guard let geometry = store.snapshot.pixelGeometry,
               LayerMaskBuffer(geometry: geometry, data: data) != nil else {
-            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+            return .failure(.rawAPIUnavailable(operation: "replaceLayerMask"))
         }
         let before = undoSnapshot()
         guard store.update({
             $0.layers[index].replaceMaskData(data, geometry: geometry)
         }) else {
-            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+            return .failure(.rawAPIUnavailable(operation: "replaceLayerMask"))
         }
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .replaceLayerMask(index: .unchecked(index), data: data))
@@ -562,7 +562,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
               store.update({
                   $0.layers[index].replaceMaskData(nil, geometry: geometry)
               }) else {
-            return .failure(.bridgeMutationFailed("clearLayerMask"))
+            return .failure(.rawAPIUnavailable(operation: "clearLayerMask"))
         }
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .clearLayerMask(index: .unchecked(index)))
@@ -586,7 +586,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                   store.update({
                       $0.layers[index].replaceMaskData(nil, geometry: geometry)
                   }) else {
-                return .failure(.bridgeMutationFailed("applyLayerMask"))
+                return .failure(.rawAPIUnavailable(operation: "applyLayerMask"))
             }
             invalidateThumbnail(for: index)
             recordMutation(
@@ -853,7 +853,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         guard updateLayerTextLayer(index: plan.layerIndex, textLayer: nil) else {
             gpuServices.release(nextHandle)
-            return .failure(.bridgeMutationFailed("applyCommittedStrokeTextLayer"))
+            return .failure(.inconsistentComposition(operation: "applyCommittedStroke", reason: "target layer is text"))
         }
         setLayerPixelState(index: plan.layerIndex, pixelData: adjustedOutput, gpuBufferHandle: nextHandle)
         invalidateThumbnail(for: plan.layerIndex)
@@ -969,7 +969,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
         guard updateLayerTextLayer(index: plan.layerIndex, textLayer: nil) else {
             gpuServices.release(nextHandle)
-            return .failure(.bridgeMutationFailed("blurStrokeTextLayer"))
+            return .failure(.inconsistentComposition(operation: "blurStroke", reason: "target layer is text"))
         }
         invalidateThumbnail(for: plan.layerIndex)
         captureDirtyUpdate(rect: payload.dirtyRect)
@@ -1000,12 +1000,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func duplicateLayer(index: Int, name: String) -> DocumentCreatedLayerMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard let geometry = store.snapshot.pixelGeometry else {
-            return .failure(.bridgeMutationFailed("duplicateLayerInvalidStoreGeometry"))
+            return .failure(.inconsistentComposition(operation: "duplicateLayer", reason: "invalid store geometry"))
         }
         let before = undoSnapshot()
         var layer = store.snapshot.layers[index]
         guard layer.replacePixelData(currentPixelData(for: index), geometry: geometry) else {
-            return .failure(.bridgeMutationFailed("duplicateLayerInvalidPixelData"))
+            return .failure(.inconsistentComposition(operation: "duplicateLayer", reason: "invalid pixel data"))
         }
         layer.name = name
         let duplicatedIndex = index + 1
@@ -1014,7 +1014,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.activeLayerIndex = duplicatedIndex
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("duplicateLayer"))
+            return .failure(.rawAPIUnavailable(operation: "duplicateLayer"))
         }
         remapFoldersAfterInsertion(at: duplicatedIndex)
         materializeGpuBackedLayerPixels()
@@ -1025,10 +1025,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
+        guard store.snapshot.layers.count > 1 else { return .failure(.rawAPIUnavailable(operation: "deleteLayer")) }
         let before = undoSnapshot()
         guard deleteLayerUnchecked(index: index) else {
-            return .failure(.bridgeMutationFailed("deleteLayer"))
+            return .failure(.rawAPIUnavailable(operation: "deleteLayer"))
         }
         recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
         return .success(())
@@ -1049,7 +1049,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("moveLayer"))
+            return .failure(.rawAPIUnavailable(operation: "moveLayer"))
         }
         remapFoldersAfterMove(from: index, to: destinationIndex)
         invalidateAllThumbnails()
@@ -1081,7 +1081,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             )
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("createFolder"))
+            return .failure(.rawAPIUnavailable(operation: "createFolder"))
         }
         recordMutation(
             before: before,
@@ -1106,7 +1106,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("deleteFolder"))
+            return .failure(.rawAPIUnavailable(operation: "deleteFolder"))
         }
         recordMutation(before: before, timelapseEvent: .deleteFolder(folderID: .unchecked(folderID)))
         return .success(())
@@ -1121,7 +1121,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.folders[folderIndex].visible = isVisible
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setFolderVisibility"))
+            return .failure(.rawAPIUnavailable(operation: "setFolderVisibility"))
         }
         recordMutation(before: before, timelapseEvent: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible))
         return .success(())
@@ -1136,7 +1136,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.folders[folderIndex].name = name
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setFolderName"))
+            return .failure(.rawAPIUnavailable(operation: "setFolderName"))
         }
         recordMutation(before: before, timelapseEvent: .setFolderName(folderID: .unchecked(folderID), name: name))
         return .success(())
@@ -1151,7 +1151,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.folders[folderIndex].expanded = isExpanded
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setFolderExpanded"))
+            return .failure(.rawAPIUnavailable(operation: "setFolderExpanded"))
         }
         recordMutation(before: before, timelapseEvent: .setFolderExpanded(folderID: .unchecked(folderID), isExpanded: isExpanded))
         return .success(())
@@ -1171,7 +1171,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].folderID = folderID
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("assignLayerToFolder"))
+            return .failure(.rawAPIUnavailable(operation: "assignLayerToFolder"))
         }
         recordMutation(
             before: before,
@@ -1190,7 +1190,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].locked = isLocked
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerLocked"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerLocked"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerLocked(index: .unchecked(index), isLocked: isLocked))
         return .success(())
@@ -1203,7 +1203,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].alphaLocked = isAlphaLocked
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerAlphaLocked"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerAlphaLocked"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked))
         return .success(())
@@ -1216,7 +1216,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].clipped = isClipped
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerClipped"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerClipped"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerClipped(index: .unchecked(index), isClipped: isClipped))
         return .success(())
@@ -1229,7 +1229,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard store.update({
             $0.layers[index].setOpacity(opacity)
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerOpacity"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerOpacity"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerOpacity(index: .unchecked(index), opacity: opacity))
         return .success(())
@@ -1242,7 +1242,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             $0.layers[index].blendMode = blendMode
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("setLayerBlendMode"))
+            return .failure(.rawAPIUnavailable(operation: "setLayerBlendMode"))
         }
         recordMutation(before: before, timelapseEvent: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode))
         return .success(())
@@ -1253,15 +1253,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateEditableLayer(index) { return .failure(failure) }
         if let failure = validateEditableLayer(index - 1) { return .failure(failure) }
         guard let geometry = store.snapshot.pixelGeometry else {
-            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidStoreGeometry"))
+            return .failure(.inconsistentComposition(operation: "mergeLayerDown", reason: "invalid store geometry"))
         }
         var upper = store.snapshot.layers[index]
         guard upper.replacePixelData(currentPixelData(for: index), geometry: geometry) else {
-            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidUpperPixels"))
+            return .failure(.inconsistentComposition(operation: "mergeLayerDown", reason: "invalid upper pixels"))
         }
         var lower = store.snapshot.layers[index - 1]
         guard lower.replacePixelData(currentPixelData(for: index - 1), geometry: geometry) else {
-            return .failure(.bridgeMutationFailed("mergeLayerDownInvalidLowerPixels"))
+            return .failure(.inconsistentComposition(operation: "mergeLayerDown", reason: "invalid lower pixels"))
         }
         guard let merged = gpuServices.mergeLayers(
             lowerPixelData: lower.pixelData,
@@ -1272,7 +1272,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             upperOpacity: Float(upper.opacity),
             upperBlendMode: upper.blendMode
         ) else {
-            return .failure(.bridgeMutationFailed("mergeLayerDown"))
+            return .failure(.rawAPIUnavailable(operation: "mergeLayerDown"))
         }
         let before = undoSnapshot()
         setLayerPixelState(
@@ -1286,7 +1286,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
         guard updateLayerTextLayer(index: index - 1, textLayer: nil),
               deleteLayerUnchecked(index: index) else {
-            return .failure(.bridgeMutationFailed("mergeLayerDown"))
+            return .failure(.rawAPIUnavailable(operation: "mergeLayerDown"))
         }
         recordMutation(before: before, timelapseEvent: .mergeLayerDown(index: .unchecked(index)))
         return .success(())
@@ -1303,7 +1303,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         if let failure = validateEditableLayer(index) { return .failure(failure) }
         guard let payload = gpuServices.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
-            return .failure(.bridgeMutationFailed("setTextLayer"))
+            return .failure(.rawAPIUnavailable(operation: "setTextLayer"))
         }
         return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
     }
@@ -1329,7 +1329,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .success(())
         case let .success(plan?):
             guard let result = strokeCommitResult(for: plan) else {
-                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+                return .failure(.rawAPIUnavailable(operation: "applyCommittedStroke"))
             }
             let mutationResult = applyStrokeCommitPlan(plan, gpuResult: result)
             if case .success = mutationResult {
@@ -1378,7 +1378,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         case let .success(plan):
             guard let payload = blurPayload(for: plan) else {
                 rollbackBlurSessionReservation(reservation)
-                return .failure(.bridgeMutationFailed("blurStroke"))
+                return .failure(.rawAPIUnavailable(operation: "blurStroke"))
             }
             let result = applyBlurPlan(plan, payload: payload)
             if case .failure = result {
@@ -1392,7 +1392,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let currentBlurStroke = strokeCoordinator.blurStrokeState,
               let baseline = currentBlurStroke.baseline
         else {
-            return .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline"))
+            return .failure(.inconsistentComposition(operation: "endBlurStroke", reason: "missing baseline"))
         }
         guard store.snapshot.layers.indices.contains(currentBlurStroke.layerIndex) else {
             return .failure(.invalidLayerIndex(currentBlurStroke.layerIndex))
@@ -1421,7 +1421,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(failure)
         case let .success(plan):
             guard let payload = fillPayload(for: plan) else {
-                return .failure(.bridgeMutationFailed("fill"))
+                return .failure(.rawAPIUnavailable(operation: "fill"))
             }
             return applyFillPlan(plan, payload: payload)
         }
@@ -1433,7 +1433,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(failure)
         case let .success(plan):
             guard let result = strokeCommitResult(for: plan) else {
-                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+                return .failure(.rawAPIUnavailable(operation: "applyCommittedStroke"))
             }
             return applyStrokeCommitPlan(plan, gpuResult: result)
         }
@@ -1905,7 +1905,7 @@ extension SwiftDocumentRuntime {
         )
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil)
         guard updateLayerTextLayer(index: index, textLayer: nil) else {
-            return .failure(.bridgeMutationFailed("replaceLayerPixelsTextLayer"))
+            return .failure(.inconsistentComposition(operation: "replaceLayerPixels", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
         recordMutation(
@@ -1969,7 +1969,7 @@ extension SwiftDocumentRuntime {
         }
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
         guard updateLayerTextLayer(index: index, textLayer: nil) else {
-            return .failure(.bridgeMutationFailed("applyLayerMutationTextLayer"))
+            return .failure(.inconsistentComposition(operation: "applyLayerMutation", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
         let finalTimelapseEvent = recordsFinalLayerPixels
@@ -2019,7 +2019,7 @@ extension SwiftDocumentRuntime {
             gpuBufferHandle: payloadLease.adoptHandle()
         )
         guard updateLayerTextLayer(index: index, textLayer: textLayer) else {
-            return .failure(.bridgeMutationFailed("applyTextLayerMutationTextLayer"))
+            return .failure(.inconsistentComposition(operation: "applyTextLayerMutation", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
         recordMutation(

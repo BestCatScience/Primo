@@ -32,10 +32,8 @@ extension DocumentFeature {
             return ApplicationFeature.Feedback.invalidLayerOpacity.message(for: language)
         case .emptyInput:
             return ApplicationFeature.Feedback.emptyDocumentMutationInput.message(for: language)
-        case let .gpu(failure):
+        case .gpu, .unexpectedGatewayResult, .rawAPIUnavailable, .inconsistentComposition, .bridgeMutationFailed, .rollbackFailed:
             return ApplicationFeature.Feedback.documentMutationBridgeFailed(failure.displayMessage).message(for: language)
-        case let .bridgeMutationFailed(message):
-            return ApplicationFeature.Feedback.documentMutationBridgeFailed(message).message(for: language)
         case .incompatibleLayerType:
             return ApplicationFeature.Feedback.unsupportedLayerType.message(for: language)
         case .invalidLayerProcessingRequest:
@@ -82,10 +80,8 @@ extension DocumentFeature {
                 return .invalidLayerOpacity
             case .emptyInput:
                 return .emptyDocumentMutationInput
-            case let .gpu(failure):
+            case .gpu, .unexpectedGatewayResult, .rawAPIUnavailable, .inconsistentComposition, .bridgeMutationFailed, .rollbackFailed:
                 return .documentMutationBridgeFailed(failure.displayMessage)
-            case let .bridgeMutationFailed(message):
-                return .documentMutationBridgeFailed(message)
             case .incompatibleLayerType:
                 return .unsupportedLayerType
             case .invalidLayerProcessingRequest:

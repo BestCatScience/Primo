@@ -1047,10 +1047,21 @@ private func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -
         return .noRedoState
     case let .gpu(failure):
         return .gpu(failure)
+    case let .unexpectedGatewayResult(operation, expected, actual):
+        return .unexpectedGatewayResult(operation: operation, expected: expected, actual: actual)
+    case let .rawAPIUnavailable(operation):
+        return .rawAPIUnavailable(operation: operation)
+    case let .inconsistentComposition(operation, reason):
+        return .inconsistentComposition(operation: operation, reason: reason)
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
     case let .incompatibleLayerType(index):
         return .incompatibleLayerType(index)
+    case let .rollbackFailed(operation, underlying):
+        return .rollbackFailed(
+            operation: operation,
+            underlying: mapDocumentEditorFailure(underlying)
+        )
     case let .transactionFailure(primary, rollback):
         return .transactionFailure(
             primary: mapDocumentEditorFailure(primary),
@@ -1093,10 +1104,21 @@ private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> Do
         return .noRedoState
     case let .gpu(failure):
         return .gpu(failure)
+    case let .unexpectedGatewayResult(operation, expected, actual):
+        return .unexpectedGatewayResult(operation: operation, expected: expected, actual: actual)
+    case let .rawAPIUnavailable(operation):
+        return .rawAPIUnavailable(operation: operation)
+    case let .inconsistentComposition(operation, reason):
+        return .inconsistentComposition(operation: operation, reason: reason)
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
     case let .incompatibleLayerType(index):
         return .incompatibleLayerType(index)
+    case let .rollbackFailed(operation, underlying):
+        return .rollbackFailed(
+            operation: operation,
+            underlying: mapDocumentRuntimeFailure(underlying)
+        )
     case let .transactionFailure(primary, rollback):
         return .transactionFailure(
             primary: mapDocumentRuntimeFailure(primary),

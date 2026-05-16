@@ -159,9 +159,37 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     case noUndoState
     case noRedoState
     case gpu(DocumentGpuMutationFailure)
+    case unexpectedGatewayResult(operation: String, expected: String, actual: String)
+    case rawAPIUnavailable(operation: String)
+    case inconsistentComposition(operation: String, reason: String)
     case bridgeMutationFailed(String)
     case incompatibleLayerType(Int)
+    indirect case rollbackFailed(operation: String, underlying: DocumentMutationFailure)
     indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
+}
+
+public extension DocumentMutationFailure {
+    var displayMessage: String? {
+        switch self {
+        case let .gpu(failure):
+            return failure.displayMessage
+        case let .unexpectedGatewayResult(operation, expected, actual):
+            return "\(operation): unexpected gateway result, expected \(expected), got \(actual)"
+        case let .rawAPIUnavailable(operation):
+            return "\(operation): raw API unavailable"
+        case let .inconsistentComposition(operation, reason):
+            return "\(operation): inconsistent composition (\(reason))"
+        case let .bridgeMutationFailed(message):
+            return message
+        case let .rollbackFailed(operation, underlying):
+            if let message = underlying.displayMessage {
+                return "\(operation): rollback failed (\(message))"
+            }
+            return "\(operation): rollback failed"
+        default:
+            return nil
+        }
+    }
 }
 
 public struct HueAdjustmentDegrees: Equatable, Sendable {

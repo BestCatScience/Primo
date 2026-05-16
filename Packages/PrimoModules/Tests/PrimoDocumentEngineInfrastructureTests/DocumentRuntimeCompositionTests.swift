@@ -120,7 +120,7 @@ struct DocumentRuntimeCompositionTests {
             }
         }
 
-        #expect(result == .failure(.bridgeMutationFailed("Reentrant document runtime access: inner")))
+        #expect(result == .failure(.rawAPIUnavailable(operation: "Reentrant document runtime access: inner")))
     }
 
     @Test
@@ -450,7 +450,7 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected reentrant access failure")
             return
         }
-        #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+        #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: inner"))
     }
 
     @Test
@@ -469,7 +469,7 @@ struct DocumentRuntimeCompositionTests {
             return
         }
         if case let .failure(failure) = innerResult {
-            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+            #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: inner"))
         } else {
             Issue.record("Expected inner result access to fail")
         }
@@ -487,7 +487,7 @@ struct DocumentRuntimeCompositionTests {
         }
 
         if case let .success(.failure(failure)) = result {
-            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+            #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: inner"))
         } else {
             Issue.record("Expected nested mutation access to fail")
         }
@@ -503,7 +503,7 @@ struct DocumentRuntimeCompositionTests {
         }
 
         if case let .success(.failure(failure)) = result {
-            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: replace"))
+            #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: replace"))
         } else {
             Issue.record("Expected nested replacement to fail")
         }
@@ -522,7 +522,7 @@ struct DocumentRuntimeCompositionTests {
                 Issue.record("Expected nested throwing access to fail")
             }
         } catch let failure as DocumentMutationFailure {
-            #expect(failure == .bridgeMutationFailed("Reentrant document runtime access: inner"))
+            #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: inner"))
         } catch {
             Issue.record("Unexpected error: \(error)")
         }

@@ -120,7 +120,7 @@ extension DocumentFeature {
                     gpuBufferHandle: mutation.surface.handle.buffer,
                     fallbackPixelData: mutation.surface.pixelData
                 ) else {
-                    return .failed(.bridgeMutationFailed("GPU stroke commit invalid payload"))
+                    return .failed(.inconsistentComposition(operation: "GPU stroke commit", reason: "invalid payload"))
                 }
                 switch layerVisibility.applyLayerSurfaceMutation(layerCommand, payload) {
                 case .success:
@@ -149,7 +149,7 @@ extension DocumentFeature {
             case let .failure(failure):
                 return .failed(failure)
             case .preview, .reset:
-                return .failed(.bridgeMutationFailed("GPU stroke commit failed: unexpected session outcome"))
+                return .failed(.unexpectedGatewayResult(operation: "GPU stroke commit", expected: "commit or failure", actual: "preview or reset"))
             }
         }
 

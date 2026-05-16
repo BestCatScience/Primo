@@ -157,7 +157,7 @@ public struct DocumentStrokeCommitWorkflowService: Sendable {
                 gpuBufferHandle: mutation.surface.handle.buffer,
                 fallbackPixelData: mutation.surface.pixelData
             ) else {
-                return .failure(.bridgeMutationFailed("GPU stroke commit invalid payload"))
+                return .failure(.inconsistentComposition(operation: "GPU stroke commit", reason: "invalid payload"))
             }
             let result = layerCommands.applyLayerSurfaceMutation(
                 mutation.surface.layerIndex,
@@ -185,7 +185,7 @@ public struct DocumentStrokeCommitWorkflowService: Sendable {
         case let .failure(failure):
             return .failure(failure)
         case .preview, .reset:
-            return .failure(.bridgeMutationFailed("GPU stroke commit failed: unexpected session outcome"))
+            return .failure(.unexpectedGatewayResult(operation: "GPU stroke commit", expected: "commit or failure", actual: "preview or reset"))
         }
     }
 }
@@ -547,7 +547,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 context: context,
                 usesResponsivePreview: usesResponsivePreview
             ) else {
-                return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing base snapshot or surface"))
+                return .failure(.inconsistentComposition(operation: "GPU stroke preview", reason: "missing base snapshot or surface"))
             }
             return previewOutcome(from: resolution)
 
@@ -561,7 +561,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 context: context,
                 usesResponsivePreview: usesResponsivePreview
             ) else {
-                return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing render snapshot or surface"))
+                return .failure(.inconsistentComposition(operation: "GPU stroke preview", reason: "missing render snapshot or surface"))
             }
             return previewOutcome(from: resolution)
 
@@ -593,14 +593,14 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             }
 
             guard let snapshot else {
-                return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
+                return .failure(.inconsistentComposition(operation: "GPU stroke commit", reason: "missing base snapshot"))
             }
             guard let result = commit.makeCommittedSurface(
                 snapshot: snapshot,
                 samples: samples,
                 context: commitContext
             ) else {
-                return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing committed surface"))
+                return .failure(.inconsistentComposition(operation: "GPU stroke commit", reason: "missing committed surface"))
             }
             return .commit(
                 GpuCommitMutation(
@@ -636,7 +636,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             let surface = resolution.result.surface,
             let dirtyRegion = resolution.result.dirtyRegion
         else {
-            return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing surface handle"))
+            return .failure(.inconsistentComposition(operation: "GPU stroke preview", reason: "missing surface handle"))
         }
         return .preview(
             GpuPreviewMutation(

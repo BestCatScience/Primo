@@ -349,7 +349,7 @@ struct SwiftDocumentRuntimeUndoTests {
             captureTimelapse: false
         ).get()
 
-        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) = runtime.endBlurStroke() else {
+        guard case .failure(.inconsistentComposition(operation: "endBlurStroke", reason: "missing baseline")) = runtime.endBlurStroke() else {
             Issue.record("Expected pure blur planning to leave no blur session reserved")
             return
         }
@@ -360,13 +360,13 @@ struct SwiftDocumentRuntimeUndoTests {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [], blurReturnsNil: true)
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
 
-        guard case .failure(.bridgeMutationFailed("blurStroke")) =
+        guard case .failure(.rawAPIUnavailable(operation: "blurStroke")) =
             runtime.blur(samples: [sample()], brush: brush(), layerIndex: 0, captureTimelapse: false)
         else {
             Issue.record("Expected nil blur payload to fail")
             return
         }
-        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) = runtime.endBlurStroke() else {
+        guard case .failure(.inconsistentComposition(operation: "endBlurStroke", reason: "missing baseline")) = runtime.endBlurStroke() else {
             Issue.record("Expected failed blur payload to roll back the blur session reservation")
             return
         }
@@ -383,7 +383,7 @@ struct SwiftDocumentRuntimeUndoTests {
             Issue.record("Expected live nil blur payload to map to a blur kernel failure")
             return
         }
-        guard case .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline")) =
+        guard case .failure(.inconsistentComposition(operation: "endBlurStroke", reason: "missing baseline")) =
             runtime.strokeGateway.endBlurStroke()
         else {
             Issue.record("Expected live blur failure to roll back the blur session reservation")

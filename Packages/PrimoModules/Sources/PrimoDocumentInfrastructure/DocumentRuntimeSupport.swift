@@ -29,7 +29,7 @@ package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable 
     package static var reentrantAccessMessage: String { "Reentrant document runtime access" }
 
     package static func reentrantMutationFailure(operation: String) -> DocumentMutationFailure {
-        .bridgeMutationFailed("\(reentrantAccessMessage): \(operation)")
+        .rawAPIUnavailable(operation: "\(reentrantAccessMessage): \(operation)")
     }
 
     private let lock = NSRecursiveLock()

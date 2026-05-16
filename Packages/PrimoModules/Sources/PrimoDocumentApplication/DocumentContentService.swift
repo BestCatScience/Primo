@@ -355,20 +355,24 @@ public struct DocumentContentService: Sendable {
             case .success:
                 break
             case let .failure(failure):
-                rollbackFailure = failure
+                rollbackFailure = .rollbackFailed(operation: "deleteResolvedNewLayer", underlying: failure)
             }
         }
         switch documentMutationGateway.setActiveLayer(resolvedTarget.originalActiveLayerIndex) {
         case .success:
             break
         case let .failure(failure):
+            let activeLayerRollbackFailure = DocumentMutationFailure.rollbackFailed(
+                operation: "restoreOriginalActiveLayer",
+                underlying: failure
+            )
             if let rollbackFailure {
                 return .transactionFailure(
                     primary: rollbackFailure,
-                    rollback: failure
+                    rollback: activeLayerRollbackFailure
                 )
             }
-            return failure
+            return activeLayerRollbackFailure
         }
         return rollbackFailure
     }

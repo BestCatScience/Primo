@@ -309,7 +309,7 @@ struct PaintDocumentMutationContractTests {
                 #expect(merged.count == width * height * 4)
                 #expect(merged[2] == 255)
             } else {
-                expectFailure(result, .bridgeMutationFailed("mergeLayerDown"))
+                expectFailure(result, .rawAPIUnavailable(operation: "mergeLayerDown"))
             }
         case let .failure(failure):
             Issue.record("Expected addLayer success, got \(String(describing: failure))")
@@ -458,7 +458,7 @@ struct PaintDocumentMutationContractTests {
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
         } else {
-            expectFailure(result, .bridgeMutationFailed("setTextLayer"))
+            expectFailure(result, .rawAPIUnavailable(operation: "setTextLayer"))
         }
     }
 

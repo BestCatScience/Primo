@@ -206,14 +206,14 @@ enum CanvasResizeCoordinator {
             timelapseEvents: store.snapshot.timelapseEvents,
             timelapseUsesOperationPersistence: store.snapshot.timelapseUsesOperationPersistence
         ) else {
-            return .failure(.bridgeMutationFailed("resizeCanvasInvalidSnapshot"))
+            return .failure(.inconsistentComposition(operation: "resizeCanvas", reason: "invalid snapshot"))
         }
         guard store.update({
             $0 = resizedSnapshot
             $0.thumbnailCache.removeAll()
             return true
         }) else {
-            return .failure(.bridgeMutationFailed("resizeCanvasInvalidSnapshot"))
+            return .failure(.inconsistentComposition(operation: "resizeCanvas", reason: "invalid snapshot"))
         }
         return .success(())
     }

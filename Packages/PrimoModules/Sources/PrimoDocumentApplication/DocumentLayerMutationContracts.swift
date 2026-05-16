@@ -25,8 +25,12 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case noUndoState
     case noRedoState
     case gpu(DocumentGpuMutationFailure)
+    case unexpectedGatewayResult(operation: String, expected: String, actual: String)
+    case rawAPIUnavailable(operation: String)
+    case inconsistentComposition(operation: String, reason: String)
     case bridgeMutationFailed(String)
     case incompatibleLayerType(Int)
+    indirect case rollbackFailed(operation: String, underlying: DocumentLayerMutationFailure)
     indirect case transactionFailure(primary: DocumentLayerMutationFailure, rollback: DocumentLayerMutationFailure)
 }
 
