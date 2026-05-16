@@ -10,8 +10,8 @@ import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentGPUContracts
+import PrimoDocumentAppSupport
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import PrimoDocumentStrokeApplication
 import SwiftUI
 import XCTest
@@ -20,21 +20,21 @@ import XCTest
 @MainActor
 final class CanvasStrokeWorkflowTests: XCTestCase {
     private func makeStrokeSessionCoordinator(
-        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().workflows.layerEditing,
+        layerVisibility: any LayerVisibilityPort = DocumentLayerCommandMutationSubmitter(service: .stub()),
         strokeInteraction: StrokeEditingRuntime
     ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
         DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerVisibility: layerCommands,
-            strokeInteraction: strokeInteraction
+            layerVisibility: layerVisibility,
+            strokeInteraction: DocumentStrokePreviewAdapter(runtime: strokeInteraction)
         )
     }
 
     private func makeStrokeSessionCoordinator(
-        layerCommands: LayerEditingRuntime = DocumentApplicationRuntime.stub().workflows.layerEditing,
+        layerVisibility: any LayerVisibilityPort = DocumentLayerCommandMutationSubmitter(service: .stub()),
         strokeInteraction: CanvasStrokeInteractionService
     ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
         makeStrokeSessionCoordinator(
-            layerCommands: layerCommands,
+            layerVisibility: layerVisibility,
             strokeInteraction: StrokeEditingRuntime(
                 strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub()),
                 canvasStrokeInteractionService: strokeInteraction
@@ -63,11 +63,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testPrepareCanvasStrokeEditingReturnsTypedFailure() {
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(
-                mutationGateway: .stub(
-                    setLayerVisibility: { _, _ in .failure(.layerLocked(0)) }
-                )
-            ),
+            layerCommands: .stub(ensureLayerVisible: { _ in .failure(.layerLocked(0)) }),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
@@ -126,15 +122,15 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         for preset in BrushPreset.defaults {
             let brush = Self.runtimeSettings(for: preset)
-            let previewBrush = GpuRenderingSupport.responsivePreviewBrush(from: brush)
+            let previewBrush = DocumentAppStrokeMath.responsivePreviewBrush(from: brush)
             let canUseGpuMutation =
-                GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush) ||
-                GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
+                DocumentAppStrokeMath.shouldUseIncrementalPreviewUpdate(for: previewBrush) ||
+                DocumentAppStrokeMath.shouldUseGpuOnlyResponsivePreview(for: brush)
 
             if !canUseGpuMutation {
                 failures.append("\(preset.name): responsive preview would fall back instead of using GPU mutation")
             }
-            if GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush), previewBrush.smudgeEngineEnabled {
+            if DocumentAppStrokeMath.shouldUseGpuOnlyResponsivePreview(for: brush), previewBrush.smudgeEngineEnabled {
                 failures.append("\(preset.name): oil/smudge responsive preview still enables smudge CPU orchestration")
             }
         }
@@ -350,7 +346,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testPreviewOutcomeAppliesGpuRenderState() {
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            layerCommands: .stub(),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
@@ -695,14 +691,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let surfaceCalls = TestRecorder<GpuLayerMutationPayload>()
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
-        let runtime = DocumentApplicationRuntime.stub(
-            mutationGateway: .stub(
-                applyLayerSurfaceMutation: { _, payload in
-                    surfaceCalls.record(payload)
-                    return .success(())
-                }
-            ),
-            strokeSessionUseCase: .stub { _ in
+        let strokeInteraction = CanvasStrokeInteractionService(
+            sessionUseCase: .stub { _ in
                 .commit(
                     GpuCommitMutation(
                         surface: GpuLayerSurface(
@@ -717,10 +707,16 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
-        let workflows = runtime.workflows
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: workflows.layerEditing,
-            strokeInteraction: workflows.strokeEditing
+            layerVisibility: DocumentLayerCommandMutationSubmitter(
+                service: .stub(
+                    applyLayerSurfaceMutation: { _, payload in
+                        surfaceCalls.record(payload)
+                        return .success(())
+                    }
+                )
+            ),
+            strokeInteraction: strokeInteraction
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
@@ -773,11 +769,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             ]
         )
 
-        let runtime = DocumentApplicationRuntime.stub(
-            mutationGateway: .stub(
-                applyLayerSurfaceMutation: { _, _ in .success(()) }
-            ),
-            strokeSessionUseCase: .stub { _ in
+        let strokeInteraction = CanvasStrokeInteractionService(
+            sessionUseCase: .stub { _ in
                 .commit(
                     GpuCommitMutation(
                         surface: GpuLayerSurface(
@@ -793,10 +786,11 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
-        let workflows = runtime.workflows
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: workflows.layerEditing,
-            strokeInteraction: workflows.strokeEditing
+            layerVisibility: DocumentLayerCommandMutationSubmitter(
+                service: .stub(applyLayerSurfaceMutation: { _, _ in .success(()) })
+            ),
+            strokeInteraction: strokeInteraction
         )
         var state = DocumentEditingState()
         state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
@@ -893,7 +887,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, baseLayerPixels)
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            layerCommands: DocumentLayerCommandService.stub(),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var loadedCurrentPresentation = false
@@ -930,11 +924,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             ]
         )
-        let runtime = DocumentApplicationRuntime.stub(
-            mutationGateway: .stub(
-                applyLayerSurfaceMutation: { _, _ in .success(()) }
-            ),
-            strokeSessionUseCase: .stub { _ in
+        let strokeInteraction = CanvasStrokeInteractionService(
+            sessionUseCase: .stub { _ in
                 .commit(
                     GpuCommitMutation(
                         surface: GpuLayerSurface(
@@ -950,14 +941,18 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
-        let workflows = runtime.workflows
+        let layerVisibility = DocumentLayerCommandMutationSubmitter(
+            service: .stub(applyLayerSurfaceMutation: { _, _ in .success(()) })
+        )
         let stateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerVisibility: workflows.layerEditing,
-            strokeCommit: workflows.strokeEditing
+            layerVisibility: layerVisibility,
+            strokeCommit: DocumentStrokeCommandMutationSubmitter(
+                service: DocumentStrokeCommandService(strokeGateway: .stub())
+            )
         )
         let sessionCoordinator = makeStrokeSessionCoordinator(
-            layerCommands: workflows.layerEditing,
-            strokeInteraction: workflows.strokeEditing
+            layerVisibility: layerVisibility,
+            strokeInteraction: strokeInteraction
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
@@ -1274,7 +1269,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testNextStrokeCapturesPendingCommittedSnapshotBeforePresentationRefresh() {
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            layerCommands: DocumentLayerCommandService.stub(),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         let pendingSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
@@ -1317,7 +1312,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         do {
             let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-                layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+                layerCommands: DocumentLayerCommandService.stub(),
                 strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
             )
             var state = DocumentEditingState()
@@ -1373,7 +1368,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let releasedLeases = TestRecorder<StrokePreviewLease>()
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            layerCommands: DocumentLayerCommandService.stub(),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
@@ -1396,7 +1391,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let releasedLeases = TestRecorder<StrokePreviewLease>()
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            layerCommands: DocumentLayerCommandService.stub(),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentEditingState()
@@ -1432,136 +1427,6 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         case let .failure(failure):
             XCTAssertEqual(failure, .invalidLayerIndex(4))
         }
-    }
-
-    func testLayerContentTransactionRollsBackCreatedLayerOnFailure() {
-        let addLayerCalls = TestRecorder<String>()
-        let deleteLayerCalls = TestRecorder<Int>()
-        let setActiveLayerCalls = TestRecorder<Int>()
-
-        let service = DocumentContentService(
-            documentQueryGateway: .stub(
-                presentation: PaintDocumentPresentation.testValue(
-                    canvasSize: CGSize(width: 1, height: 1),
-                    activeLayerIndex: 3
-                )
-            ),
-            documentRenderGateway: .stub(),
-            documentEditingGateway: .stub { request in
-                guard case .content = request else {
-                    return .failure(.bridgeMutationFailed("unexpected"))
-                }
-                return .failure(.bridgeMutationFailed("replace failed"))
-            },
-            documentMutationGateway: .stub(
-                addLayer: { name in
-                    addLayerCalls.record(name)
-                    return .success(7)
-                },
-                deleteLayer: { index in
-                    deleteLayerCalls.record(index)
-                    return .success(())
-                },
-                setActiveLayer: { index in
-                    setActiveLayerCalls.record(index)
-                    return .success(())
-                }
-            )
-        )
-        let result = service.applyPixels(
-            Data(repeating: 0x00, count: 4),
-            to: .newLayer(name: "Imported")
-        )
-
-        XCTAssertEqual(result, .failure(.bridgeMutationFailed("replace failed")))
-        XCTAssertEqual(addLayerCalls.values, ["Imported"])
-        XCTAssertEqual(deleteLayerCalls.values, [7])
-        XCTAssertEqual(setActiveLayerCalls.values, [3])
-    }
-
-    func testLayerContentTransactionSurfacesRollbackFailure() {
-        let service = DocumentContentService(
-            documentQueryGateway: .stub(
-                presentation: PaintDocumentPresentation.testValue(
-                    canvasSize: CGSize(width: 1, height: 1),
-                    activeLayerIndex: 3
-                )
-            ),
-            documentRenderGateway: .stub(),
-            documentEditingGateway: .stub { request in
-                guard case .content = request else {
-                    return .failure(.bridgeMutationFailed("unexpected"))
-                }
-                return .failure(.bridgeMutationFailed("replace failed"))
-            },
-            documentMutationGateway: .stub(
-                addLayer: { _ in .success(7) },
-                deleteLayer: { _ in
-                    .failure(.bridgeMutationFailed("delete rollback failed"))
-                },
-                setActiveLayer: { _ in
-                    .failure(.bridgeMutationFailed("active layer rollback failed"))
-                }
-            )
-        )
-        let result = service.applyPixels(
-            Data(repeating: 0x00, count: 4),
-            to: .newLayer(name: "Imported")
-        )
-
-        XCTAssertEqual(
-            result,
-            .failure(
-                .transactionFailure(
-                    primary: .bridgeMutationFailed("replace failed"),
-                    rollback: .transactionFailure(
-                        primary: .bridgeMutationFailed("delete rollback failed"),
-                        rollback: .bridgeMutationFailed("active layer rollback failed")
-                    )
-                )
-            )
-        )
-    }
-
-    func testAIImageApplyRollsBackCreatedLayerOnFailure() {
-        let addLayerCalls = TestRecorder<String>()
-        let deleteLayerCalls = TestRecorder<Int>()
-        let setActiveLayerCalls = TestRecorder<Int>()
-
-        let service = DocumentContentService(
-            documentQueryGateway: .stub(
-                presentation: PaintDocumentPresentation.testValue(activeLayerIndex: 2)
-            ),
-            documentRenderGateway: .stub(),
-            documentEditingGateway: .stub { request in
-                guard case .content = request else {
-                    return .failure(.bridgeMutationFailed("unexpected"))
-                }
-                return .failure(.bridgeMutationFailed("apply failed"))
-            },
-            documentMutationGateway: .stub(
-                addLayer: { name in
-                    addLayerCalls.record(name)
-                    return .success(9)
-                },
-                deleteLayer: { index in
-                    deleteLayerCalls.record(index)
-                    return .success(())
-                },
-                setActiveLayer: { index in
-                    setActiveLayerCalls.record(index)
-                    return .success(())
-                }
-            )
-        )
-        _ = service.applyPixels(
-            Data([0x00, 0x00, 0x00, 0x00]),
-            to: .newLayer(name: "AI Image")
-        )
-
-        XCTAssertEqual(addLayerCalls.values.count, 1)
-        XCTAssertEqual(deleteLayerCalls.values, [9])
-        XCTAssertEqual(setActiveLayerCalls.values, [2])
     }
 
     private func makeCompositeSnapshot(

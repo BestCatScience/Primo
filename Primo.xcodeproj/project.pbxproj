@@ -142,10 +142,9 @@
 		B90000000000000000000037 /* PrimoDocumentRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000038 /* PrimoDocumentRuntime */; };
 		B90000000000000000000039 /* PrimoDocumentRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003A /* PrimoDocumentRuntime */; };
 		B93000000000000000000001 /* PrimoDocumentRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B93000000000000000000011 /* PrimoDocumentRuntime */; };
-		B94000000000000000000001 /* PrimoDocumentRuntimeLive in Frameworks */ = {isa = PBXBuildFile; productRef = B94000000000000000000011 /* PrimoDocumentRuntimeLive */; };
 		B95000000000000000000001 /* PrimoDocumentAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B95000000000000000000011 /* PrimoDocumentAppSupport */; };
 		B94000000000000000000002 /* PrimoCanvasPresentationRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B94000000000000000000012 /* PrimoCanvasPresentationRuntime */; };
-		B94000000000000000000003 /* PrimoDocumentRuntimeLive in Frameworks */ = {isa = PBXBuildFile; productRef = B94000000000000000000013 /* PrimoDocumentRuntimeLive */; };
+		B94000000000000000000003 /* PrimoDocumentAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B94000000000000000000013 /* PrimoDocumentAppSupport */; };
 		B94000000000000000000004 /* PrimoCanvasPresentationRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B94000000000000000000014 /* PrimoCanvasPresentationRuntime */; };
 		B9000000000000000000003B /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B9000000000000000000003C /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
@@ -414,7 +413,7 @@
 				AA100000000000000000000E /* PrimoDocumentStrokeApplication in Frameworks */,
 				AA100000000000000000000D /* PrimoDocumentGPUContracts in Frameworks */,
 				AA100000000000000000000C /* PrimoDocumentRuntime in Frameworks */,
-				B94000000000000000000003 /* PrimoDocumentRuntimeLive in Frameworks */,
+				B94000000000000000000003 /* PrimoDocumentAppSupport in Frameworks */,
 				B94000000000000000000004 /* PrimoCanvasPresentationRuntime in Frameworks */,
 				B90000000000000000000031 /* PrimoDocumentRuntime in Frameworks */,
 				B90000000000000000000023 /* PrimoBrushDomain in Frameworks */,
@@ -780,7 +779,7 @@
 				B9000000000000000000002A /* PrimoDocumentApplication */,
 				B90000000000000000000036 /* PrimoDocumentRuntime */,
 				B90000000000000000000032 /* PrimoDocumentRuntime */,
-				B94000000000000000000013 /* PrimoDocumentRuntimeLive */,
+				B94000000000000000000013 /* PrimoDocumentAppSupport */,
 				B94000000000000000000014 /* PrimoCanvasPresentationRuntime */,
 				AA9000000000000000000001 /* PrimoDocumentGPUContracts */,
 				B91000000000000000000012 /* PrimoDocumentStrokeApplication */,
@@ -1506,11 +1505,6 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentRuntime;
 		};
-		B94000000000000000000011 /* PrimoDocumentRuntimeLive */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoDocumentRuntimeLive;
-		};
 		B95000000000000000000011 /* PrimoDocumentAppSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
@@ -1521,10 +1515,10 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoCanvasPresentationRuntime;
 		};
-		B94000000000000000000013 /* PrimoDocumentRuntimeLive */ = {
+		B94000000000000000000013 /* PrimoDocumentAppSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoDocumentRuntimeLive;
+			productName = PrimoDocumentAppSupport;
 		};
 		B94000000000000000000014 /* PrimoCanvasPresentationRuntime */ = {
 			isa = XCSwiftPackageProductDependency;

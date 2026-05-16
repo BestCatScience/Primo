@@ -20,7 +20,6 @@ let package = Package(
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
         .library(name: "PrimoDocumentRuntime", targets: ["PrimoDocumentRuntime"]),
-        .library(name: "PrimoDocumentRuntimeLive", targets: ["PrimoDocumentRuntimeLive"]),
         .library(name: "PrimoDocumentAppSupport", targets: ["PrimoDocumentAppSupport"]),
         .library(name: "PrimoCanvasPresentationRuntime", targets: ["PrimoCanvasPresentationRuntime"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),

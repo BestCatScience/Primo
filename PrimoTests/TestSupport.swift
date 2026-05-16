@@ -13,7 +13,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
+import PrimoDocumentAppSupport
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
 @testable import Primo
@@ -311,17 +311,17 @@ extension DocumentQueryGateway {
         presentation: PaintDocumentPresentation = .testValue()
     ) -> Self {
         Self(
-            lightweightPresentation: { presentation },
-            presentation: { presentation }
+            lightweightPresentation: { .success(presentation) },
+            presentation: { .success(presentation) }
         )
     }
 }
 
 extension DocumentRenderGateway {
     static func stub(
-        compositePixelData: @escaping @Sendable () -> Data = { Data() },
-        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface = {
-            DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
+        compositePixelData: @escaping @Sendable () -> Result<Data, DocumentMutationFailure> = { .success(Data()) },
+        compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure> = {
+            .success(DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0])))
         },
         pixelDataForLayer: @escaping @Sendable (Int) -> Result<Data, DocumentMutationFailure> = { _ in .success(Data()) }
     ) -> Self {
@@ -333,42 +333,44 @@ extension DocumentRenderGateway {
     }
 }
 
-extension DocumentMutationGateway {
+extension DocumentCanvasCommandService {
     static func stub(
-        resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult = { _, _ in .success(()) },
-        resizeCanvasExtent: @escaping @Sendable (Int, Int) -> DocumentMutationResult = { _, _ in .success(()) },
-        addLayer: @escaping @Sendable (String) -> DocumentIndexedMutationResult = { _ in .success(0) },
-        deleteLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
-        setActiveLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
-        setLayerName: @escaping @Sendable (Int, String) -> DocumentMutationResult = { _, _ in .success(()) },
-        setLayerVisibility: @escaping @Sendable (Int, Bool) -> DocumentMutationResult = { _, _ in .success(()) },
-        revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
+        createCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult = { _ in .success(()) },
+        resizeCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult = { _ in .success(()) },
+        resizeCanvasExtent: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult = { _ in .success(()) },
+        initializeImportedCanvas: @escaping @Sendable (ImportedCanvasRequest, String) -> DocumentMutationResult = { _, _ in .success(()) },
+        compositeSurface: @escaping @Sendable () -> Result<DocumentCompositeSurface, DocumentMutationFailure> = {
+            .success(DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0])))
+        }
+    ) -> Self {
+        Self(
+            createCanvas: createCanvas,
+            resizeCanvas: resizeCanvas,
+            resizeCanvasExtent: resizeCanvasExtent,
+            initializeImportedCanvas: initializeImportedCanvas,
+            compositeSurface: compositeSurface
+        )
+    }
+}
+
+extension DocumentLayerCommandService {
+    static func stub(
+        ensureLayerVisible: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .success(()) },
         replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult = { _, _, _ in .success(()) },
         applyLayerSurfaceMutation: @escaping @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult = { _, _ in .success(()) },
         applyLayerMutation: @escaping @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult = { _, _ in .success(()) },
         applyTextLayerMutation: @escaping @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult = { _, _, _ in .success(()) },
-        applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .success(()) }
+        revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) }
     ) -> Self {
         Self(
-            resizeCanvas: resizeCanvas,
-            resizeCanvasExtent: resizeCanvasExtent,
-            addLayer: addLayer,
-            deleteLayer: deleteLayer,
-            setActiveLayer: setActiveLayer,
-            setLayerName: setLayerName,
-            setLayerVisibility: setLayerVisibility,
-            revealLayerForEditing: revealLayerForEditing,
+            ensureLayerVisible: ensureLayerVisible,
             replaceLayerPixels: replaceLayerPixels,
             replaceLayerPixelsInRect: replaceLayerPixelsInRect,
             applyLayerSurfaceMutation: applyLayerSurfaceMutation,
             applyLayerMutation: applyLayerMutation,
             applyTextLayerMutation: applyTextLayerMutation,
-            replaceLayerMask: { _, _ in .success(()) },
-            clearLayerMask: { _ in .success(()) },
-            applyLayerMask: { _ in .success(()) },
-            clearLayer: { _ in .success(()) },
-            applyLayerProcessing: applyLayerProcessing
+            revealLayerForEditing: revealLayerForEditing
         )
     }
 }
@@ -376,15 +378,15 @@ extension DocumentMutationGateway {
 extension StrokeInputGateway {
     static func stub(
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult = { _, _, _, _ in .success(()) },
-        cancelBlurStroke: @escaping @Sendable () -> Void = {},
+        cancelBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) },
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult = { _, _ in .success(()) },
         applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult = { _, _, _ in .success(()) }
     ) -> Self {
         Self(
-            beginStroke: { _, _ in },
-            appendStroke: { _ in },
+            beginStroke: { _, _ in .success(()) },
+            appendStroke: { _ in .success(()) },
             endStroke: { .success(()) },
-            cancelStroke: {},
+            cancelStroke: { .success(()) },
             blurStroke: blurStroke,
             endBlurStroke: { .success(()) },
             cancelBlurStroke: cancelBlurStroke,
@@ -400,8 +402,8 @@ extension DocumentHistoryGateway {
         redo: @escaping @Sendable () -> DocumentMutationResult = { .success(()) }
     ) -> Self {
         Self(
-            canUndo: { true },
-            canRedo: { true },
+            canUndo: { .success(true) },
+            canRedo: { .success(true) },
             undo: undo,
             redo: redo
         )
@@ -441,9 +443,9 @@ extension DocumentPersistenceGateway {
         Self(
             saveProject: saveProject,
             loadProject: loadProject,
-            setPaperStyle: { _ in },
-            newCanvas: { _, _ in },
-            prewarmDrawingResources: {}
+            setPaperStyle: { _ in .success(()) },
+            newCanvas: { _, _ in .success(()) },
+            prewarmDrawingResources: { .success(()) }
         )
     }
 }
@@ -455,9 +457,9 @@ extension DocumentExportGateway {
         timelapseCapture: @escaping @Sendable () -> TimelapseCapture? = { nil }
     ) -> Self {
         Self(
-            compositeSurface: compositeSurface,
-            compositePNGData: compositePNGData,
-            timelapseCapture: timelapseCapture
+            compositeSurface: { .success(compositeSurface($0)) },
+            compositePNGData: { .success(compositePNGData($0)) },
+            timelapseCapture: { .success(timelapseCapture()) }
         )
     }
 }
@@ -535,6 +537,18 @@ private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, SelectionMaskP
     }
 }
 
+private struct TestCanvasEyedropperSampler: CanvasEyedropperSampling {
+    func sampledColor(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        source: EyedropperSamplingSource,
+        point: CGPoint,
+        paperStyle: CanvasPaperStyle
+    ) -> SampledColor? {
+        nil
+    }
+}
+
 private struct TestLayerTransformProcessor: LayerTransformProcessing {
     let gateway: TestGpuOperationGateway
 
@@ -600,7 +614,6 @@ extension DocumentApplicationEnvironment {
     static func stub(
         queryGateway: DocumentQueryGateway = .stub(),
         renderGateway: DocumentRenderGateway = .stub(),
-        mutationGateway: DocumentMutationGateway = .stub(),
         strokeGateway: StrokeInputGateway = .stub(),
         historyGateway: DocumentHistoryGateway = .stub(),
         persistenceGateway: DocumentPersistenceGateway = .stub(),
@@ -618,7 +631,6 @@ extension DocumentApplicationEnvironment {
             workflows: DocumentApplicationRuntime.stub(
                 queryGateway: queryGateway,
                 renderGateway: renderGateway,
-                mutationGateway: mutationGateway,
                 strokeGateway: strokeGateway,
                 historyGateway: historyGateway,
                 persistenceGateway: persistenceGateway,
@@ -640,7 +652,6 @@ extension DocumentApplicationRuntime {
     static func stub(
         queryGateway: DocumentQueryGateway = .stub(),
         renderGateway: DocumentRenderGateway = .stub(),
-        mutationGateway: DocumentMutationGateway = .stub(),
         strokeGateway: StrokeInputGateway = .stub(),
         historyGateway: DocumentHistoryGateway = .stub(),
         persistenceGateway: DocumentPersistenceGateway = .stub(),
@@ -654,67 +665,36 @@ extension DocumentApplicationRuntime {
         layerTransformProcessor: (any LayerTransformProcessing)? = nil,
         selectionMaskProcessor: (any SelectionMaskProcessing)? = nil
     ) -> Self {
-        let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
+        let baseWorkflows = DocumentAppRuntimeSupport.liveWorkflows()
         let canvasCommands = DocumentCanvasCommandService(
-            queryGateway: queryGateway,
-            renderGateway: renderGateway,
-            mutationGateway: mutationGateway,
-            persistenceGateway: persistenceGateway
+            createCanvas: { size in
+                switch persistenceGateway.newCanvas(size.width, size.height) {
+                case let .failure(failure): return .failure(failure)
+                case .success: break
+                }
+                return persistenceGateway.prewarmDrawingResources()
+            },
+            resizeCanvas: { _ in .success(()) },
+            resizeCanvasExtent: { _ in .success(()) },
+            initializeImportedCanvas: { _, _ in .success(()) },
+            compositeSurface: {
+                .success(DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0])))
+            }
         )
-        let layerCommands = DocumentLayerCommandService(mutationGateway: mutationGateway)
         let strokeCommands = DocumentStrokeCommandService(strokeGateway: strokeGateway)
         let canvasStrokeInteractionService = CanvasStrokeInteractionService(
             sessionUseCase: strokeSessionUseCase ?? .stub()
         )
         let historyCommands = DocumentHistoryCommandService(historyGateway: historyGateway)
-        let mutationWorkflow = DocumentMutationWorkflowService(
-            documentQueryGateway: queryGateway,
-            documentEditingGateway: resolvedEditingGateway,
-            documentLayerEffectsGateway: layerEffectsGateway
-        )
-        let contentService = DocumentContentService(
-            documentQueryGateway: queryGateway,
-            documentRenderGateway: renderGateway,
-            documentEditingGateway: resolvedEditingGateway,
-            documentMutationGateway: mutationGateway
-        )
         let defaultCanvasPreviewRenderer = TestCanvasPreviewRenderer(gateway: gpuOperationGateway)
         let canvasPreviewRenderer = canvasPreviewRenderer ?? defaultCanvasPreviewRenderer
-        let layerTransformProcessor = layerTransformProcessor ?? TestLayerTransformProcessor(gateway: gpuOperationGateway)
         let selectionMaskProcessor = selectionMaskProcessor ?? defaultCanvasPreviewRenderer
-        let canvasEditingWorkflow = CanvasEditingWorkflowService(
-            documentContentService: contentService,
-            layerTransformProcessor: layerTransformProcessor
-        )
-        let selectionWorkflow = SelectionWorkflowService(
-            combinedSelectionMask: { _, _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
-            expandedSelectionMask: { request in
-                gpuOperationGateway.expandedSelectionMask(request)
-                    .map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
-            },
-            lassoSelection: { _, _, _ in .failure(.kernelFailed(operation: "stub")) },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
-            colorRangeSelection: { _, _, _, _ in .failure(.kernelFailed(operation: "stub")) },
-            expandedMask: { mask, _, _, _ in .success(mask) },
-            contractedMask: { mask, _, _, _ in .success(mask) },
-            featheredMask: { mask, _, _, _ in .success(mask) },
-            invertMask: { mask in .success(mask.map { $0 == 0 ? 255 : 0 }) },
-            croppedSelectionMask: { _, _, _ in nil }
-        )
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: PrimoDocumentRuntimeLive.GpuCanvasEyedropperSampler(),
+            eyedropperSampler: TestCanvasEyedropperSampler(),
             selectionProcessor: selectionMaskProcessor
         )
-        let renderingWorkflow = DocumentApplicationRuntimeFactory.liveWorkflows().presentation.renderingWorkflow
-        let textLayerService = DocumentTextLayerService(
-            textLayerData: { _ in nil },
-            setTextLayer: { index, textLayer in
-                resolvedEditingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
-                    .map { _ in () }
-            },
-            clearTextLayerData: { _ in }
-        )
+        let renderingWorkflow = DocumentAppRuntimeSupport.liveWorkflows().presentation.renderingWorkflow
         let exportClient = DocumentExportClient(
             compositeSurface: exportGateway.compositeSurface,
             compositePNGData: exportGateway.compositePNGData,
@@ -724,13 +704,13 @@ extension DocumentApplicationRuntime {
             saveProject: persistenceGateway.saveProject,
             loadProject: persistenceGateway.loadProject,
             setPaperStyle: persistenceGateway.setPaperStyle,
-            rawNewCanvas: persistenceGateway.newCanvas,
+            newCanvas: { size in persistenceGateway.newCanvas(size.width, size.height) },
             prewarmDrawingResources: persistenceGateway.prewarmDrawingResources
         )
         return Self(
             presentation: DocumentPresentationRuntime(
-                lightweightPresentation: { .testValue() },
-                presentation: { .testValue() },
+                lightweightPresentation: { .success(.testValue()) },
+                presentation: { .success(.testValue()) },
                 renderingWorkflow: renderingWorkflow
             ),
             canvasMutation: CanvasMutationRuntime(
@@ -741,21 +721,12 @@ extension DocumentApplicationRuntime {
                 strokeCommands: strokeCommands,
                 canvasStrokeInteractionService: canvasStrokeInteractionService
             ),
-            layerEditing: LayerEditingRuntime(
-                layerCommands: layerCommands,
-                mutationWorkflow: mutationWorkflow,
-                contentService: contentService,
-                textLayerService: textLayerService,
-                selectionWorkflow: selectionWorkflow,
-                canvasStrokeInteractionService: canvasStrokeInteractionService,
-                layerTransformProcessor: layerTransformProcessor,
-                canvasEditingWorkflow: canvasEditingWorkflow
-            ),
+            layerEditing: baseWorkflows.layerEditing,
             persistence: DocumentPersistenceRuntime(persistenceClient: persistenceClient),
             export: DocumentExportRuntime(exportClient: exportClient),
             preview: CanvasPreviewRuntime(
                 canvasPreviewRenderer: canvasPreviewRenderer,
-                canvasEyedropperSampler: PrimoDocumentRuntimeLive.GpuCanvasEyedropperSampler(),
+                canvasEyedropperSampler: TestCanvasEyedropperSampler(),
                 selectionMaskProcessor: selectionMaskProcessor,
                 canvasPresentationEnvironment: canvasPresentationEnvironment
             )
@@ -843,9 +814,9 @@ extension TextLayerGateway {
         setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult = { _, _ in .success(()) }
     ) -> Self {
         Self(
-            textLayerData: { _ in nil },
+            textLayerData: { _ in .success(nil) },
             setTextLayer: setTextLayer,
-            clearTextLayerData: { _ in }
+            clearTextLayerData: { _ in .success(()) }
         )
     }
 }

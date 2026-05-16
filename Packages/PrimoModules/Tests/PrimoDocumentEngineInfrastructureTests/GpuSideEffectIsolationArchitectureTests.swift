@@ -396,6 +396,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "PrimoDocumentPersistenceInfrastructure",
             "PrimoDocumentMetalRuntimeInfrastructure",
             "PrimoDocumentRenderingInfrastructure",
+            "PrimoDocumentRuntimeLive",
             "PrimoDocumentStrokeInfrastructure",
             "PrimoDocumentTimelapseInfrastructure",
             "PrimoWorkspaceInfrastructure"
@@ -438,6 +439,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "product: PrimoDocumentMetalSurfaceInfrastructure",
             "product: PrimoDocumentPersistenceInfrastructure",
             "product: PrimoDocumentRenderingInfrastructure",
+            "product: PrimoDocumentRuntimeLive",
             "product: PrimoDocumentStrokeInfrastructure",
             "product: PrimoDocumentTimelapseInfrastructure",
             "product: PrimoWorkspaceInfrastructure"
@@ -469,9 +471,15 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(appTargetBlock.contains("- target: PrimoAppSupport"))
         #expect(appTargetBlock.contains("product: PrimoDocumentAppSupport"))
         #expect(!appTargetBlock.contains("product: PrimoDocumentRuntimeLive"))
-        #expect(package.contains(".library(name: \"PrimoDocumentAppSupport\""))
-        #expect(package.contains("name: \"PrimoDocumentAppSupport\""))
-        #expect(package.contains("\"PrimoDocumentRuntimeLive\""))
+        let productNames = PackageManifestProductParser.libraryProductNames(in: package)
+        #expect(productNames.contains("PrimoDocumentAppSupport"))
+        #expect(!productNames.contains("PrimoDocumentRuntimeLive"))
+        let graph = try Self.packageTargetGraph()
+        let appSupportDependencies = try #require(graph["PrimoDocumentAppSupport"])
+        #expect(
+            appSupportDependencies.contains("PrimoDocumentRuntimeLive"),
+            "PrimoDocumentAppSupport should depend on the internal PrimoDocumentRuntimeLive target"
+        )
 
         let runtimeWiringProducts = [
             "PrimoBrushRuntime",
@@ -517,6 +525,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         for product in Self.infrastructureProductNames(in: package) {
             #expect(!product.hasSuffix("Infrastructure"), "\(product) should remain an internal target, not a library product")
         }
+        let productNames = PackageManifestProductParser.libraryProductNames(in: package)
+        #expect(
+            !productNames.contains("PrimoDocumentRuntimeLive"),
+            "PrimoDocumentRuntimeLive should remain an internal target, not a library product"
+        )
     }
 
     @Test

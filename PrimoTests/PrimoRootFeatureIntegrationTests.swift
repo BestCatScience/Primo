@@ -14,7 +14,6 @@ import PrimoWorkspaceApplication
 import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
-import PrimoDocumentRuntimeLive
 
 @MainActor
 final class PrimoRootFeatureIntegrationTests: XCTestCase {

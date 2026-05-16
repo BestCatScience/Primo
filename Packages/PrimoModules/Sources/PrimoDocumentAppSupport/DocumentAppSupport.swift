@@ -85,6 +85,18 @@ public enum DocumentAppStrokeMath {
         )
     }
 
+    public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: brush)
+    }
+
+    public static func shouldUseGpuOnlyResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
+    }
+
+    public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
+        GpuRenderingSupport.responsivePreviewBrush(from: brush)
+    }
+
     public static func previewStampAlpha(
         pressure: Double,
         opacityJitter: Double,
