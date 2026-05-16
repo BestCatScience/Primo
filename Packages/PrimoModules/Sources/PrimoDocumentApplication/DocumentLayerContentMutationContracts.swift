@@ -146,10 +146,6 @@ public enum ValidatedLayerContentMutationCommand: Equatable, Sendable {
     case applyMask(index: EditableLayerIndex)
 }
 
-public struct LayerContentMutationPlan: Equatable, Sendable {
-    public init() {}
-}
-
 public protocol LayerContentGateway: Sendable {
     func replaceLayerPixels(index: EditableLayerIndex, pixelData: LayerPixelData) -> DocumentLayerMutationResult
     func setTextLayer(index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentLayerMutationResult
@@ -223,7 +219,7 @@ package struct LayerContentMutationUseCase: Sendable {
         _ command: LayerContentMutationCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerContentGateway
-    ) -> Result<LayerContentMutationPlan, DocumentLayerMutationFailure> {
+    ) -> DocumentLayerMutationResult {
         let validatedCommand: ValidatedLayerContentMutationCommand
         switch validator.validated(command, in: context) {
         case let .failure(failure):
@@ -234,19 +230,19 @@ package struct LayerContentMutationUseCase: Sendable {
 
         switch validatedCommand {
         case let .replacePixels(index, pixelData):
-            return gateway.replaceLayerPixels(index: index, pixelData: pixelData).map { LayerContentMutationPlan() }
+            return gateway.replaceLayerPixels(index: index, pixelData: pixelData)
         case let .setTextLayer(index, textLayer):
-            return gateway.setTextLayer(index: index, textLayer: textLayer).map { LayerContentMutationPlan() }
+            return gateway.setTextLayer(index: index, textLayer: textLayer)
         case let .clear(index):
-            return gateway.clearLayer(index: index).map { LayerContentMutationPlan() }
+            return gateway.clearLayer(index: index)
         case let .applyProcessing(index, request):
-            return gateway.applyLayerProcessing(index: index, request: request).map { LayerContentMutationPlan() }
+            return gateway.applyLayerProcessing(index: index, request: request)
         case let .replaceMask(index, mask):
-            return gateway.replaceLayerMask(index: index, mask: mask).map { LayerContentMutationPlan() }
+            return gateway.replaceLayerMask(index: index, mask: mask)
         case let .clearMask(index):
-            return gateway.clearLayerMask(index: index).map { LayerContentMutationPlan() }
+            return gateway.clearLayerMask(index: index)
         case let .applyMask(index):
-            return gateway.applyLayerMask(index: index).map { LayerContentMutationPlan() }
+            return gateway.applyLayerMask(index: index)
         }
     }
 }

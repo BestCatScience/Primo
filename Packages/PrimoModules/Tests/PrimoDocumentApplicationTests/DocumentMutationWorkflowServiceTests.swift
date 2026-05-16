@@ -175,7 +175,7 @@ struct DocumentMutationWorkflowServiceTests {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1, revision: { DocumentRevision(2) }),
-            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content) },
             documentLayerEffectsGateway: .unused
         )
         let staleIndex = try #require(editableLayerIndex(0, revision: DocumentRevision(1), layerCount: 1))
@@ -235,7 +235,7 @@ struct DocumentMutationWorkflowServiceTests {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
-            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content) },
             documentLayerEffectsGateway: .unused
         )
         let index = try #require(editableLayerIndex(0, layerCount: 1))
@@ -267,7 +267,7 @@ struct DocumentMutationWorkflowServiceTests {
         ))
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 7),
-            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content(LayerContentMutationPlan())) },
+            documentEditingGateway: .recordingContent(recorder) { _ in .success(.content) },
             documentLayerEffectsGateway: .unused
         )
 

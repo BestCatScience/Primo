@@ -137,7 +137,7 @@ struct PaintDocumentMutationContractTests {
         expectSuccess(runtime.setFolderName(folderID, "References"))
         expectSuccess(runtime.setFolderExpanded(folderID, false))
 
-        guard case let .operations(operations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
+        guard case let .operations(operations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
@@ -336,14 +336,14 @@ struct PaintDocumentMutationContractTests {
             return
         }
         expectSuccess(runtime.mutationGateway.replaceLayerPixels(upperIndex, upper))
-        guard case let .operations(beforeOperations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
+        guard case let .operations(beforeOperations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
 
         expectSuccess(runtime.mergeLayerDown(upperIndex))
 
-        guard case let .operations(afterOperations) = try runtime.exportGateway.timelapseCapture().get()?.source else {
+        guard case let .operations(afterOperations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }

@@ -78,6 +78,48 @@ public struct TimelapseCapture: Equatable, Sendable {
     }
 }
 
+public enum PreviewUnavailableReason: Equatable, Sendable {
+    case generationUnavailable
+}
+
+public enum PreviewOutcome: Equatable, Sendable {
+    case available(DocumentCompositeSurface)
+    case unavailable(reason: PreviewUnavailableReason)
+
+    public var surface: DocumentCompositeSurface? {
+        guard case let .available(surface) = self else { return nil }
+        return surface
+    }
+}
+
+public enum PreviewDataUnavailableReason: Equatable, Sendable {
+    case generationUnavailable
+}
+
+public enum PreviewDataOutcome: Equatable, Sendable {
+    case available(Data)
+    case unavailable(reason: PreviewDataUnavailableReason)
+
+    public var data: Data? {
+        guard case let .available(data) = self else { return nil }
+        return data
+    }
+}
+
+public enum TimelapseCaptureUnavailableReason: Equatable, Sendable {
+    case noHistory
+}
+
+public enum TimelapseCaptureOutcome: Equatable, Sendable {
+    case available(TimelapseCapture)
+    case unavailable(reason: TimelapseCaptureUnavailableReason)
+
+    public var capture: TimelapseCapture? {
+        guard case let .available(capture) = self else { return nil }
+        return capture
+    }
+}
+
 public struct DocumentPersistenceGateway: Sendable {
     public let saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
     public let loadProject: @Sendable (URL) throws -> LoadedPaintProject
@@ -101,14 +143,14 @@ public struct DocumentPersistenceGateway: Sendable {
 }
 
 public struct DocumentExportGateway: Sendable {
-    public let compositeSurface: @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>
-    public let compositePNGData: @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>
-    public let timelapseCapture: @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
+    public let compositeSurface: @Sendable (CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure>
+    public let compositePNGData: @Sendable (CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure>
+    public let timelapseCapture: @Sendable () -> Result<TimelapseCaptureOutcome, DocumentMutationFailure>
 
     public init(
-        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> = { _ in .success(nil) },
-        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>,
-        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure> = { _ in .success(.unavailable(reason: .generationUnavailable)) },
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure>,
+        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCaptureOutcome, DocumentMutationFailure>
     ) {
         self.compositeSurface = compositeSurface
         self.compositePNGData = compositePNGData

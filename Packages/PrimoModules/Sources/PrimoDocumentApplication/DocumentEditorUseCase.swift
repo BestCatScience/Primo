@@ -12,7 +12,7 @@ package enum DocumentEditorRequest: Equatable, Sendable {
 public enum DocumentEditorResult: Equatable, Sendable {
     case structure(LayerStructureMutationPlan)
     case attribute(LayerAttributeMutationPlan)
-    case content(LayerContentMutationPlan)
+    case content
 }
 
 public protocol DocumentEditorGateway: LayerStructureGateway, LayerAttributeGateway, LayerContentGateway {}
@@ -51,7 +51,7 @@ package struct DocumentEditorUseCase: Sendable {
         case let .content(command):
             return contentUseCase
                 .execute(command, in: context, gateway: gateway)
-                .map(DocumentEditorResult.content)
+                .map { .content }
         }
     }
 }

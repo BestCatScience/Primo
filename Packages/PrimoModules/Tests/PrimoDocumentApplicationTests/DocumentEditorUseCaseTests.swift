@@ -145,7 +145,7 @@ struct DocumentEditorUseCaseTests {
             gateway: gateway
         )
 
-        #expect(try result.get() == .content(LayerContentMutationPlan()))
+        #expect(try result.get() == .content)
         #expect(gateway.contentEvents == ["replacePixels:2:4"])
     }
 
@@ -165,7 +165,7 @@ struct DocumentEditorUseCaseTests {
             gateway: gateway
         )
 
-        #expect(try result.get() == .content(LayerContentMutationPlan()))
+        #expect(try result.get() == .content)
         #expect(gateway.contentEvents == ["process:1:true"])
     }
 

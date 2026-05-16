@@ -574,7 +574,7 @@ private func editingGateway(
             case let .applyMask(index):
                 recorder.record("applyLayerMask:\(index)")
             }
-            return contentResult.map { .content(LayerContentMutationPlan()) }
+            return contentResult.map { .content }
         case .structure, .attribute:
             return .failure(.bridgeMutationFailed("unexpected"))
         }

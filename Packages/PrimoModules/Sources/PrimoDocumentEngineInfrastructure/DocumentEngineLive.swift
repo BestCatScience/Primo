@@ -487,27 +487,36 @@ package enum DocumentEngineFactory {
                 runtimeExecutor.performValue(operation: "exportCompositeSurface") {
                     $0.materializedSnapshot()
                 }.map {
-                    SwiftDocumentRuntime.compositeExportSurface(
+                    guard let surface = SwiftDocumentRuntime.compositeExportSurface(
                         forMaterializedSnapshot: $0,
                         paperStyle: style,
                         gpuServices: gpuServices
-                    )
+                    ) else {
+                        return .unavailable(reason: .generationUnavailable)
+                    }
+                    return .available(surface)
                 }
             },
             compositePNGData: { style in
                 runtimeExecutor.performValue(operation: "compositePNGData") {
                     $0.materializedSnapshot()
                 }.map {
-                    SwiftDocumentRuntime.compositePNGData(
+                    guard let data = SwiftDocumentRuntime.compositePNGData(
                         forMaterializedSnapshot: $0,
                         paperStyle: style,
                         gpuServices: gpuServices
-                    )
+                    ) else {
+                        return .unavailable(reason: .generationUnavailable)
+                    }
+                    return .available(data)
                 }
             },
             timelapseCapture: {
                 runtimeExecutor.performValue(operation: "timelapseCapture") {
-                    $0.timelapseCapture()
+                    guard let capture = $0.timelapseCapture() else {
+                        return .unavailable(reason: .noHistory)
+                    }
+                    return .available(capture)
                 }
             }
         )
@@ -1014,117 +1023,11 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
 }
 
 private func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure {
-    switch failure {
-    case let .invalidLayerIndex(index):
-        return .invalidLayerIndex(index)
-    case let .staleLayerIndex(index, validationRevision, currentRevision):
-        return .staleLayerIndex(index: index, validationRevision: validationRevision, currentRevision: currentRevision)
-    case let .invalidFolderID(folderID):
-        return .invalidFolderID(folderID)
-    case let .staleFolderID(folderID, validationRevision, currentRevision):
-        return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
-    case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
-        return .staleLayerAnchor(
-            anchorLayerIndex: anchorLayerIndex,
-            validationRevision: validationRevision,
-            currentRevision: currentRevision
-        )
-    case let .layerLocked(index):
-        return .layerLocked(index)
-    case let .alphaLocked(index):
-        return .alphaLocked(index)
-    case let .invalidCanvasSize(width, height):
-        return .invalidCanvasSize(width: width, height: height)
-    case let .invalidOpacity(opacity):
-        return .invalidOpacity(opacity)
-    case let .invalidLayerProcessingRequest(reason):
-        return .invalidLayerProcessingRequest(reason)
-    case .emptyInput:
-        return .emptyInput
-    case .noUndoState:
-        return .noUndoState
-    case .noRedoState:
-        return .noRedoState
-    case let .gpu(failure):
-        return .gpu(failure)
-    case let .unexpectedGatewayResult(operation, expected, actual):
-        return .unexpectedGatewayResult(operation: operation, expected: expected, actual: actual)
-    case let .rawAPIUnavailable(operation):
-        return .rawAPIUnavailable(operation: operation)
-    case let .inconsistentComposition(operation, reason):
-        return .inconsistentComposition(operation: operation, reason: reason)
-    case let .bridgeMutationFailed(message):
-        return .bridgeMutationFailed(message)
-    case let .incompatibleLayerType(index):
-        return .incompatibleLayerType(index)
-    case let .rollbackFailed(operation, underlying):
-        return .rollbackFailed(
-            operation: operation,
-            underlying: mapDocumentEditorFailure(underlying)
-        )
-    case let .transactionFailure(primary, rollback):
-        return .transactionFailure(
-            primary: mapDocumentEditorFailure(primary),
-            rollback: mapDocumentEditorFailure(rollback)
-        )
-    }
+    DocumentMutationFailure(coreFailure: failure.coreFailure)
 }
 
 private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLayerMutationFailure {
-    switch failure {
-    case let .invalidLayerIndex(index):
-        return .invalidLayerIndex(index)
-    case let .staleLayerIndex(index, validationRevision, currentRevision):
-        return .staleLayerIndex(index: index, validationRevision: validationRevision, currentRevision: currentRevision)
-    case let .invalidFolderID(folderID):
-        return .invalidFolderID(folderID)
-    case let .staleFolderID(folderID, validationRevision, currentRevision):
-        return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
-    case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
-        return .staleLayerAnchor(
-            anchorLayerIndex: anchorLayerIndex,
-            validationRevision: validationRevision,
-            currentRevision: currentRevision
-        )
-    case let .layerLocked(index):
-        return .layerLocked(index)
-    case let .alphaLocked(index):
-        return .alphaLocked(index)
-    case let .invalidCanvasSize(width, height):
-        return .invalidCanvasSize(width: width, height: height)
-    case let .invalidOpacity(opacity):
-        return .invalidOpacity(opacity)
-    case let .invalidLayerProcessingRequest(reason):
-        return .invalidLayerProcessingRequest(reason)
-    case .emptyInput:
-        return .emptyInput
-    case .noUndoState:
-        return .noUndoState
-    case .noRedoState:
-        return .noRedoState
-    case let .gpu(failure):
-        return .gpu(failure)
-    case let .unexpectedGatewayResult(operation, expected, actual):
-        return .unexpectedGatewayResult(operation: operation, expected: expected, actual: actual)
-    case let .rawAPIUnavailable(operation):
-        return .rawAPIUnavailable(operation: operation)
-    case let .inconsistentComposition(operation, reason):
-        return .inconsistentComposition(operation: operation, reason: reason)
-    case let .bridgeMutationFailed(message):
-        return .bridgeMutationFailed(message)
-    case let .incompatibleLayerType(index):
-        return .incompatibleLayerType(index)
-    case let .rollbackFailed(operation, underlying):
-        return .rollbackFailed(
-            operation: operation,
-            underlying: mapDocumentRuntimeFailure(underlying)
-        )
-    case let .transactionFailure(primary, rollback):
-        return .transactionFailure(
-            primary: mapDocumentRuntimeFailure(primary),
-            rollback: mapDocumentRuntimeFailure(rollback)
-        )
-    }
+    DocumentLayerMutationFailure(coreFailure: failure.coreFailure)
 }
 
 public final class DocumentTimelapseReplayService: @unchecked Sendable {

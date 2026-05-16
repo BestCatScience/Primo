@@ -34,8 +34,8 @@ extension ImportExportFeature {
     func handleExportDocumentRequest(state: inout State) -> Effect<Action> {
         let pngData: Data?
         switch documentExportGateway.compositePNGData(.default) {
-        case let .success(data):
-            pngData = data
+        case let .success(outcome):
+            pngData = outcome.data
         case let .failure(failure):
             if let feedback = DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure) {
                 return .send(.delegate(.presentFeedback(feedback)))
@@ -57,8 +57,8 @@ extension ImportExportFeature {
     func handleTimelapseExportRequest(state: inout State) -> Effect<Action> {
         let capture: TimelapseCapture?
         switch documentExportGateway.timelapseCapture() {
-        case let .success(result):
-            capture = result
+        case let .success(outcome):
+            capture = outcome.capture
         case let .failure(failure):
             if let feedback = DocumentFeature.DocumentMutationFeedbackMapper().feedback(for: failure) {
                 return .send(.delegate(.presentFeedback(feedback)))

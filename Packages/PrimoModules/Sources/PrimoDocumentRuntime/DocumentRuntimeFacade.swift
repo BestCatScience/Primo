@@ -253,29 +253,29 @@ public struct DocumentPersistenceClient: Sendable {
 }
 
 public struct DocumentExportClient: Sendable {
-    private let compositeSurfaceHandler: @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>
-    private let compositePNGDataHandler: @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>
-    private let timelapseCaptureHandler: @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
+    private let compositeSurfaceHandler: @Sendable (CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure>
+    private let compositePNGDataHandler: @Sendable (CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure>
+    private let timelapseCaptureHandler: @Sendable () -> Result<TimelapseCaptureOutcome, DocumentMutationFailure>
 
     public init(
-        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure>,
-        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure>,
-        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCapture?, DocumentMutationFailure>
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure>,
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure>,
+        timelapseCapture: @escaping @Sendable () -> Result<TimelapseCaptureOutcome, DocumentMutationFailure>
     ) {
         self.compositeSurfaceHandler = compositeSurface
         self.compositePNGDataHandler = compositePNGData
         self.timelapseCaptureHandler = timelapseCapture
     }
 
-    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> {
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure> {
         compositeSurfaceHandler(paperStyle)
     }
 
-    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure> {
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure> {
         compositePNGDataHandler(paperStyle)
     }
 
-    public func timelapseCapture() -> Result<TimelapseCapture?, DocumentMutationFailure> {
+    public func timelapseCapture() -> Result<TimelapseCaptureOutcome, DocumentMutationFailure> {
         timelapseCaptureHandler()
     }
 }
@@ -1199,9 +1199,9 @@ public struct DocumentExportRuntime: Sendable {
         self.exportClient = services.exportClient
     }
 
-    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<DocumentCompositeSurface?, DocumentMutationFailure> { exportClient.compositeSurface(paperStyle) }
-    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<Data?, DocumentMutationFailure> { exportClient.compositePNGData(paperStyle) }
-    public func timelapseCapture() -> Result<TimelapseCapture?, DocumentMutationFailure> { exportClient.timelapseCapture() }
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> Result<PreviewOutcome, DocumentMutationFailure> { exportClient.compositeSurface(paperStyle) }
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Result<PreviewDataOutcome, DocumentMutationFailure> { exportClient.compositePNGData(paperStyle) }
+    public func timelapseCapture() -> Result<TimelapseCaptureOutcome, DocumentMutationFailure> { exportClient.timelapseCapture() }
 }
 
 public struct CanvasPreviewRuntime: Sendable {

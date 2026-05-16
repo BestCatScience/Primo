@@ -765,11 +765,22 @@ struct DocumentRuntimeCompositionTests {
         )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
-        #expect(body.contains("case let .alphaLocked(index):\n        return .alphaLocked(index)"))
-        #expect(body.contains("case let .invalidCanvasSize(width, height):\n        return .invalidCanvasSize(width: width, height: height)"))
-        #expect(body.contains("case .emptyInput:\n        return .emptyInput"))
-        #expect(body.contains("case .noUndoState:\n        return .noUndoState"))
-        #expect(body.contains("case let .incompatibleLayerType(index):\n        return .incompatibleLayerType(index)"))
+        let coreFailures: [DocumentMutationCoreFailure] = [
+            .alphaLocked(1),
+            .invalidCanvasSize(width: 2, height: 3),
+            .emptyInput,
+            .noUndoState,
+            .incompatibleLayerType(4),
+            .rollbackFailed(operation: "rollback", underlying: .layerLocked(5)),
+            .transactionFailure(primary: .invalidFolderID(6), rollback: .noRedoState)
+        ]
+        for coreFailure in coreFailures {
+            #expect(DocumentMutationFailure(coreFailure: coreFailure).coreFailure == coreFailure)
+            #expect(DocumentLayerMutationFailure(coreFailure: coreFailure).coreFailure == coreFailure)
+        }
+
+        #expect(body.contains("DocumentMutationFailure(coreFailure: failure.coreFailure)"))
+        #expect(body.contains("DocumentLayerMutationFailure(coreFailure: failure.coreFailure)"))
         #expect(!body.contains("bridgeMutationFailed(\"alphaLocked\")"))
         #expect(!body.contains("bridgeMutationFailed(\"invalidCanvasSize\")"))
         #expect(!body.contains("bridgeMutationFailed(\"emptyInput\")"))

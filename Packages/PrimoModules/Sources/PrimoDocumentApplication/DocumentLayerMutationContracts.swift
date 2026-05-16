@@ -34,6 +34,140 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     indirect case transactionFailure(primary: DocumentLayerMutationFailure, rollback: DocumentLayerMutationFailure)
 }
 
+public extension DocumentLayerMutationFailure {
+    init(coreFailure: DocumentMutationCoreFailure) {
+        switch coreFailure {
+        case let .invalidLayerIndex(index):
+            self = .invalidLayerIndex(index)
+        case let .staleLayerIndex(index, validationRevision, currentRevision):
+            self = .staleLayerIndex(
+                index: index,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .invalidFolderID(folderID):
+            self = .invalidFolderID(folderID)
+        case let .staleFolderID(folderID, validationRevision, currentRevision):
+            self = .staleFolderID(
+                folderID: folderID,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
+            self = .staleLayerAnchor(
+                anchorLayerIndex: anchorLayerIndex,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .layerLocked(index):
+            self = .layerLocked(index)
+        case let .alphaLocked(index):
+            self = .alphaLocked(index)
+        case let .invalidCanvasSize(width, height):
+            self = .invalidCanvasSize(width: width, height: height)
+        case let .invalidOpacity(opacity):
+            self = .invalidOpacity(opacity)
+        case let .invalidLayerProcessingRequest(reason):
+            self = .invalidLayerProcessingRequest(reason)
+        case .emptyInput:
+            self = .emptyInput
+        case .noUndoState:
+            self = .noUndoState
+        case .noRedoState:
+            self = .noRedoState
+        case let .gpu(failure):
+            self = .gpu(failure)
+        case let .unexpectedGatewayResult(operation, expected, actual):
+            self = .unexpectedGatewayResult(
+                operation: operation,
+                expected: expected,
+                actual: actual
+            )
+        case let .rawAPIUnavailable(operation):
+            self = .rawAPIUnavailable(operation: operation)
+        case let .inconsistentComposition(operation, reason):
+            self = .inconsistentComposition(operation: operation, reason: reason)
+        case let .bridgeMutationFailed(message):
+            self = .bridgeMutationFailed(message)
+        case let .incompatibleLayerType(index):
+            self = .incompatibleLayerType(index)
+        case let .rollbackFailed(operation, underlying):
+            self = .rollbackFailed(
+                operation: operation,
+                underlying: DocumentLayerMutationFailure(coreFailure: underlying)
+            )
+        case let .transactionFailure(primary, rollback):
+            self = .transactionFailure(
+                primary: DocumentLayerMutationFailure(coreFailure: primary),
+                rollback: DocumentLayerMutationFailure(coreFailure: rollback)
+            )
+        }
+    }
+
+    var coreFailure: DocumentMutationCoreFailure {
+        switch self {
+        case let .invalidLayerIndex(index):
+            return .invalidLayerIndex(index)
+        case let .staleLayerIndex(index, validationRevision, currentRevision):
+            return .staleLayerIndex(
+                index: index,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .invalidFolderID(folderID):
+            return .invalidFolderID(folderID)
+        case let .staleFolderID(folderID, validationRevision, currentRevision):
+            return .staleFolderID(
+                folderID: folderID,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
+            return .staleLayerAnchor(
+                anchorLayerIndex: anchorLayerIndex,
+                validationRevision: validationRevision,
+                currentRevision: currentRevision
+            )
+        case let .layerLocked(index):
+            return .layerLocked(index)
+        case let .alphaLocked(index):
+            return .alphaLocked(index)
+        case let .invalidCanvasSize(width, height):
+            return .invalidCanvasSize(width: width, height: height)
+        case let .invalidOpacity(opacity):
+            return .invalidOpacity(opacity)
+        case let .invalidLayerProcessingRequest(reason):
+            return .invalidLayerProcessingRequest(reason)
+        case .emptyInput:
+            return .emptyInput
+        case .noUndoState:
+            return .noUndoState
+        case .noRedoState:
+            return .noRedoState
+        case let .gpu(failure):
+            return .gpu(failure)
+        case let .unexpectedGatewayResult(operation, expected, actual):
+            return .unexpectedGatewayResult(
+                operation: operation,
+                expected: expected,
+                actual: actual
+            )
+        case let .rawAPIUnavailable(operation):
+            return .rawAPIUnavailable(operation: operation)
+        case let .inconsistentComposition(operation, reason):
+            return .inconsistentComposition(operation: operation, reason: reason)
+        case let .bridgeMutationFailed(message):
+            return .bridgeMutationFailed(message)
+        case let .incompatibleLayerType(index):
+            return .incompatibleLayerType(index)
+        case let .rollbackFailed(operation, underlying):
+            return .rollbackFailed(operation: operation, underlying: underlying.coreFailure)
+        case let .transactionFailure(primary, rollback):
+            return .transactionFailure(primary: primary.coreFailure, rollback: rollback.coreFailure)
+        }
+    }
+}
+
 public struct DocumentLayerMutationContext: Sendable {
     public let revision: DocumentRevision
     public let layerIndexes: LayerIndexSet

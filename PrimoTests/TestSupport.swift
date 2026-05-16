@@ -427,7 +427,7 @@ extension DocumentEditingGateway {
             case .attribute:
                 return .success(.attribute(LayerAttributeMutationPlan()))
             case .content:
-                return .success(.content(LayerContentMutationPlan()))
+                return .success(.content)
             }
         }
     ) -> Self {
@@ -457,9 +457,24 @@ extension DocumentExportGateway {
         timelapseCapture: @escaping @Sendable () -> TimelapseCapture? = { nil }
     ) -> Self {
         Self(
-            compositeSurface: { .success(compositeSurface($0)) },
-            compositePNGData: { .success(compositePNGData($0)) },
-            timelapseCapture: { .success(timelapseCapture()) }
+            compositeSurface: {
+                guard let surface = compositeSurface($0) else {
+                    return .success(.unavailable(reason: .generationUnavailable))
+                }
+                return .success(.available(surface))
+            },
+            compositePNGData: {
+                guard let data = compositePNGData($0) else {
+                    return .success(.unavailable(reason: .generationUnavailable))
+                }
+                return .success(.available(data))
+            },
+            timelapseCapture: {
+                guard let capture = timelapseCapture() else {
+                    return .success(.unavailable(reason: .noHistory))
+                }
+                return .success(.available(capture))
+            }
         )
     }
 }
