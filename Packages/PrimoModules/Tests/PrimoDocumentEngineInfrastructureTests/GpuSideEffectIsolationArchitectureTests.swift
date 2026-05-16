@@ -812,6 +812,13 @@ struct GpuSideEffectIsolationArchitectureTests {
             "CanvasMutationRuntime",
             "StrokeEditingRuntime",
             "LayerEditingRuntime",
+            "LayerStructureEditingRuntime",
+            "LayerContentEditingRuntime",
+            "TextLayerEditingRuntime",
+            "LayerSelectionEditingRuntime",
+            "LayerTransformEditingRuntime",
+            "CanvasEditingRuntime",
+            "LayerPreviewLeaseRuntime",
             "DocumentPersistenceRuntime",
             "DocumentExportRuntime",
             "CanvasPreviewRuntime",
@@ -1588,10 +1595,10 @@ struct GpuSideEffectIsolationArchitectureTests {
         let adapterExpectations: [(String, String, [String])] = [
             ("DocumentStrokePreviewAdapter", "StrokeEditingRuntime", ["LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
             ("DocumentStrokeCommitAdapter", "StrokeEditingRuntime", ["LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
-            ("DocumentLayerVisibilityAdapter", "LayerEditingRuntime", ["StrokeEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
-            ("DocumentLayerContentAdapter", "LayerEditingRuntime", ["StrokeEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
-            ("DocumentSelectionProcessingAdapter", "LayerEditingRuntime", ["StrokeEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
-            ("DocumentCanvasTransformAdapter", "LayerEditingRuntime", ["StrokeEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
+            ("DocumentLayerVisibilityAdapter", "LayerStructureEditingRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
+            ("DocumentLayerContentAdapter", "LayerContentEditingRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
+            ("DocumentSelectionProcessingAdapter", "LayerSelectionEditingRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
+            ("DocumentCanvasTransformAdapter", "LayerTransformEditingRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPresentationRuntime", "DocumentPersistenceRuntime"]),
             ("DocumentCanvasEditingPresentationAdapter", "DocumentPresentationRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPersistenceRuntime"]),
             ("DocumentPaperStyleAdapter", "DocumentPersistenceRuntime", ["StrokeEditingRuntime", "LayerEditingRuntime", "DocumentPresentationRuntime"])
         ]
@@ -1604,10 +1611,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         }
         #expect(environment.contains("DocumentStrokePreviewAdapter(runtime: runtime.strokeEditing)"))
         #expect(environment.contains("DocumentStrokeCommitAdapter(runtime: runtime.strokeEditing)"))
-        #expect(environment.contains("DocumentLayerVisibilityAdapter(runtime: runtime.layerEditing)"))
-        #expect(environment.contains("DocumentLayerContentAdapter(runtime: runtime.layerEditing)"))
-        #expect(environment.contains("DocumentSelectionProcessingAdapter(runtime: runtime.layerEditing)"))
-        #expect(environment.contains("DocumentCanvasTransformAdapter(runtime: runtime.layerEditing)"))
+        #expect(environment.contains("DocumentLayerVisibilityAdapter(runtime: runtime.layerEditing.structure)"))
+        #expect(environment.contains("DocumentLayerContentAdapter(runtime: runtime.layerEditing.content)"))
+        #expect(environment.contains("DocumentSelectionProcessingAdapter(runtime: runtime.layerEditing.selection)"))
+        #expect(environment.contains("canvasEditingRuntime: runtime.layerEditing.canvasEditing"))
+        #expect(environment.contains("transformRuntime: runtime.layerEditing.transform"))
         #expect(environment.contains("DocumentCanvasEditingPresentationAdapter(runtime: runtime.presentation)"))
         #expect(environment.contains("DocumentPaperStyleAdapter(runtime: runtime.persistence)"))
     }

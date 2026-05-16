@@ -10,10 +10,15 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 
 struct DocumentCanvasTransformAdapter: CanvasTransformPort {
-    private let runtime: LayerEditingRuntime
+    private let canvasEditingRuntime: CanvasEditingRuntime
+    private let transformRuntime: LayerTransformEditingRuntime
 
-    init(runtime: LayerEditingRuntime) {
-        self.runtime = runtime
+    init(
+        canvasEditingRuntime: CanvasEditingRuntime,
+        transformRuntime: LayerTransformEditingRuntime
+    ) {
+        self.canvasEditingRuntime = canvasEditingRuntime
+        self.transformRuntime = transformRuntime
     }
 }
 
@@ -65,7 +70,7 @@ extension DocumentCanvasEditingPresentationAdapter {
 
 extension DocumentCanvasTransformAdapter {
     func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome {
-        runtime.execute(command, state: context)
+        canvasEditingRuntime.execute(command, state: context)
     }
 
     func transformedLayerPixels(
@@ -79,7 +84,7 @@ extension DocumentCanvasTransformAdapter {
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets
     ) -> Data? {
-        runtime.transformedLayerPixels(
+        transformRuntime.transformedLayerPixels(
             source: source,
             selection: selection,
             translation: translation,
@@ -103,7 +108,7 @@ extension DocumentCanvasTransformAdapter {
         quadOffsets: TransformQuadOffsets,
         canvasSize: CGSize
     ) -> CanvasSelection? {
-        runtime.transformedSelection(
+        transformRuntime.transformedSelection(
             selection,
             translation: translation,
             scaleX: scaleX,
@@ -120,7 +125,7 @@ extension DocumentCanvasTransformAdapter {
         selection: CanvasSelection?,
         surface: RgbaSurface
     ) -> CGRect? {
-        runtime.transformationBounds(
+        transformRuntime.transformationBounds(
             selection: selection,
             surface: surface
         )

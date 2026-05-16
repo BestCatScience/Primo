@@ -38,7 +38,7 @@ struct LayerWorkflowReducer: Reducer {
         layerWorkflowEnvironment.canvasStrokeInteractionService
     }
 
-    var documentTextLayerService: LayerEditingRuntime {
+    var documentTextLayerService: TextLayerEditingRuntime {
         layerWorkflowEnvironment.textLayerService
     }
 

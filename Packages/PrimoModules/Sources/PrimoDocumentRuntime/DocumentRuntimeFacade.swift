@@ -621,45 +621,21 @@ public struct CanvasMutationRuntime: Sendable {
     }
 }
 
-public struct LayerEditingRuntime: Sendable {
+public struct LayerStructureEditingRuntime: Sendable {
     private let layerCommands: DocumentLayerCommandService
     private let mutationWorkflow: DocumentMutationWorkflowService
-    private let contentService: DocumentContentService
-    private let textLayerService: DocumentTextLayerService
-    private let selectionWorkflow: SelectionWorkflowService
-    private let canvasStrokeInteractionService: CanvasStrokeInteractionService
-    private let layerTransformProcessor: any LayerTransformProcessing
-    private let canvasEditingWorkflow: CanvasEditingWorkflowService
 
     public init(
         layerCommands: DocumentLayerCommandService,
-        mutationWorkflow: DocumentMutationWorkflowService,
-        contentService: DocumentContentService,
-        textLayerService: DocumentTextLayerService,
-        selectionWorkflow: SelectionWorkflowService,
-        canvasStrokeInteractionService: CanvasStrokeInteractionService,
-        layerTransformProcessor: any LayerTransformProcessing,
-        canvasEditingWorkflow: CanvasEditingWorkflowService
+        mutationWorkflow: DocumentMutationWorkflowService
     ) {
         self.layerCommands = layerCommands
         self.mutationWorkflow = mutationWorkflow
-        self.contentService = contentService
-        self.textLayerService = textLayerService
-        self.selectionWorkflow = selectionWorkflow
-        self.canvasStrokeInteractionService = canvasStrokeInteractionService
-        self.layerTransformProcessor = layerTransformProcessor
-        self.canvasEditingWorkflow = canvasEditingWorkflow
     }
 
     package init(services: DocumentRuntimeServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
-        self.contentService = services.contentService
-        self.textLayerService = services.textLayerService
-        self.selectionWorkflow = services.selectionWorkflow
-        self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
-        self.layerTransformProcessor = services.layerTransformProcessor
-        self.canvasEditingWorkflow = services.canvasEditingWorkflow
     }
 
     public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
@@ -682,27 +658,111 @@ public struct LayerEditingRuntime: Sendable {
     public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { mutationWorkflow.setLayerBlendMode(index, blendMode: blendMode) }
     public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { mutationWorkflow.setLayerName(index, name: name) }
     public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { mutationWorkflow.applyLayerProcessing(index, request: request) }
-    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
     public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayer(index) }
     public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult { mutationWorkflow.replaceLayerMask(index, mask: mask) }
     public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.clearLayerMask(index) }
     public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
+    public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index.rawValue) }
+    public func ensureLayerVisible(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index.rawValue) }
+    public func applyLayerSurfaceMutation(_ index: EditableLayerIndex, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index.rawValue, payload) }
+}
+
+public struct LayerContentEditingRuntime: Sendable {
+    private let layerCommands: DocumentLayerCommandService
+    private let contentService: DocumentContentService
+
+    public init(
+        layerCommands: DocumentLayerCommandService,
+        contentService: DocumentContentService
+    ) {
+        self.layerCommands = layerCommands
+        self.contentService = contentService
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.layerCommands = services.layerCommands
+        self.contentService = services.contentService
+    }
 
     public func pixelDataForLayer(_ index: ExistingLayerIndex) -> Result<LayerPixelData, DocumentMutationFailure> { contentService.pixelDataForLayer(index) }
     public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { contentService.replaceLayerPixels(command) }
     public func applyPixels(_ pixelData: LayerPixelData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { layerCommands.replaceLayerPixelsInRect(index.rawValue, rect, pixelData.rgba) }
+    public func applyLayerMutation(_ index: EditableLayerIndex, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index.rawValue, payload) }
+}
+
+public struct TextLayerEditingRuntime: Sendable {
+    private let layerCommands: DocumentLayerCommandService
+    private let mutationWorkflow: DocumentMutationWorkflowService
+    private let contentService: DocumentContentService
+    private let textLayerService: DocumentTextLayerService
+
+    public init(
+        layerCommands: DocumentLayerCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        textLayerService: DocumentTextLayerService
+    ) {
+        self.layerCommands = layerCommands
+        self.mutationWorkflow = mutationWorkflow
+        self.contentService = contentService
+        self.textLayerService = textLayerService
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.layerCommands = services.layerCommands
+        self.mutationWorkflow = services.mutationWorkflow
+        self.contentService = services.contentService
+        self.textLayerService = services.textLayerService
+    }
+
+    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
     public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index) }
     public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { textLayerService.clearTextLayerData(index) }
-    public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
-    public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
-    public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.revealLayerForEditing(index.rawValue) }
-    public func ensureLayerVisible(_ index: ExistingLayerIndex) -> DocumentMutationResult { layerCommands.ensureLayerVisible(index.rawValue) }
-    public func applyLayerSurfaceMutation(_ index: EditableLayerIndex, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerSurfaceMutation(index.rawValue, payload) }
-    public func applyLayerMutation(_ index: EditableLayerIndex, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyLayerMutation(index.rawValue, payload) }
+    public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func applyTextLayerMutation(_ index: EditableLayerIndex, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index.rawValue, textLayer, payload) }
-    public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
+}
+
+public struct LayerSelectionEditingRuntime: Sendable {
+    private let selectionWorkflow: SelectionWorkflowService
+
+    public init(selectionWorkflow: SelectionWorkflowService) {
+        self.selectionWorkflow = selectionWorkflow
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.selectionWorkflow = services.selectionWorkflow
+    }
+
+    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
+    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
+    public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
+    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
+    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
+    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
+    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
+    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
+    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
+    public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selectionWorkflow.expandedSelectionMask(source, expansion: expansion) }
+    public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface { selectionWorkflow.contractedSelectionMask(source, contraction: contraction) }
+    public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selectionWorkflow.featheredSelectionMask(source, radius: radius) }
+    public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selectionWorkflow.invertedSelectionMask(source) }
+    public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, mode: mode) }
+    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
+}
+
+public struct LayerTransformEditingRuntime: Sendable {
+    private let layerTransformProcessor: any LayerTransformProcessing
+
+    public init(layerTransformProcessor: any LayerTransformProcessing) {
+        self.layerTransformProcessor = layerTransformProcessor
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.layerTransformProcessor = services.layerTransformProcessor
+    }
+
     public func transformedLayerPixels(
         source: RgbaSurface,
         selection: CanvasSelection?,
@@ -757,22 +817,186 @@ public struct LayerEditingRuntime: Sendable {
             surface: surface
         )
     }
+}
 
-    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
-    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
-    public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { selectionWorkflow.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
-    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { selectionWorkflow.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
-    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
-    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { selectionWorkflow.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
-    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selectionWorkflow.makeLassoSelection(from: points, canvasSize: canvasSize) }
-    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selectionWorkflow.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
-    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
-    public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selectionWorkflow.expandedSelectionMask(source, expansion: expansion) }
-    public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface { selectionWorkflow.contractedSelectionMask(source, contraction: contraction) }
-    public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selectionWorkflow.featheredSelectionMask(source, radius: radius) }
-    public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selectionWorkflow.invertedSelectionMask(source) }
-    public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selectionWorkflow.croppedSelection(from: source, mode: mode) }
-    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selectionWorkflow.closedPolygon(points, canvasSize: canvasSize) }
+public struct CanvasEditingRuntime: Sendable {
+    private let canvasEditingWorkflow: CanvasEditingWorkflowService
+
+    public init(canvasEditingWorkflow: CanvasEditingWorkflowService) {
+        self.canvasEditingWorkflow = canvasEditingWorkflow
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.canvasEditingWorkflow = services.canvasEditingWorkflow
+    }
+
+    public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
+    public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditingWorkflow.execute(command, state: context) }
+}
+
+public struct LayerPreviewLeaseRuntime: Sendable {
+    private let canvasStrokeInteractionService: CanvasStrokeInteractionService
+
+    public init(canvasStrokeInteractionService: CanvasStrokeInteractionService) {
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
+    }
+
+    public func discardPreviewLease(_ lease: StrokePreviewLease) { canvasStrokeInteractionService.discardPreviewLease(lease) }
+}
+
+public struct LayerEditingRuntime: Sendable {
+    public let structure: LayerStructureEditingRuntime
+    public let content: LayerContentEditingRuntime
+    public let text: TextLayerEditingRuntime
+    public let selection: LayerSelectionEditingRuntime
+    public let transform: LayerTransformEditingRuntime
+    public let canvasEditing: CanvasEditingRuntime
+    public let previewLease: LayerPreviewLeaseRuntime
+
+    public init(
+        layerCommands: DocumentLayerCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        textLayerService: DocumentTextLayerService,
+        selectionWorkflow: SelectionWorkflowService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService,
+        layerTransformProcessor: any LayerTransformProcessing,
+        canvasEditingWorkflow: CanvasEditingWorkflowService
+    ) {
+        self.structure = LayerStructureEditingRuntime(layerCommands: layerCommands, mutationWorkflow: mutationWorkflow)
+        self.content = LayerContentEditingRuntime(layerCommands: layerCommands, contentService: contentService)
+        self.text = TextLayerEditingRuntime(
+            layerCommands: layerCommands,
+            mutationWorkflow: mutationWorkflow,
+            contentService: contentService,
+            textLayerService: textLayerService
+        )
+        self.selection = LayerSelectionEditingRuntime(selectionWorkflow: selectionWorkflow)
+        self.transform = LayerTransformEditingRuntime(layerTransformProcessor: layerTransformProcessor)
+        self.canvasEditing = CanvasEditingRuntime(canvasEditingWorkflow: canvasEditingWorkflow)
+        self.previewLease = LayerPreviewLeaseRuntime(canvasStrokeInteractionService: canvasStrokeInteractionService)
+    }
+
+    package init(services: DocumentRuntimeServices) {
+        self.structure = LayerStructureEditingRuntime(services: services)
+        self.content = LayerContentEditingRuntime(services: services)
+        self.text = TextLayerEditingRuntime(services: services)
+        self.selection = LayerSelectionEditingRuntime(services: services)
+        self.transform = LayerTransformEditingRuntime(services: services)
+        self.canvasEditing = CanvasEditingRuntime(services: services)
+        self.previewLease = LayerPreviewLeaseRuntime(services: services)
+    }
+
+    public func addLayer(named name: String) -> DocumentIndexedMutationResult { structure.addLayer(named: name) }
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { structure.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
+    public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { structure.deleteFolder(folderID) }
+    public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.deleteLayer(index) }
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { structure.duplicateLayer(index, named: duplicateName) }
+    public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { structure.moveLayer(index, to: destinationIndex) }
+    public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { structure.assignLayer(index, toFolder: folderID) }
+    public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.mergeLayerDown(index) }
+    public func setLayerVisibility(_ index: ExistingLayerIndex, visible: Bool) -> DocumentMutationResult { structure.setLayerVisibility(index, visible: visible) }
+    public func setActiveLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.setActiveLayer(index) }
+    public func setLayerOpacity(_ index: ExistingLayerIndex, opacity: UnitInterval) -> DocumentMutationResult { structure.setLayerOpacity(index, opacity: opacity) }
+    public func setLayerLocked(_ index: ExistingLayerIndex, isLocked: Bool) -> DocumentMutationResult { structure.setLayerLocked(index, isLocked: isLocked) }
+    public func setLayerAlphaLocked(_ index: ExistingLayerIndex, isAlphaLocked: Bool) -> DocumentMutationResult { structure.setLayerAlphaLocked(index, isAlphaLocked: isAlphaLocked) }
+    public func setLayerClipped(_ index: ExistingLayerIndex, isClipped: Bool) -> DocumentMutationResult { structure.setLayerClipped(index, isClipped: isClipped) }
+    public func setFolderExpanded(_ folderID: ExistingFolderID, isExpanded: Bool) -> DocumentMutationResult { structure.setFolderExpanded(folderID, isExpanded: isExpanded) }
+    public func setFolderVisibility(_ folderID: ExistingFolderID, visible: Bool) -> DocumentMutationResult { structure.setFolderVisibility(folderID, visible: visible) }
+    public func setFolderName(_ folderID: ExistingFolderID, name: String) -> DocumentMutationResult { structure.setFolderName(folderID, name: name) }
+    public func setLayerBlendMode(_ index: ExistingLayerIndex, blendMode: LayerBlendMode) -> DocumentMutationResult { structure.setLayerBlendMode(index, blendMode: blendMode) }
+    public func setLayerName(_ index: ExistingLayerIndex, name: String) -> DocumentMutationResult { structure.setLayerName(index, name: name) }
+    public func applyLayerProcessing(_ index: EditableLayerIndex, request: LayerProcessingRequest) -> DocumentMutationResult { structure.applyLayerProcessing(index, request: request) }
+    public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { text.setTextLayer(index, textLayer: textLayer) }
+    public func clearLayer(_ index: EditableLayerIndex) -> DocumentMutationResult { structure.clearLayer(index) }
+    public func replaceLayerMask(_ index: EditableLayerIndex, mask: LayerMaskData) -> DocumentMutationResult { structure.replaceLayerMask(index, mask: mask) }
+    public func clearLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { structure.clearLayerMask(index) }
+    public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { structure.applyLayerMask(index) }
+    public func pixelDataForLayer(_ index: ExistingLayerIndex) -> Result<LayerPixelData, DocumentMutationFailure> { content.pixelDataForLayer(index) }
+    public func replaceLayerPixels(_ command: LayerPixelReplacementCommand) -> DocumentMutationResult { content.replaceLayerPixels(command) }
+    public func applyPixels(_ pixelData: LayerPixelData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { content.applyPixels(pixelData, to: target) }
+    public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { text.applyTextLayer(textLayer, to: target) }
+    public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { content.replaceLayerPixelsInRect(index, rect, pixelData) }
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { text.textLayerData(index) }
+    public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { text.clearTextLayerData(index) }
+    public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditing.execute(command, state: context) }
+    public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditing.executeCanvasEditing(command, state: context) }
+    public func revealLayerForEditing(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.revealLayerForEditing(index) }
+    public func ensureLayerVisible(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.ensureLayerVisible(index) }
+    public func applyLayerSurfaceMutation(_ index: EditableLayerIndex, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult { structure.applyLayerSurfaceMutation(index, payload) }
+    public func applyLayerMutation(_ index: EditableLayerIndex, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { content.applyLayerMutation(index, payload) }
+    public func applyTextLayerMutation(_ index: EditableLayerIndex, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { text.applyTextLayerMutation(index, textLayer, payload) }
+    public func discardPreviewLease(_ lease: StrokePreviewLease) { previewLease.discardPreviewLease(lease) }
+    public func transformedLayerPixels(
+        source: RgbaSurface,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        transform.transformedLayerPixels(
+            source: source,
+            selection: selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets
+        )
+    }
+
+    public func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        transform.transformedSelection(
+            selection,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets,
+            canvasSize: canvasSize
+        )
+    }
+
+    public func transformationBounds(selection: CanvasSelection?, surface: RgbaSurface) -> CGRect? {
+        transform.transformationBounds(selection: selection, surface: surface)
+    }
+    public func combinedSelection(existing: CanvasSelection?, incoming: CanvasSelection?, mode: SelectionCombineMode, canvasSize: CGSize) -> CanvasSelection? { selection.combinedSelection(existing: existing, incoming: incoming, mode: mode, canvasSize: canvasSize) }
+    public func makeRectangleSelection(from startPoint: CGPoint, to endPoint: CGPoint, canvasSize: CGSize) -> CanvasSelection? { selection.makeRectangleSelection(from: startPoint, to: endPoint, canvasSize: canvasSize) }
+    public func expandedMask(from selection: CanvasSelection, canvasGeometry: PixelGeometry) -> MaskSurface? { self.selection.expandedMask(from: selection, canvasGeometry: canvasGeometry) }
+    public func adjustedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, expansion: Int, isInverted: Bool) -> CanvasSelection? { self.selection.adjustedSelection(selection, canvasSize: canvasSize, expansion: expansion, isInverted: isInverted) }
+    public func invertedSelection(_ selection: CanvasSelection?, canvasSize: CGSize, mode: SelectionToolMode) -> CanvasSelection? { self.selection.invertedSelection(selection, canvasSize: canvasSize, mode: mode) }
+    public func featheredSelection(_ selection: CanvasSelection?, canvasSize: CGSize, radius: Int) -> CanvasSelection? { self.selection.featheredSelection(selection, canvasSize: canvasSize, radius: radius) }
+    public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? { selection.makeLassoSelection(from: points, canvasSize: canvasSize) }
+    public func makeAutoSelection(at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: ExistingLayerIndex, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int) -> CanvasSelection? { selection.makeAutoSelection(at: point, snapshot: snapshot, layerIndex: layerIndex, thresholdMode: thresholdMode, opacityTolerance: opacityTolerance, colorTolerance: colorTolerance, expansion: expansion) }
+    public func makeColorRangeSelection(request: ColorRangeSelectionRequest, snapshot: MetalDocumentSnapshot?, activeLayerIndex: ExistingLayerIndex, mode: SelectionToolMode) -> CanvasSelection? { selection.makeColorRangeSelection(request: request, snapshot: snapshot, activeLayerIndex: activeLayerIndex, mode: mode) }
+    public func expandedSelectionMask(_ source: MaskSurface, expansion: Int) -> MaskSurface { selection.expandedSelectionMask(source, expansion: expansion) }
+    public func contractedSelectionMask(_ source: MaskSurface, contraction: Int) -> MaskSurface { selection.contractedSelectionMask(source, contraction: contraction) }
+    public func featheredSelectionMask(_ source: MaskSurface, radius: Int) -> MaskSurface { selection.featheredSelectionMask(source, radius: radius) }
+    public func invertedSelectionMask(_ source: MaskSurface) -> MaskSurface { selection.invertedSelectionMask(source) }
+    public func croppedSelection(from source: MaskSurface, mode: SelectionToolMode) -> CanvasSelection? { selection.croppedSelection(from: source, mode: mode) }
+    public func closedPolygon(_ points: [CGPoint], canvasSize: CGSize) -> [CGPoint] { selection.closedPolygon(points, canvasSize: canvasSize) }
 }
 
 package struct CanvasStrokeRuntime: Sendable {

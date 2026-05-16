@@ -34,7 +34,7 @@ struct AIImageWorkflowReducer: Reducer {
         layerWorkflowEnvironment.presentationReader
     }
 
-    var documentTextLayerService: LayerEditingRuntime {
+    var documentTextLayerService: TextLayerEditingRuntime {
         layerWorkflowEnvironment.textLayerService
     }
 

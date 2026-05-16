@@ -35,12 +35,18 @@ struct DocumentCanvasMutationCapability: Sendable {
 }
 
 struct DocumentLayerMutationCapability: Sendable {
-    let layerEditingRuntime: LayerEditingRuntime
+    let layerStructureRuntime: LayerStructureEditingRuntime
+    let layerContentRuntime: LayerContentEditingRuntime
+    let textLayerRuntime: TextLayerEditingRuntime
+    let selectionRuntime: LayerSelectionEditingRuntime
     let presentationRuntime: DocumentPresentationRuntime
 }
 
 struct LayerWorkflowEnvironment: Sendable {
-    let layerEditingRuntime: LayerEditingRuntime
+    let layerStructureRuntime: LayerStructureEditingRuntime
+    let layerContentRuntime: LayerContentEditingRuntime
+    let textLayerRuntime: TextLayerEditingRuntime
+    let selectionRuntime: LayerSelectionEditingRuntime
     let presentationRuntime: DocumentPresentationRuntime
     let strokeRuntime: StrokeEditingRuntime
 }

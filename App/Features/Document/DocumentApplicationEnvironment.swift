@@ -31,20 +31,29 @@ struct DocumentApplicationEnvironment: Sendable {
             persistenceRuntime: runtime.persistence
         )
         self.layerMutationCapability = DocumentLayerMutationCapability(
-            layerEditingRuntime: runtime.layerEditing,
+            layerStructureRuntime: runtime.layerEditing.structure,
+            layerContentRuntime: runtime.layerEditing.content,
+            textLayerRuntime: runtime.layerEditing.text,
+            selectionRuntime: runtime.layerEditing.selection,
             presentationRuntime: runtime.presentation
         )
         self.layerWorkflowEnvironment = LayerWorkflowEnvironment(
-            layerEditingRuntime: runtime.layerEditing,
+            layerStructureRuntime: runtime.layerEditing.structure,
+            layerContentRuntime: runtime.layerEditing.content,
+            textLayerRuntime: runtime.layerEditing.text,
+            selectionRuntime: runtime.layerEditing.selection,
             presentationRuntime: runtime.presentation,
             strokeRuntime: runtime.strokeEditing
         )
         self.strokePreviewPort = DocumentStrokePreviewAdapter(runtime: runtime.strokeEditing)
         self.strokeCommitPort = DocumentStrokeCommitAdapter(runtime: runtime.strokeEditing)
-        self.layerVisibilityPort = DocumentLayerVisibilityAdapter(runtime: runtime.layerEditing)
-        self.layerContentPort = DocumentLayerContentAdapter(runtime: runtime.layerEditing)
-        self.selectionProcessingPort = DocumentSelectionProcessingAdapter(runtime: runtime.layerEditing)
-        self.canvasTransformPort = DocumentCanvasTransformAdapter(runtime: runtime.layerEditing)
+        self.layerVisibilityPort = DocumentLayerVisibilityAdapter(runtime: runtime.layerEditing.structure)
+        self.layerContentPort = DocumentLayerContentAdapter(runtime: runtime.layerEditing.content)
+        self.selectionProcessingPort = DocumentSelectionProcessingAdapter(runtime: runtime.layerEditing.selection)
+        self.canvasTransformPort = DocumentCanvasTransformAdapter(
+            canvasEditingRuntime: runtime.layerEditing.canvasEditing,
+            transformRuntime: runtime.layerEditing.transform
+        )
         self.canvasEditingPresentationPort = DocumentCanvasEditingPresentationAdapter(runtime: runtime.presentation)
         self.paperStylePort = DocumentPaperStyleAdapter(runtime: runtime.persistence)
         self.exportCapability = DocumentExportCapability(exportRuntime: runtime.export)

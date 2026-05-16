@@ -11,30 +11,30 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 
 struct DocumentLayerVisibilityAdapter: LayerVisibilityPort {
-    private let runtime: LayerEditingRuntime
+    private let runtime: LayerStructureEditingRuntime
 
-    init(runtime: LayerEditingRuntime) {
+    init(runtime: LayerStructureEditingRuntime) {
         self.runtime = runtime
     }
 }
 
 struct DocumentLayerContentAdapter: LayerContentPort {
-    private let runtime: LayerEditingRuntime
+    private let runtime: LayerContentEditingRuntime
 
-    init(runtime: LayerEditingRuntime) {
+    init(runtime: LayerContentEditingRuntime) {
         self.runtime = runtime
     }
 }
 
 struct DocumentSelectionProcessingAdapter: SelectionProcessingPort {
-    private let runtime: LayerEditingRuntime
+    private let runtime: LayerSelectionEditingRuntime
 
-    init(runtime: LayerEditingRuntime) {
+    init(runtime: LayerSelectionEditingRuntime) {
         self.runtime = runtime
     }
 }
 
-extension LayerEditingRuntime {
+extension LayerStructureEditingRuntime {
     func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
         revealLayerForEditing(command.existingLayerIndex)
     }
@@ -59,14 +59,19 @@ extension LayerContentSubmitting {
     }
 }
 
-extension LayerEditingRuntime:
+extension LayerStructureEditingRuntime:
     LayerMutationWorkflowSubmitting,
-    LayerContentWorkflowSubmitting,
     LayerMutationSubmitting,
-    LayerVisibilityPort,
+    LayerVisibilityPort
+{}
+
+extension LayerContentEditingRuntime:
+    LayerContentWorkflowSubmitting,
     LayerContentSubmitting,
-    LayerContentPort,
-    CanvasEditingExecuting,
+    LayerContentPort
+{}
+
+extension LayerSelectionEditingRuntime:
     SelectionWorkflowRequesting,
     SelectionProcessingPort
 {}
@@ -88,8 +93,8 @@ struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisi
 }
 
 extension DocumentLayerMutationCapability {
-    var contentService: LayerEditingRuntime {
-        layerEditingRuntime
+    var contentService: any LayerContentWorkflowSubmitting {
+        layerContentRuntime
     }
 
     var renderingWorkflow: DocumentRenderingWorkflow {
@@ -97,7 +102,7 @@ extension DocumentLayerMutationCapability {
     }
 
     var mutationWorkflowService: any LayerMutationWorkflowSubmitting {
-        layerEditingRuntime
+        layerStructureRuntime
     }
 
     var presentationReader: DocumentPresentationReader {
@@ -107,18 +112,18 @@ extension DocumentLayerMutationCapability {
         )
     }
 
-    var textLayerService: LayerEditingRuntime {
-        layerEditingRuntime
+    var textLayerService: TextLayerEditingRuntime {
+        textLayerRuntime
     }
 
     var selectionWorkflowService: any SelectionWorkflowRequesting {
-        layerEditingRuntime
+        selectionRuntime
     }
 }
 
 extension LayerWorkflowEnvironment {
     var contentService: any LayerContentWorkflowSubmitting {
-        layerEditingRuntime
+        layerContentRuntime
     }
 
     var renderingWorkflow: DocumentRenderingWorkflow {
@@ -126,7 +131,7 @@ extension LayerWorkflowEnvironment {
     }
 
     var mutationWorkflowService: any LayerMutationWorkflowSubmitting {
-        layerEditingRuntime
+        layerStructureRuntime
     }
 
     var presentationReader: DocumentPresentationReader {
@@ -136,12 +141,12 @@ extension LayerWorkflowEnvironment {
         )
     }
 
-    var textLayerService: LayerEditingRuntime {
-        layerEditingRuntime
+    var textLayerService: TextLayerEditingRuntime {
+        textLayerRuntime
     }
 
     var selectionWorkflowService: any SelectionWorkflowRequesting {
-        layerEditingRuntime
+        selectionRuntime
     }
 
     var canvasStrokeInteractionService: any StrokePreviewLeasing {
