@@ -15,7 +15,7 @@ struct DocumentMutationWorkflowServiceTests {
     @Test
     func layerStructureCommandsReturnResultingIndexes() throws {
         let service = DocumentMutationWorkflowService(
-            documentQueryGateway: queryGateway(),
+            documentQueryGateway: queryGateway(layerCount: 2),
             documentEditingGateway: DocumentEditingGateway { request in
                 switch request {
                 case .structure(.duplicateLayer):
@@ -27,7 +27,8 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let index = try service.duplicateLayer(1, named: "Copy").get()
+        let sourceIndex = try #require(existingLayerIndex(1, layerCount: 2))
+        let index = try service.duplicateLayer(sourceIndex, named: "Copy").get()
 
         #expect(index == 4)
     }
@@ -297,7 +298,7 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func failedCommandsReturnFailureWithoutOutcomeSideEffects() {
+    func failedCommandsReturnFailureWithoutOutcomeSideEffects() throws {
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(),
             documentEditingGateway: DocumentEditingGateway { _ in
@@ -306,7 +307,8 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result: DocumentMutationResult = service.setLayerVisibility(7, visible: true)
+        let index = try #require(existingLayerIndex(0, layerCount: 1))
+        let result: DocumentMutationResult = service.setLayerVisibility(index, visible: true)
 
         guard case let .failure(failure) = result else {
             Issue.record("Expected layerLocked failure")
@@ -467,6 +469,21 @@ private func editableLayerIndex(
         isLayerLocked: { lockedLayerIndexes.contains($0) }
     )
     .editableLayerIndex(rawValue)
+}
+
+private func existingLayerIndex(
+    _ rawValue: Int,
+    revision: DocumentRevision = .initial,
+    layerCount: Int
+) -> ExistingLayerIndex? {
+    DocumentLayerMutationContext(
+        revision: revision,
+        layerCount: layerCount,
+        folderIDs: [],
+        canvasGeometry: PixelGeometry(width: 1, height: 1),
+        isLayerLocked: { _ in false }
+    )
+    .existingLayerIndex(rawValue)
 }
 
 private func presentation(

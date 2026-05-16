@@ -1236,29 +1236,10 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         let workflowRawPackage = Set(Self.rawLayerPackageCallableSignatures(in: mutationWorkflowBody))
-        let expectedWorkflowRawPackage: Set<String> = [
-            "package func assignLayer(_ index: Int, toFolder folderID: Int?)",
-            "package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int?)",
-            "package func deleteFolder(_ folderID: Int)",
-            "package func deleteLayer(_ index: Int)",
-            "package func duplicateLayer(_ index: Int, named duplicateName: String)",
-            "package func mergeLayerDown(_ index: Int)",
-            "package func moveLayer(_ index: Int, to destinationIndex: Int)",
-            "package func setActiveLayer(_ index: Int)",
-            "package func setFolderExpanded(_ folderID: Int, isExpanded: Bool)",
-            "package func setFolderName(_ folderID: Int, name: String)",
-            "package func setFolderVisibility(_ folderID: Int, visible: Bool)",
-            "package func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool)",
-            "package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode)",
-            "package func setLayerClipped(_ index: Int, isClipped: Bool)",
-            "package func setLayerLocked(_ index: Int, isLocked: Bool)",
-            "package func setLayerName(_ index: Int, name: String)",
-            "package func setLayerOpacity(_ index: Int, opacity: Double)",
-            "package func setLayerVisibility(_ index: Int, visible: Bool)"
-        ]
+        let expectedWorkflowRawPackage: Set<String> = []
         #expect(
             workflowRawPackage == expectedWorkflowRawPackage,
-            "DocumentMutationWorkflowService raw package API baseline changed. Actual: \(workflowRawPackage.sorted())"
+            "DocumentMutationWorkflowService raw package API should stay removed. Actual: \(workflowRawPackage.sorted())"
         )
     }
 

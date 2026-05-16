@@ -77,7 +77,7 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
-        createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue)
+        executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)))
     }
 
     public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult {
@@ -232,78 +232,6 @@ public struct DocumentMutationWorkflowService: Sendable {
         requireEditable(index).flatMap { index in
             executeContent(.applyMask(index: index.rawValue))
         }
-    }
-
-    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int?) -> DocumentIndexedMutationResult {
-        executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: activeLayerIndex)))
-    }
-
-    package func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
-        execute(.structure(.deleteFolder(folderID: folderID)))
-    }
-
-    package func deleteLayer(_ index: Int) -> DocumentMutationResult {
-        execute(.structure(.deleteLayer(index: index)))
-    }
-
-    package func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult {
-        executeIndexed(.structure(.duplicateLayer(index: index, name: duplicateName)))
-    }
-
-    package func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult {
-        execute(.structure(.moveLayer(index: index, destinationIndex: destinationIndex)))
-    }
-
-    package func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult {
-        execute(.structure(.assignLayerToFolder(index: index, folderID: folderID)))
-    }
-
-    package func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
-        documentLayerEffectsGateway.mergeLayerDown(index)
-    }
-
-    package func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setLayerVisibility(index: index, isVisible: visible)))
-    }
-
-    package func setActiveLayer(_ index: Int) -> DocumentMutationResult {
-        execute(.attribute(.setActiveLayer(index: index)))
-    }
-
-    package func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult {
-        execute(.attribute(.setLayerOpacity(index: index, opacity: opacity)))
-    }
-
-    package func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setLayerLocked(index: index, isLocked: isLocked)))
-    }
-
-    package func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)))
-    }
-
-    package func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setLayerClipped(index: index, isClipped: isClipped)))
-    }
-
-    package func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)))
-    }
-
-    package func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult {
-        execute(.attribute(.setFolderVisibility(folderID: folderID, isVisible: visible)))
-    }
-
-    package func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult {
-        execute(.attribute(.setFolderName(folderID: folderID, name: name)))
-    }
-
-    package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
-        execute(.attribute(.setLayerBlendMode(index: index, blendMode: blendMode)))
-    }
-
-    package func setLayerName(_ index: Int, name: String) -> DocumentMutationResult {
-        execute(.attribute(.setLayerName(index: index, name: name)))
     }
 
     private func requireCurrent(_ index: ExistingLayerIndex) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
