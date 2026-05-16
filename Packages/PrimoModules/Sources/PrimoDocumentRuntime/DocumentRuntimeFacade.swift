@@ -324,7 +324,7 @@ public struct DocumentExportClient: Sendable {
 
 public struct DocumentRenderingWorkflow: Sendable {
     private let compositedPaperPreviewRGBAHandler: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
-    private let compositedPreviewPixelDataHandler: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    private let compositedPreviewPixelDataHandler: @Sendable (MetalDocumentSnapshot, ExistingLayerIndex, RgbaSurface) -> DocumentRenderingResult<Data>
     private let processedLayerPixelDataHandler: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
     private let alphaMaskHandler: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
     private let croppedSelectionMaskHandler: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
@@ -333,7 +333,7 @@ public struct DocumentRenderingWorkflow: Sendable {
 
     package init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
-        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, ExistingLayerIndex, RgbaSurface) -> DocumentRenderingResult<Data>,
         processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>,
         alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
         croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
@@ -352,7 +352,13 @@ public struct DocumentRenderingWorkflow: Sendable {
     public init(operations: DocumentRenderingOperations) {
         self.init(
             compositedPaperPreviewRGBA: operations.compositedPaperPreviewRGBA,
-            compositedPreviewPixelData: operations.compositedPreviewPixelData,
+            compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in
+                operations.compositedPreviewPixelData(
+                    snapshot,
+                    activeLayerIndex.rawValue,
+                    adjustedActiveLayerPixels.data
+                )
+            },
             processedLayerPixelData: operations.processedLayerPixelData,
             alphaMask: operations.alphaMask,
             croppedSelectionMask: operations.croppedSelectionMask,
@@ -373,7 +379,7 @@ public struct DocumentRenderingWorkflow: Sendable {
         activeLayerIndex: ExistingLayerIndex,
         adjustedActiveLayerPixels: RgbaSurface
     ) -> DocumentRenderingResult<Data> {
-        compositedPreviewPixelDataHandler(snapshot, activeLayerIndex.rawValue, adjustedActiveLayerPixels.data)
+        compositedPreviewPixelDataHandler(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
     }
 
     public func processedLayerPixelData(

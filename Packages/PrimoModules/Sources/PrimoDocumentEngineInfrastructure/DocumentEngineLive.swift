@@ -898,8 +898,8 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
 
     private func validateFreshLayerAnchorIndex(_ index: LayerAnchorIndex) -> DocumentLayerMutationFailure? {
         guard index.revision == currentPresentation.revision else {
-            return .staleLayerIndex(
-                index: index.rawValue ?? -1,
+            return .staleLayerAnchor(
+                anchorLayerIndex: index.rawValue,
                 validationRevision: index.revision,
                 currentRevision: currentPresentation.revision
             )
@@ -924,6 +924,12 @@ private func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -
         return .invalidFolderID(folderID)
     case let .staleFolderID(folderID, validationRevision, currentRevision):
         return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
+        return .staleLayerAnchor(
+            anchorLayerIndex: anchorLayerIndex,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .layerLocked(index):
         return .layerLocked(index)
     case let .alphaLocked(index):
@@ -964,6 +970,12 @@ private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> Do
         return .invalidFolderID(folderID)
     case let .staleFolderID(folderID, validationRevision, currentRevision):
         return .staleFolderID(folderID: folderID, validationRevision: validationRevision, currentRevision: currentRevision)
+    case let .staleLayerAnchor(anchorLayerIndex, validationRevision, currentRevision):
+        return .staleLayerAnchor(
+            anchorLayerIndex: anchorLayerIndex,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .layerLocked(index):
         return .layerLocked(index)
     case let .alphaLocked(index):

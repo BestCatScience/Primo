@@ -18,6 +18,8 @@ extension DocumentFeature {
             return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
         case .staleLayerIndex:
             return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
+        case .staleLayerAnchor:
+            return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
         case .invalidFolderID:
             return ApplicationFeature.Feedback.folderUnavailable.message(for: language)
         case .staleFolderID:
@@ -65,6 +67,8 @@ extension DocumentFeature {
             case .invalidLayerIndex:
                 return .layerUnavailable
             case .staleLayerIndex:
+                return .layerUnavailable
+            case .staleLayerAnchor:
                 return .layerUnavailable
             case .invalidFolderID:
                 return .folderUnavailable

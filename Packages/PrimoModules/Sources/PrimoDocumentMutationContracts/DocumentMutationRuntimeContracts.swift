@@ -80,6 +80,7 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case invalidFolderID(Int)
     case staleFolderID(folderID: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
+    case staleLayerAnchor(anchorLayerIndex: Int?, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case layerLocked(Int)
     case alphaLocked(Int)
     case invalidCanvasSize(width: Int, height: Int)

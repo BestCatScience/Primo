@@ -77,7 +77,9 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
-        executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)))
+        requireCurrent(anchorLayerIndex).flatMap { anchorLayerIndex in
+            executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)))
+        }
     }
 
     public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult {
@@ -273,6 +275,27 @@ public struct DocumentMutationWorkflowService: Sendable {
     private func requireCurrent(_ folderID: ExistingFolderID?) -> Result<ExistingFolderID?, DocumentMutationFailure> {
         guard let folderID else { return .success(nil) }
         return requireCurrent(folderID).map(Optional.some)
+    }
+
+    private func requireCurrent(_ anchorLayerIndex: LayerAnchorIndex) -> Result<LayerAnchorIndex, DocumentMutationFailure> {
+        currentMutationContext().flatMap { context in
+            guard anchorLayerIndex.revision == context.revision else {
+                return .failure(
+                    .staleLayerAnchor(
+                        anchorLayerIndex: anchorLayerIndex.rawValue,
+                        validationRevision: anchorLayerIndex.revision,
+                        currentRevision: context.revision
+                    )
+                )
+            }
+            guard let rawValue = anchorLayerIndex.rawValue else {
+                return .success(anchorLayerIndex)
+            }
+            guard let currentAnchor = context.anchorLayerIndex(rawValue) else {
+                return .failure(.invalidLayerIndex(rawValue))
+            }
+            return .success(currentAnchor)
+        }
     }
 
     private func requireEditable(_ index: EditableLayerIndex) -> Result<EditableLayerIndex, DocumentMutationFailure> {

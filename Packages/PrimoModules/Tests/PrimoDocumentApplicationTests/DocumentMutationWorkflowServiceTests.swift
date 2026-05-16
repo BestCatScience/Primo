@@ -232,6 +232,46 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
+    func typedCreateFolderRejectsStaleAnchorBeforeRawMutation() throws {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1, revision: { DocumentRevision(2) }),
+            documentEditingGateway: .recordingStructure(recorder) { _ in .success(.structure(LayerStructureMutationPlan())) },
+            documentLayerEffectsGateway: .unused
+        )
+        let staleAnchor = try #require(anchorLayerIndex(0, revision: DocumentRevision(1), layerCount: 1))
+
+        let result = service.createFolder(named: "Group", afterLayerAt: staleAnchor)
+
+        expectFailure(result, .staleLayerAnchor(
+            anchorLayerIndex: 0,
+            validationRevision: DocumentRevision(1),
+            currentRevision: DocumentRevision(2)
+        ))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
+    func typedCreateFolderRejectsStaleNilAnchorBeforeRawMutation() throws {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 1, revision: { DocumentRevision(2) }),
+            documentEditingGateway: .recordingStructure(recorder) { _ in .success(.structure(LayerStructureMutationPlan())) },
+            documentLayerEffectsGateway: .unused
+        )
+        let staleAnchor = try #require(anchorLayerIndex(nil, revision: DocumentRevision(1), layerCount: 1))
+
+        let result = service.createFolder(named: "Group", afterLayerAt: staleAnchor)
+
+        expectFailure(result, .staleLayerAnchor(
+            anchorLayerIndex: nil,
+            validationRevision: DocumentRevision(1),
+            currentRevision: DocumentRevision(2)
+        ))
+        #expect(recorder.events.isEmpty)
+    }
+
+    @Test
     func typedPixelReplacementRejectsMismatchedGeometryBeforeRawMutation() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
@@ -348,6 +388,14 @@ private func expectFailure(_ result: DocumentMutationResult, _ expected: Documen
     #expect(failure == expected)
 }
 
+private func expectFailure(_ result: DocumentIndexedMutationResult, _ expected: DocumentMutationFailure) {
+    guard case let .failure(failure) = result else {
+        Issue.record("Expected \(expected)")
+        return
+    }
+    #expect(failure == expected)
+}
+
 private extension DocumentEditingGateway {
     static let failing = DocumentEditingGateway { _ in
         .failure(.bridgeMutationFailed("unused"))
@@ -363,6 +411,19 @@ private extension DocumentEditingGateway {
     ) -> DocumentEditingGateway {
         DocumentEditingGateway { request in
             guard case let .content(command) = request else {
+                return .failure(.bridgeMutationFailed("unexpected"))
+            }
+            recorder.record(command.eventDescription)
+            return result(command)
+        }
+    }
+
+    static func recordingStructure(
+        _ recorder: MutationRecorder,
+        result: @escaping @Sendable (LayerStructureCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
+    ) -> DocumentEditingGateway {
+        DocumentEditingGateway { request in
+            guard case let .structure(command) = request else {
                 return .failure(.bridgeMutationFailed("unexpected"))
             }
             recorder.record(command.eventDescription)
@@ -388,6 +449,27 @@ private extension LayerContentMutationCommand {
             return "clearMask:\(index)"
         case let .applyMask(index):
             return "applyMask:\(index)"
+        }
+    }
+}
+
+private extension LayerStructureCommand {
+    var eventDescription: String {
+        switch self {
+        case let .addLayer(name):
+            return "addLayer:\(name)"
+        case let .duplicateLayer(index, name):
+            return "duplicateLayer:\(index):\(name)"
+        case let .deleteLayer(index):
+            return "deleteLayer:\(index)"
+        case let .moveLayer(index, destinationIndex):
+            return "moveLayer:\(index):\(destinationIndex)"
+        case let .createFolder(name, anchorLayerIndex):
+            return "createFolder:\(name):\(String(describing: anchorLayerIndex))"
+        case let .deleteFolder(folderID):
+            return "deleteFolder:\(folderID)"
+        case let .assignLayerToFolder(index, folderID):
+            return "assignLayerToFolder:\(index):\(String(describing: folderID))"
         }
     }
 }
@@ -484,6 +566,21 @@ private func existingLayerIndex(
         isLayerLocked: { _ in false }
     )
     .existingLayerIndex(rawValue)
+}
+
+private func anchorLayerIndex(
+    _ rawValue: Int?,
+    revision: DocumentRevision = .initial,
+    layerCount: Int
+) -> LayerAnchorIndex? {
+    DocumentLayerMutationContext(
+        revision: revision,
+        layerCount: layerCount,
+        folderIDs: [],
+        canvasGeometry: PixelGeometry(width: 1, height: 1),
+        isLayerLocked: { _ in false }
+    )
+    .anchorLayerIndex(rawValue)
 }
 
 private func presentation(

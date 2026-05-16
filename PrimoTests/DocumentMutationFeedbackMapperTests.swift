@@ -15,6 +15,16 @@ final class DocumentMutationFeedbackMapperTests: XCTestCase {
         let mapper = DocumentFeature.DocumentMutationFeedbackMapper()
 
         XCTAssertEqual(mapper.feedback(for: .invalidLayerIndex(2)), .layerUnavailable)
+        XCTAssertEqual(
+            mapper.feedback(
+                for: .staleLayerAnchor(
+                    anchorLayerIndex: 2,
+                    validationRevision: .initial,
+                    currentRevision: .initial
+                )
+            ),
+            .layerUnavailable
+        )
         XCTAssertEqual(mapper.feedback(for: .invalidFolderID(7)), .folderUnavailable)
         XCTAssertEqual(mapper.feedback(for: .layerLocked(1)), .layerEditLocked)
         XCTAssertEqual(mapper.feedback(for: .alphaLocked(1)), .layerAlphaEditLocked)

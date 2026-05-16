@@ -999,6 +999,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             isDirectory: false
         )
         let body = try String(contentsOf: facade, encoding: .utf8)
+        let renderingWorkflowBody = try #require(Self.typeBody(named: "DocumentRenderingWorkflow", in: body))
         let publicCallables = Self.callables(accessLevel: "public", in: body)
         let signatures = Set(publicCallables.map(\.signature).map(Self.normalizedSignature))
 
@@ -1084,6 +1085,14 @@ struct GpuSideEffectIsolationArchitectureTests {
                     $0.hasParameter(named: "adjustedActiveLayerPixels", type: "Data")
             },
             "Public composited preview rendering should accept ExistingLayerIndex and RgbaSurface instead of raw Int/Data"
+        )
+        #expect(
+            !renderingWorkflowBody.contains("(MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>"),
+            "DocumentRenderingWorkflow should store typed composited preview handlers and bridge raw rendering operations at construction"
+        )
+        #expect(
+            renderingWorkflowBody.contains("(MetalDocumentSnapshot, ExistingLayerIndex, RgbaSurface) -> DocumentRenderingResult<Data>"),
+            "DocumentRenderingWorkflow composited preview handler should accept ExistingLayerIndex and RgbaSurface"
         )
         #expect(
             !publicCallables.contains { $0.name == "makeColorRangeSelection" && $0.hasParameter(named: "activeLayerIndex", type: "Int") },
@@ -1836,6 +1845,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let structureGateway = try #require(Self.declarationBody(named: "LayerStructureGateway", in: body))
         let attributeGateway = try #require(Self.declarationBody(named: "LayerAttributeGateway", in: body))
         let contentGateway = try #require(Self.declarationBody(named: "LayerContentGateway", in: contentContracts))
+        let layerAnchorIndex = try #require(Self.typeBody(named: "LayerAnchorIndex", in: body))
 
         let structureSignatures = Set(Self.functionSignatures(in: structureGateway))
         let attributeSignatures = Set(Self.functionSignatures(in: attributeGateway))
@@ -1875,6 +1885,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(structureSignatures == expectedStructureSignatures)
         #expect(attributeSignatures == expectedAttributeSignatures)
         #expect(contentSignatures == expectedContentSignatures)
+        #expect(layerAnchorIndex.contains("public let rawValue: Int?"))
+        #expect(layerAnchorIndex.contains("public let revision: DocumentRevision"))
         let gatewayCallables = [
             structureGateway,
             attributeGateway,
@@ -2726,6 +2738,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let bannedPatterns = [
             #"anchorLayerIndex\s*:\s*-1"#,
             #"anchorLayerIndex\.rawValue\s*\?\?\s*-1"#,
+            #"rawValue\s*\?\?\s*-1"#,
             #"folderID\?\.rawValue\s*\?\?\s*-1"#,
             #"rawValueOrSentinel"#
         ]
@@ -2750,7 +2763,7 @@ struct GpuSideEffectIsolationArchitectureTests {
     func appPreviewAdaptersDoNotCreateAuthoritativeLayerIndexesWithInitialRevision() throws {
         let repoRoot = try Self.repoRoot()
         let adapterFiles = [
-            "App/Features/Document/DocumentRuntimeAdapters.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PresentationWorkflow.swift",
             "App/Features/Document/DocumentRuntimeAdapters+Canvas.swift",
             "App/Features/Document/DocumentRuntimeAdapters+Layer.swift",
             "App/Features/Document/DocumentRuntimeAdapters+PersistenceExport.swift",
@@ -3081,7 +3094,7 @@ struct GpuSideEffectIsolationArchitectureTests {
 
     private static func documentRuntimeAdapterSources(repoRoot: URL) throws -> String {
         try [
-            "App/Features/Document/DocumentRuntimeAdapters.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PresentationWorkflow.swift",
             "App/Features/Document/DocumentRuntimeAdapters+Canvas.swift",
             "App/Features/Document/DocumentRuntimeAdapters+Layer.swift",
             "App/Features/Document/DocumentRuntimeAdapters+PersistenceExport.swift",

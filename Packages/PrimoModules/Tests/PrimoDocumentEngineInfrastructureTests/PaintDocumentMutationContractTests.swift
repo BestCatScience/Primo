@@ -215,8 +215,8 @@ struct PaintDocumentMutationContractTests {
         case .success:
             Issue.record("Expected stale layer anchor failure")
         case let .failure(failure):
-            #expect(failure == .staleLayerIndex(
-                index: 0,
+            #expect(failure == .staleLayerAnchor(
+                anchorLayerIndex: anchor.rawValue,
                 validationRevision: anchor.revision,
                 currentRevision: currentRevision
             ))
