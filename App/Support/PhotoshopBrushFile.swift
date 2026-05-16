@@ -1,3 +1,4 @@
+import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoBrushRuntimeContracts
 

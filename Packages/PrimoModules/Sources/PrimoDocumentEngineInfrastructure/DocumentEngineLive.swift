@@ -681,6 +681,8 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
     let runtime: SwiftDocumentRuntime
     let currentPresentation: PaintDocumentPresentation
 
+    // Authoritative stale validation happens at the runtime boundary with the
+    // current presentation revision, even when the app already preflighted.
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         runtime.addLayer(name: name)
             .map { AddedAndSelectedLayer.addedAndSelected(index: $0) }

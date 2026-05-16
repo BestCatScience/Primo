@@ -1,7 +1,6 @@
 import CoreGraphics
 import Foundation
 import PrimoBrushDomain
-import PrimoBrushFileFormats
 
 public struct BrushPresetName: Equatable, Sendable {
     public let rawValue: String

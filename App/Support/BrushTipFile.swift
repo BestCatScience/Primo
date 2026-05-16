@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoBrushRuntime
 import PrimoBrushRuntimeContracts
@@ -7,7 +8,7 @@ import PrimoCoreTypes
 import UniformTypeIdentifiers
 
 struct BrushTipLibraryClient: Sendable {
-    let loadRaster: @Sendable (URL) throws -> PrimoBrushFileFormats.BrushTipRaster
+    let loadRaster: @Sendable (URL) throws -> BrushTipRaster
     let prepareBrushTipFile: @Sendable (URL) throws -> URL
     let importPhotoshopBrushes: @Sendable (URL) throws -> [ImportedPhotoshopBrush]
 

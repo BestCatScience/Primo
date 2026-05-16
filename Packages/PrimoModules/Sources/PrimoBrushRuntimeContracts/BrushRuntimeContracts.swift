@@ -1,6 +1,5 @@
 import Foundation
 import PrimoBrushDomain
-import PrimoBrushFileFormats
 
 public enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case opacity

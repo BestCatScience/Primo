@@ -1,5 +1,17 @@
 import Foundation
 
+public struct BrushTipRaster: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+    public let alphaData: Data
+
+    public init(width: Int, height: Int, alphaData: Data) {
+        self.width = width
+        self.height = height
+        self.alphaData = alphaData
+    }
+}
+
 public enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case pencil
     case ink

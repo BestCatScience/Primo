@@ -90,7 +90,6 @@ let package = Package(
             dependencies: [
                 "PrimoBrushDomain",
                 "PrimoBrushRuntimeContracts",
-                "PrimoBrushFileFormats",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMutationContracts",
@@ -325,7 +324,6 @@ let package = Package(
             name: "PrimoAIImageDomain",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentPresentationContracts",
@@ -362,7 +360,6 @@ let package = Package(
             name: "PrimoBrushRuntimeContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoCoreTypes",
             ]
         ),
@@ -382,7 +379,6 @@ let package = Package(
             name: "PrimoDocumentPresentationContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
             ]
@@ -391,7 +387,6 @@ let package = Package(
             name: "PrimoDocumentMutationContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
@@ -402,7 +397,6 @@ let package = Package(
             name: "PrimoDocumentRenderingContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
@@ -414,7 +408,6 @@ let package = Package(
             name: "PrimoDocumentPersistenceContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
@@ -433,7 +426,6 @@ let package = Package(
                 "PrimoDocumentRenderingContracts",
                 "PrimoDocumentDomain",
                 "PrimoBrushDomain",
-                "PrimoBrushFileFormats",
             ]
         ),
         .target(
@@ -490,6 +482,7 @@ let package = Package(
         .target(
             name: "PrimoBrushFileFormats",
             dependencies: [
+                "PrimoBrushDomain",
                 "PrimoCoreTypes",
                 "PrimoSystemClients",
                 "PrimoDocumentDomain",
@@ -580,6 +573,7 @@ let package = Package(
         .testTarget(
             name: "PrimoDocumentRenderingInfrastructureTests",
             dependencies: [
+                "PrimoBrushDomain",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMetalStrokeInfrastructure",
@@ -629,7 +623,10 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoBrushFileFormatsTests",
-            dependencies: ["PrimoBrushFileFormats"]
+            dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+            ]
         ),
     ]
 )

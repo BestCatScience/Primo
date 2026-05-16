@@ -540,7 +540,7 @@ private struct StoredBrushPreset: Codable {
         let dualTipKind = BrushTipKind(rawValue: dualTipKindRawValue) ?? .ink
         let dualBlendMode = BrushDualBlendMode(rawValue: dualBlendModeRawValue) ?? .multiply
         let smudgeMode = BrushSmudgeMode(rawValue: smudgeModeRawValue) ?? .smearing
-        let customTip: PrimoBrushFileFormats.BrushTipRaster?
+        let customTip: BrushTipRaster?
         if let tipFileName {
             let url = baseDirectory.appendingPathComponent(tipFileName, isDirectory: false)
             customTip = try brushTipLibraryClient.loadRaster(url)

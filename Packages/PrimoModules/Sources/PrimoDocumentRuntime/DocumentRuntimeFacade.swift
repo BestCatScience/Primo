@@ -716,7 +716,7 @@ public struct LayerEditingRuntime: Sendable {
     public func applyLayerMask(_ index: EditableLayerIndex) -> DocumentMutationResult { mutationWorkflow.applyLayerMask(index) }
 
     @available(*, deprecated, message: "Use createFolder(named:afterLayerAt:) with LayerAnchorIndex once the caller has validated the layer index.")
-    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
+    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int?) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: activeLayerIndex) }
     @available(*, deprecated, message: "Use deleteFolder(_:) with ExistingFolderID.")
     package func deleteFolder(_ folderID: Int) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
     @available(*, deprecated, message: "Use duplicateLayer(_:named:) with ExistingLayerIndex.")

@@ -1221,6 +1221,46 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func noDuplicateCompositionTypeNamesAcrossRuntimeAndInfrastructure() throws {
+        let repoRoot = try Self.repoRoot()
+        let sourceRoots = [
+            "PrimoDocumentRuntime": repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRuntime",
+                isDirectory: true
+            ),
+            "PrimoDocumentEngineInfrastructure": repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure",
+                isDirectory: true
+            )
+        ]
+
+        var declarationsByName: [String: [String]] = [:]
+        for (targetName, sourceRoot) in sourceRoots {
+            for source in try Self.swiftSources(under: sourceRoot) {
+                let body = try String(contentsOf: source, encoding: .utf8)
+                let relativePath = source.path
+                    .replacingOccurrences(of: repoRoot.path + "/", with: "")
+                for declaration in ArchitectureSourceInspector(source: body).topLevelDeclarations
+                    where declaration.name.contains("Composition") {
+                    declarationsByName[declaration.name, default: []].append("\(targetName):\(relativePath)")
+                }
+            }
+        }
+
+        let duplicates = declarationsByName
+            .filter { _, locations in Set(locations.map(Self.targetName(in:))).count > 1 }
+            .map { name, locations in "\(name): \(locations.sorted().joined(separator: ", "))" }
+            .sorted()
+
+        #expect(
+            duplicates.isEmpty,
+            "Composition type names must stay unique across PrimoDocumentRuntime and PrimoDocumentEngineInfrastructure: \(duplicates.joined(separator: "; "))"
+        )
+        #expect(declarationsByName["DocumentRuntimeComposition"]?.count == 1)
+        #expect(declarationsByName["DocumentEngineRuntimeComposition"]?.count == 1)
+    }
+
+    @Test
     func appStrokeWorkflowUsesPreviewLeaseInsteadOfMetalHandles() throws {
         let repoRoot = try Self.repoRoot()
         let appStrokeFiles = [
@@ -1796,7 +1836,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let layerContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift")
         let contentContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift")
         let editorUseCase = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentEditorUseCase.swift")
-        let runtimeComposition = try read("Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift")
+        let engineLive = try read("Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift")
         let readme = try read("README.md")
 
         #expect(layerContracts.contains("authoritative contract boundary"))
@@ -1807,9 +1847,9 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(contentContracts.contains("revision-aware EditableLayerIndex"))
         #expect(editorUseCase.contains("authoritative application contract"))
         #expect(editorUseCase.contains("fresh mutation context"))
-        #expect(runtimeComposition.contains("Authoritative stale validation"))
-        #expect(runtimeComposition.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
-        #expect(runtimeComposition.contains("private func validateFreshLayerIndex(_ index: EditableLayerIndex)"))
+        #expect(engineLive.contains("Authoritative stale validation"))
+        #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
+        #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: EditableLayerIndex)"))
         #expect(readme.contains("App validation は preflight、runtime validation は本契約"))
         #expect(readme.contains("authoritative validation"))
     }
@@ -2365,6 +2405,211 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func packageContractTargetsDoNotDependOnInfrastructureOrSystemClients() throws {
+        let graph = try Self.packageTargetGraph()
+
+        for (target, dependencies) in graph {
+            guard target.hasSuffix("Contracts") || target.hasSuffix("Domain") else { continue }
+
+            for dependency in dependencies {
+                guard Self.isForbiddenContractBoundaryDependency(dependency) else { continue }
+                #expect(
+                    Bool(false),
+                    "\(target) must not depend on \(dependency); keep infrastructure, system clients, and file-format parsers behind runtime/application facades"
+                )
+            }
+        }
+    }
+
+    @Test
+    func validatedMutationTokensAreNotPubliclyForgeable() throws {
+        let repoRoot = try Self.repoRoot()
+        let mutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let layerContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        let tokenBodies = [
+            "EditableLayerIndex": mutationContracts,
+            "ExistingLayerIndex": layerContracts,
+            "ExistingFolderID": layerContracts,
+            "LayerAnchorIndex": layerContracts
+        ].compactMap { name, source in
+            Self.declarationBody(named: name, in: source).map { (name, $0) }
+        }
+        #expect(tokenBodies.count == 4)
+
+        for (name, body) in tokenBodies {
+            #expect(
+                Self.initializerSignatures(accessLevel: "public", in: body).isEmpty,
+                "\(name) must not be publicly constructible"
+            )
+            #expect(
+                !Self.functionSignatures(accessLevel: "public", in: body).contains { signature in
+                    signature.contains("validated(") || signature.contains("unchecked") || signature.contains("unsafe")
+                },
+                "\(name) must not expose public minting or unchecked factories"
+            )
+        }
+        #expect(layerContracts.contains("public func editableLayerIndex(_ rawValue: Int) -> EditableLayerIndex?"))
+        #expect(!mutationContracts.contains("public static func validated("))
+    }
+
+    @Test
+    func noPublicRawIntLayerMutationMethods() throws {
+        let repoRoot = try Self.repoRoot()
+        let checkedFiles = [
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift"
+        ]
+        let mutationMethodPrefixes = [
+            "createFolder",
+            "deleteFolder",
+            "deleteLayer",
+            "duplicateLayer",
+            "moveLayer",
+            "assignLayer",
+            "mergeLayerDown",
+            "setLayer",
+            "setFolder",
+            "replaceLayer",
+            "applyLayer",
+            "clearLayer",
+            "revealLayer",
+            "ensureLayer",
+            "setTextLayer",
+            "clearTextLayer"
+        ]
+        let rawLayerParameterNames: Set<String> = [
+            "index",
+            "layerIndex",
+            "activeLayerIndex",
+            "destinationIndex",
+            "folderID",
+            "activeLayerIndex"
+        ]
+
+        for file in checkedFiles {
+            let body = try String(
+                contentsOf: repoRoot.appendingPathComponent(file, isDirectory: false),
+                encoding: .utf8
+            )
+            for callable in Self.callables(accessLevel: "public", in: body)
+                where callable.kind == "func" &&
+                    mutationMethodPrefixes.contains(where: callable.name.hasPrefix)
+            {
+                let rawLayerParameter = callable.parameters.first { parameter in
+                    rawLayerParameterNames.contains(parameter.semanticName) && parameter.type == "Int"
+                }
+                #expect(rawLayerParameter == nil, "\(file): \(callable.signature) should use typed layer/folder tokens")
+            }
+        }
+    }
+
+    @Test
+    func uncheckedSendableIsAllowlisted() throws {
+        let repoRoot = try Self.repoRoot()
+        let roots = [
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources", isDirectory: true),
+            repoRoot.appendingPathComponent("App", isDirectory: true)
+        ].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let allowed: Set<String> = [
+            "Packages/PrimoModules/Sources/PrimoBrushInfrastructure/TextFontLibraryClient.swift:RegisteredFontURLRegistry",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DirtyUpdatePublisher.swift:DirtyUpdatePublisher",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift:DocumentTimelapseReplayService",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentPresentationBuilder.swift:DocumentPresentationBuilder",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/GpuMutationPayloadLease.swift:GpuMutationPayloadLease",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift:GpuResourceLease",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift:SwiftDocumentRuntime",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentStore.swift:SwiftDocumentStore",
+            "Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/DocumentRuntimeSupport.swift:LockedDocumentRuntimeExecutor",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift:PrimoMetalDocumentProcessingClient",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift:PreviewStrokeStyle",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift:PreviewStrokeTrack",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeLive.swift:DocumentRuntimePresentationBroadcaster"
+        ]
+
+        var actual: Set<String> = []
+        for root in roots {
+            for source in try Self.swiftSources(under: root) {
+                let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+                let body = try String(contentsOf: source, encoding: .utf8)
+                for declaration in Self.uncheckedSendableDeclarations(in: body) {
+                    actual.insert("\(relativePath):\(declaration)")
+                }
+            }
+        }
+
+        #expect(actual == allowed, "Update this allowlist only when the unchecked Sendable ownership/locking rationale is reviewed. Actual: \(actual.sorted())")
+    }
+
+    @Test
+    func noSentinelLayerIndexValues() throws {
+        let repoRoot = try Self.repoRoot()
+        let roots = [
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources", isDirectory: true),
+            repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        ].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let bannedPatterns = [
+            #"anchorLayerIndex\s*:\s*-1"#,
+            #"anchorLayerIndex\.rawValue\s*\?\?\s*-1"#,
+            #"folderID\?\.rawValue\s*\?\?\s*-1"#,
+            #"rawValueOrSentinel"#
+        ]
+
+        for root in roots {
+            for source in try Self.swiftSources(under: root) {
+                let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+                let code = Self.swiftCodeWithCommentsAndStringsBlanked(
+                    in: try String(contentsOf: source, encoding: .utf8)
+                )
+                for pattern in bannedPatterns {
+                    #expect(
+                        code.range(of: pattern, options: .regularExpression) == nil,
+                        "\(relativePath) should use LayerAnchorIndex/optional typed values instead of sentinel pattern \(pattern)"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    func appPreviewAdaptersDoNotCreateAuthoritativeLayerIndexesWithInitialRevision() throws {
+        let repoRoot = try Self.repoRoot()
+        let adapterFiles = [
+            "App/Features/Document/DocumentRuntimeAdapters.swift",
+            "App/Features/Document/DocumentWorkflowValidation.swift"
+        ]
+
+        for file in adapterFiles {
+            let body = Self.swiftCodeWithCommentsAndStringsBlanked(
+                in: try String(
+                    contentsOf: repoRoot.appendingPathComponent(file, isDirectory: false),
+                    encoding: .utf8
+                )
+            )
+            #expect(
+                !body.contains("DocumentLayerMutationContext(\n                revision: .initial") &&
+                    !body.contains("DocumentLayerMutationContext(\n            revision: .initial") &&
+                    !body.contains("DocumentLayerMutationContext(revision: .initial"),
+                "\(file) should not mint authoritative layer indexes from preview state at .initial revision"
+            )
+        }
+    }
+
+    @Test
     func coreTypesStayFreeOfLiveSystemSideEffects() throws {
         let repoRoot = try Self.repoRoot()
         let graph = try Self.packageTargetGraph()
@@ -2506,6 +2751,10 @@ struct GpuSideEffectIsolationArchitectureTests {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey])
             return values.isRegularFile == true ? url : nil
         }
+    }
+
+    private static func targetName(in declarationLocation: String) -> String {
+        String(declarationLocation.prefix { $0 != ":" })
     }
 
     private static func swiftImports(in source: String) -> Set<String> {
@@ -2715,6 +2964,25 @@ struct GpuSideEffectIsolationArchitectureTests {
 
     private static func packageTargetGraph() throws -> [String: Set<String>] {
         try cachedPackageTargetGraph.get()
+    }
+
+    private static func isForbiddenContractBoundaryDependency(_ dependency: String) -> Bool {
+        dependency.contains("Infrastructure") ||
+            dependency == "PrimoSystemClients" ||
+            dependency.hasSuffix("FileFormats")
+    }
+
+    private static func uncheckedSendableDeclarations(in source: String) -> [String] {
+        let pattern = #"(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*@unchecked\s+Sendable|(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*:\s*@unchecked\s+Sendable"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsRange = NSRange(source.startIndex..<source.endIndex, in: source)
+        return regex.matches(in: source, range: nsRange).compactMap { match in
+            for index in 1..<match.numberOfRanges {
+                guard let range = Range(match.range(at: index), in: source) else { continue }
+                return String(source[range])
+            }
+            return nil
+        }
     }
 
     private static let cachedPackageTargetGraph: Result<[String: Set<String>], Error> = Result {

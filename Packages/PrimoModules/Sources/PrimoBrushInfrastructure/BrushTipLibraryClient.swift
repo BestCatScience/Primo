@@ -1,4 +1,5 @@
 import Foundation
+import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoCoreTypes
 

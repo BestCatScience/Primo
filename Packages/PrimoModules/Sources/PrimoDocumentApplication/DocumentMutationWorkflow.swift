@@ -77,7 +77,7 @@ public struct DocumentMutationWorkflowService: Sendable {
     }
 
     public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
-        createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue ?? -1)
+        createFolder(named: name, afterLayerAt: anchorLayerIndex.rawValue)
     }
 
     public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult {
@@ -234,7 +234,7 @@ public struct DocumentMutationWorkflowService: Sendable {
         }
     }
 
-    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult {
+    package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int?) -> DocumentIndexedMutationResult {
         executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: activeLayerIndex)))
     }
 

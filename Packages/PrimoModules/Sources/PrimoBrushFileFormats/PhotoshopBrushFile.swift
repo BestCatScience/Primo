@@ -1,4 +1,5 @@
 import Foundation
+import PrimoBrushDomain
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoSystemClients

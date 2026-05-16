@@ -1,7 +1,6 @@
 import CoreGraphics
 import Foundation
 import PrimoBrushDomain
-import PrimoBrushFileFormats
 import simd
 
 public enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {

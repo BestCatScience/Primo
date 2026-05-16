@@ -641,7 +641,7 @@ private struct CanvasPreviewRuntimeRenderer: CanvasPreviewRendering {
         guard
             let geometry = PixelGeometry(width: snapshot.width, height: snapshot.height),
             let layerIndex = DocumentLayerMutationContext(
-                revision: .initial,
+                revision: DocumentRevision(snapshot.revision),
                 layerCount: snapshot.layers.count,
                 folderIDs: [],
                 isLayerLocked: { _ in false }
@@ -690,7 +690,7 @@ private struct CanvasPreviewRuntimeEyedropperSampler: CanvasEyedropperSampling {
         paperStyle: CanvasPaperStyle
     ) -> SampledColor? {
         guard let layerIndex = DocumentLayerMutationContext(
-            revision: .initial,
+            revision: DocumentRevision(snapshot.revision),
             layerCount: snapshot.layers.count,
             folderIDs: [],
             isLayerLocked: { _ in false }

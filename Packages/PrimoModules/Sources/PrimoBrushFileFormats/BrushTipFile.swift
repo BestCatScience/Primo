@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import PrimoBrushDomain
 import PrimoDocumentDomain
 import UniformTypeIdentifiers
 
@@ -8,18 +9,6 @@ import UniformTypeIdentifiers
 public extension UTType {
     static let primoBrushTip = UTType(exportedAs: "com.bestcatscience.primo.brush-tip", conformingTo: .data)
     static let primoDocument = UTType(exportedAs: "com.bestcatscience.primo.document", conformingTo: .package)
-}
-
-public struct BrushTipRaster: Equatable, Sendable {
-    public let width: Int
-    public let height: Int
-    public let alphaData: Data
-
-    public init(width: Int, height: Int, alphaData: Data) {
-        self.width = width
-        self.height = height
-        self.alphaData = alphaData
-    }
 }
 
 public struct BrushTipFile: Equatable, Sendable {

@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoBrushRuntime
 import PrimoBrushRuntimeContracts

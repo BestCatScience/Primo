@@ -87,8 +87,8 @@ public struct DocumentLayerMutationContext: Sendable {
         return ExistingFolderID(rawValue, revision: revision)
     }
 
-    public func anchorLayerIndex(_ rawValue: Int) -> LayerAnchorIndex? {
-        guard rawValue >= 0 else { return LayerAnchorIndex(nil) }
+    public func anchorLayerIndex(_ rawValue: Int?) -> LayerAnchorIndex? {
+        guard let rawValue else { return LayerAnchorIndex(nil) }
         return existingLayerIndex(rawValue).map { LayerAnchorIndex($0) }
     }
 }
@@ -134,7 +134,7 @@ public enum LayerStructureCommand: Equatable, Sendable {
     case duplicateLayer(index: Int, name: String)
     case deleteLayer(index: Int)
     case moveLayer(index: Int, destinationIndex: Int)
-    case createFolder(name: String, anchorLayerIndex: Int)
+    case createFolder(name: String, anchorLayerIndex: Int?)
     case deleteFolder(folderID: Int)
     case assignLayerToFolder(index: Int, folderID: Int?)
 }
@@ -294,10 +294,13 @@ public struct LayerStructureCommandValidator: Sendable {
             return .success(.moveLayer(index: index, destinationIndex: destinationIndex))
         case let .createFolder(name, anchorLayerIndex):
             guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
-            guard let anchorLayerIndex = context.anchorLayerIndex(anchorLayerIndex) else {
-                return .failure(.invalidLayerIndex(anchorLayerIndex))
+            if let anchorLayerIndex {
+                guard let anchorLayerIndex = context.anchorLayerIndex(anchorLayerIndex) else {
+                    return .failure(.invalidLayerIndex(anchorLayerIndex))
+                }
+                return .success(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex))
             }
-            return .success(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex))
+            return .success(.createFolder(name: name, anchorLayerIndex: LayerAnchorIndex(nil)))
         case let .deleteFolder(folderID):
             guard let folderID = context.existingFolderID(folderID) else {
                 return .failure(.invalidFolderID(folderID))

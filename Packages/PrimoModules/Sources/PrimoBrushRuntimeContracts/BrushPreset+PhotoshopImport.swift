@@ -1,6 +1,5 @@
 import Foundation
 import PrimoBrushDomain
-import PrimoBrushFileFormats
 
 public extension BrushPreset {
     static func photoshopImported(name: String, tip: BrushTipRaster) -> BrushPreset {

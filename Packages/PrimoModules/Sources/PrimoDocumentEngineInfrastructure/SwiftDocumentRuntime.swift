@@ -1814,8 +1814,9 @@ extension SwiftDocumentRuntime {
         case let .mergeLayerDown(index):
             _ = mergeLayerDown(index: index.rawValue)
         case let .createFolder(folderID, name, anchorLayerIndex):
-            let resolved = (try? createFolder(name: name, anchorLayerIndex: anchorLayerIndex?.rawValue).get()) ?? -1
-            folderIDMap[folderID] = resolved
+            if let resolved = try? createFolder(name: name, anchorLayerIndex: anchorLayerIndex?.rawValue).get() {
+                folderIDMap[folderID] = resolved
+            }
         case let .deleteFolder(folderID):
             if let resolved = folderIDMap[folderID] { _ = deleteFolder(folderID: resolved) }
         case let .setFolderVisibility(folderID, isVisible):
