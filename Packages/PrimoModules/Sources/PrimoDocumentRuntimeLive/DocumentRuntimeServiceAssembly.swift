@@ -3,8 +3,25 @@ import PrimoDocumentApplication
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 
-package extension DocumentRuntimeServices {
+package extension DocumentPresentationServices {
     init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        let presentationReader = DocumentPresentationReader(
+            lightweightPresentation: composition.queryGateway.lightweightPresentation,
+            presentation: composition.queryGateway.presentation
+        )
+        let renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
+        self.init(
+            presentationReader: presentationReader,
+            renderingWorkflow: renderingWorkflow
+        )
+    }
+}
+
+package extension DocumentMutationServices {
+    init(
+        composition: PrimoDocumentRuntime.DocumentRuntimeComposition,
+        previewServices: DocumentPreviewServices
+    ) {
         let canvasCommands = DocumentCanvasCommandService(
             queryGateway: composition.queryGateway,
             renderGateway: composition.renderGateway,
@@ -29,28 +46,11 @@ package extension DocumentRuntimeServices {
             documentEditingGateway: composition.editingGateway,
             documentMutationGateway: composition.mutationGateway
         )
-        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
-        let canvasEyedropperSampler = GpuCanvasEyedropperSampler()
-        let layerTransformProcessor = GpuLayerTransformProcessor(
-            layerTransformOperations: composition.layerTransformOperations,
-            selectionOperations: composition.selectionMaskOperations
-        )
-        let selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
         let canvasEditingWorkflow = CanvasEditingWorkflowService(
             documentContentService: contentService,
-            layerTransformProcessor: layerTransformProcessor
+            layerTransformProcessor: previewServices.layerTransformProcessor
         )
         let selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
-        let canvasPresentationEnvironment = CanvasPresentationEnvironment(
-            previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: canvasEyedropperSampler,
-            selectionProcessor: selectionMaskProcessor
-        )
-        let presentationReader = DocumentPresentationReader(
-            lightweightPresentation: composition.queryGateway.lightweightPresentation,
-            presentation: composition.queryGateway.presentation
-        )
-        let renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
         let textLayerService = DocumentTextLayerService(
             textLayerData: { index in composition.textLayerGateway.textLayerData(index.rawValue) },
             setTextLayer: { index, textLayer in
@@ -59,6 +59,47 @@ package extension DocumentRuntimeServices {
             },
             clearTextLayerData: { index in composition.textLayerGateway.clearTextLayerData(index.rawValue) }
         )
+        self.init(
+            canvasCommands: canvasCommands,
+            layerCommands: layerCommands,
+            strokeCommands: strokeCommands,
+            canvasStrokeInteractionService: canvasStrokeInteractionService,
+            historyCommands: historyCommands,
+            mutationWorkflow: mutationWorkflow,
+            contentService: contentService,
+            canvasEditingWorkflow: canvasEditingWorkflow,
+            selectionWorkflow: selectionWorkflow,
+            textLayerService: textLayerService
+        )
+    }
+}
+
+package extension DocumentPreviewServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
+        let canvasEyedropperSampler = GpuCanvasEyedropperSampler()
+        let layerTransformProcessor = GpuLayerTransformProcessor(
+            layerTransformOperations: composition.layerTransformOperations,
+            selectionOperations: composition.selectionMaskOperations
+        )
+        let selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
+        let canvasPresentationEnvironment = CanvasPresentationEnvironment(
+            previewRenderer: canvasPreviewRenderer,
+            eyedropperSampler: canvasEyedropperSampler,
+            selectionProcessor: selectionMaskProcessor
+        )
+        self.init(
+            canvasPreviewRenderer: canvasPreviewRenderer,
+            canvasEyedropperSampler: canvasEyedropperSampler,
+            layerTransformProcessor: layerTransformProcessor,
+            selectionMaskProcessor: selectionMaskProcessor,
+            canvasPresentationEnvironment: canvasPresentationEnvironment
+        )
+    }
+}
+
+package extension DocumentPersistenceServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
         let persistenceClient = DocumentPersistenceClient(
             saveProject: composition.persistenceGateway.saveProject,
             loadProject: composition.persistenceGateway.loadProject,
@@ -72,23 +113,6 @@ package extension DocumentRuntimeServices {
             timelapseCapture: composition.exportGateway.timelapseCapture
         )
         self.init(
-            canvasCommands: canvasCommands,
-            layerCommands: layerCommands,
-            strokeCommands: strokeCommands,
-            canvasStrokeInteractionService: canvasStrokeInteractionService,
-            historyCommands: historyCommands,
-            mutationWorkflow: mutationWorkflow,
-            contentService: contentService,
-            canvasEditingWorkflow: canvasEditingWorkflow,
-            selectionWorkflow: selectionWorkflow,
-            canvasPreviewRenderer: canvasPreviewRenderer,
-            canvasEyedropperSampler: canvasEyedropperSampler,
-            layerTransformProcessor: layerTransformProcessor,
-            selectionMaskProcessor: selectionMaskProcessor,
-            canvasPresentationEnvironment: canvasPresentationEnvironment,
-            presentationReader: presentationReader,
-            renderingWorkflow: renderingWorkflow,
-            textLayerService: textLayerService,
             exportClient: exportClient,
             persistenceClient: persistenceClient
         )
@@ -97,15 +121,24 @@ package extension DocumentRuntimeServices {
 
 package extension DocumentApplicationRuntime {
     init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
-        let services = DocumentRuntimeServices(composition: composition)
+        let presentationServices = DocumentPresentationServices(composition: composition)
+        let previewServices = DocumentPreviewServices(composition: composition)
+        let mutationServices = DocumentMutationServices(
+            composition: composition,
+            previewServices: previewServices
+        )
+        let persistenceServices = DocumentPersistenceServices(composition: composition)
         self.init(
-            presentation: DocumentPresentationRuntime(services: services),
-            canvasMutation: CanvasMutationRuntime(services: services),
-            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: services)),
-            layerEditing: LayerEditingRuntime(services: services),
-            persistence: DocumentPersistenceRuntime(services: services),
-            export: DocumentExportRuntime(services: services),
-            preview: CanvasPreviewRuntime(services: services)
+            presentation: DocumentPresentationRuntime(services: presentationServices),
+            canvasMutation: CanvasMutationRuntime(services: mutationServices),
+            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: mutationServices)),
+            layerEditing: LayerEditingRuntime(
+                mutationServices: mutationServices,
+                previewServices: previewServices
+            ),
+            persistence: DocumentPersistenceRuntime(services: persistenceServices),
+            export: DocumentExportRuntime(services: persistenceServices),
+            preview: CanvasPreviewRuntime(services: previewServices)
         )
     }
 }

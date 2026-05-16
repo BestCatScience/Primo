@@ -69,47 +69,6 @@ package struct DocumentRuntimeComposition: Sendable {
         self.renderingOperations = renderingOperations
         self.surfaceHandleReleaser = surfaceHandleReleaser
     }
-
-
-    package func withOverrides(
-        queryGateway: DocumentQueryGateway? = nil,
-        renderGateway: DocumentRenderGateway? = nil,
-        dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
-        mutationGateway: DocumentMutationGateway? = nil,
-        strokeGateway: StrokeInputGateway? = nil,
-        historyGateway: DocumentHistoryGateway? = nil,
-        persistenceGateway: DocumentPersistenceGateway? = nil,
-        exportGateway: DocumentExportGateway? = nil,
-        textLayerGateway: TextLayerGateway? = nil,
-        layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
-        editingGateway: DocumentEditingGateway? = nil,
-        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
-        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
-        layerTransformOperations: DocumentLayerTransformOperations? = nil,
-        renderingOperations: DocumentRenderingOperations? = nil,
-        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
-    ) -> DocumentRuntimeComposition {
-        DocumentRuntimeComposition(
-            queryGateway: queryGateway ?? self.queryGateway,
-            renderGateway: renderGateway ?? self.renderGateway,
-            dirtyUpdateQueue: dirtyUpdateQueue ?? self.dirtyUpdateQueue,
-            mutationGateway: mutationGateway ?? self.mutationGateway,
-            strokeGateway: strokeGateway ?? self.strokeGateway,
-            historyGateway: historyGateway ?? self.historyGateway,
-            persistenceGateway: persistenceGateway ?? self.persistenceGateway,
-            exportGateway: exportGateway ?? self.exportGateway,
-            textLayerGateway: textLayerGateway ?? self.textLayerGateway,
-            layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
-            editingGateway: editingGateway ?? self.editingGateway,
-            strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
-            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
-            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
-            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
-            renderingOperations: renderingOperations ?? self.renderingOperations,
-            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
-        )
-    }
 }
 
 public enum DocumentMutationSuccess: Equatable, Sendable {
@@ -413,7 +372,20 @@ public struct DocumentRenderingWorkflow: Sendable {
 
 
 
-package struct DocumentRuntimeServices: Sendable {
+package struct DocumentPresentationServices: Sendable {
+    package let presentationReader: DocumentPresentationReader
+    package let renderingWorkflow: DocumentRenderingWorkflow
+
+    package init(
+        presentationReader: DocumentPresentationReader,
+        renderingWorkflow: DocumentRenderingWorkflow
+    ) {
+        self.presentationReader = presentationReader
+        self.renderingWorkflow = renderingWorkflow
+    }
+}
+
+package struct DocumentMutationServices: Sendable {
     package let canvasCommands: DocumentCanvasCommandService
     package let layerCommands: DocumentLayerCommandService
     package let strokeCommands: DocumentStrokeCommandService
@@ -423,16 +395,7 @@ package struct DocumentRuntimeServices: Sendable {
     package let contentService: DocumentContentService
     package let canvasEditingWorkflow: CanvasEditingWorkflowService
     package let selectionWorkflow: SelectionWorkflowService
-    package let canvasPreviewRenderer: any CanvasPreviewRendering
-    package let canvasEyedropperSampler: any CanvasEyedropperSampling
-    package let layerTransformProcessor: any LayerTransformProcessing
-    package let selectionMaskProcessor: any SelectionMaskProcessing
-    package let canvasPresentationEnvironment: CanvasPresentationEnvironment
-    package let presentationReader: DocumentPresentationReader
-    package let renderingWorkflow: DocumentRenderingWorkflow
     package let textLayerService: DocumentTextLayerService
-    package let exportClient: DocumentExportClient
-    package let persistenceClient: DocumentPersistenceClient
 
     package init(
         canvasCommands: DocumentCanvasCommandService,
@@ -444,16 +407,7 @@ package struct DocumentRuntimeServices: Sendable {
         contentService: DocumentContentService,
         canvasEditingWorkflow: CanvasEditingWorkflowService,
         selectionWorkflow: SelectionWorkflowService,
-        canvasPreviewRenderer: any CanvasPreviewRendering,
-        canvasEyedropperSampler: any CanvasEyedropperSampling,
-        layerTransformProcessor: any LayerTransformProcessing,
-        selectionMaskProcessor: any SelectionMaskProcessing,
-        canvasPresentationEnvironment: CanvasPresentationEnvironment,
-        presentationReader: DocumentPresentationReader,
-        renderingWorkflow: DocumentRenderingWorkflow,
-        textLayerService: DocumentTextLayerService,
-        exportClient: DocumentExportClient,
-        persistenceClient: DocumentPersistenceClient
+        textLayerService: DocumentTextLayerService
     ) {
         self.canvasCommands = canvasCommands
         self.layerCommands = layerCommands
@@ -464,14 +418,40 @@ package struct DocumentRuntimeServices: Sendable {
         self.contentService = contentService
         self.canvasEditingWorkflow = canvasEditingWorkflow
         self.selectionWorkflow = selectionWorkflow
+        self.textLayerService = textLayerService
+    }
+}
+
+package struct DocumentPreviewServices: Sendable {
+    package let canvasPreviewRenderer: any CanvasPreviewRendering
+    package let canvasEyedropperSampler: any CanvasEyedropperSampling
+    package let layerTransformProcessor: any LayerTransformProcessing
+    package let selectionMaskProcessor: any SelectionMaskProcessing
+    package let canvasPresentationEnvironment: CanvasPresentationEnvironment
+
+    package init(
+        canvasPreviewRenderer: any CanvasPreviewRendering,
+        canvasEyedropperSampler: any CanvasEyedropperSampling,
+        layerTransformProcessor: any LayerTransformProcessing,
+        selectionMaskProcessor: any SelectionMaskProcessing,
+        canvasPresentationEnvironment: CanvasPresentationEnvironment
+    ) {
         self.canvasPreviewRenderer = canvasPreviewRenderer
         self.canvasEyedropperSampler = canvasEyedropperSampler
         self.layerTransformProcessor = layerTransformProcessor
         self.selectionMaskProcessor = selectionMaskProcessor
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
-        self.presentationReader = presentationReader
-        self.renderingWorkflow = renderingWorkflow
-        self.textLayerService = textLayerService
+    }
+}
+
+package struct DocumentPersistenceServices: Sendable {
+    package let exportClient: DocumentExportClient
+    package let persistenceClient: DocumentPersistenceClient
+
+    package init(
+        exportClient: DocumentExportClient,
+        persistenceClient: DocumentPersistenceClient
+    ) {
         self.exportClient = exportClient
         self.persistenceClient = persistenceClient
     }
@@ -494,7 +474,7 @@ public struct DocumentPresentationRuntime: Sendable {
         self.renderingPipeline = renderingWorkflow
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentPresentationServices) {
         self.presentationReader = services.presentationReader
         self.renderingPipeline = services.renderingWorkflow
     }
@@ -572,7 +552,7 @@ public struct CanvasMutationRuntime: Sendable {
         self.historyCommands = historyCommands
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.canvasCommands = services.canvasCommands
         self.historyCommands = services.historyCommands
     }
@@ -638,7 +618,7 @@ public struct LayerStructureEditingRuntime: Sendable {
         self.mutationWorkflow = mutationWorkflow
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
     }
@@ -684,7 +664,7 @@ public struct LayerContentEditingRuntime: Sendable {
         self.contentService = contentService
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.layerCommands = services.layerCommands
         self.contentService = services.contentService
     }
@@ -715,7 +695,7 @@ public struct TextLayerEditingRuntime: Sendable {
         self.textLayerService = textLayerService
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
         self.contentService = services.contentService
@@ -736,7 +716,7 @@ public struct LayerSelectionEditingRuntime: Sendable {
         self.selectionWorkflow = selectionWorkflow
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.selectionWorkflow = services.selectionWorkflow
     }
 
@@ -764,7 +744,7 @@ public struct LayerTransformEditingRuntime: Sendable {
         self.layerTransformProcessor = layerTransformProcessor
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentPreviewServices) {
         self.layerTransformProcessor = services.layerTransformProcessor
     }
 
@@ -831,7 +811,7 @@ public struct CanvasEditingRuntime: Sendable {
         self.canvasEditingWorkflow = canvasEditingWorkflow
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.canvasEditingWorkflow = services.canvasEditingWorkflow
     }
 
@@ -846,7 +826,7 @@ public struct LayerPreviewLeaseRuntime: Sendable {
         self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }
 
@@ -886,14 +866,17 @@ public struct LayerEditingRuntime: Sendable {
         self.previewLease = LayerPreviewLeaseRuntime(canvasStrokeInteractionService: canvasStrokeInteractionService)
     }
 
-    package init(services: DocumentRuntimeServices) {
-        self.structure = LayerStructureEditingRuntime(services: services)
-        self.content = LayerContentEditingRuntime(services: services)
-        self.text = TextLayerEditingRuntime(services: services)
-        self.selection = LayerSelectionEditingRuntime(services: services)
-        self.transform = LayerTransformEditingRuntime(services: services)
-        self.canvasEditing = CanvasEditingRuntime(services: services)
-        self.previewLease = LayerPreviewLeaseRuntime(services: services)
+    package init(
+        mutationServices: DocumentMutationServices,
+        previewServices: DocumentPreviewServices
+    ) {
+        self.structure = LayerStructureEditingRuntime(services: mutationServices)
+        self.content = LayerContentEditingRuntime(services: mutationServices)
+        self.text = TextLayerEditingRuntime(services: mutationServices)
+        self.selection = LayerSelectionEditingRuntime(services: mutationServices)
+        self.transform = LayerTransformEditingRuntime(services: previewServices)
+        self.canvasEditing = CanvasEditingRuntime(services: mutationServices)
+        self.previewLease = LayerPreviewLeaseRuntime(services: mutationServices)
     }
 
     public func addLayer(named name: String) -> DocumentCreatedLayerMutationResult { structure.addLayer(named: name) }
@@ -1016,7 +999,7 @@ package struct CanvasStrokeRuntime: Sendable {
         self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentMutationServices) {
         self.strokeCommands = services.strokeCommands
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }
@@ -1193,7 +1176,7 @@ public struct DocumentPersistenceRuntime: Sendable {
         self.persistenceClient = persistenceClient
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentPersistenceServices) {
         self.persistenceClient = services.persistenceClient
     }
 
@@ -1212,7 +1195,7 @@ public struct DocumentExportRuntime: Sendable {
         self.exportClient = exportClient
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentPersistenceServices) {
         self.exportClient = services.exportClient
     }
 
@@ -1239,7 +1222,7 @@ public struct CanvasPreviewRuntime: Sendable {
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
     }
 
-    package init(services: DocumentRuntimeServices) {
+    package init(services: DocumentPreviewServices) {
         self.canvasPreviewRenderer = services.canvasPreviewRenderer
         self.canvasEyedropperSampler = services.canvasEyedropperSampler
         self.selectionMaskProcessor = services.selectionMaskProcessor

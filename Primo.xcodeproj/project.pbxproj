@@ -88,6 +88,8 @@
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
 		A000000000000000000000D4 /* PrimoRootFeatureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D5 /* PrimoRootFeatureModels.swift */; };
 		A000000000000000000000E4 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift */; };
+		A000000000000000000000E6 /* CanvasEditingWorkflowReducer+TransformWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E8 /* CanvasEditingWorkflowReducer+TransformWorkflow.swift */; };
+		A000000000000000000000E7 /* CanvasEditingWorkflowReducer+WorkflowObjects.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E9 /* CanvasEditingWorkflowReducer+WorkflowObjects.swift */; };
 		A000000000000000000000F6 /* CrossFeatureIntegrationReducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */; };
 		A00000000000000000000100 /* ImportExportFeature+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000101 /* ImportExportFeature+Workflow.swift */; };
 		A00000000000000000000102 /* WorkspaceFeature+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */; };
@@ -308,6 +310,8 @@
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
 		A000000000000000000000D5 /* PrimoRootFeatureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoRootFeatureModels.swift; sourceTree = "<group>"; };
 		A000000000000000000000E5 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasEditingWorkflowReducer+SelectionWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E8 /* CanvasEditingWorkflowReducer+TransformWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasEditingWorkflowReducer+TransformWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E9 /* CanvasEditingWorkflowReducer+WorkflowObjects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasEditingWorkflowReducer+WorkflowObjects.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossFeatureIntegrationReducer.swift; sourceTree = "<group>"; };
 		A00000000000000000000101 /* ImportExportFeature+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportExportFeature+Workflow.swift"; sourceTree = "<group>"; };
 		A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceFeature+Workflow.swift"; sourceTree = "<group>"; };
@@ -599,6 +603,8 @@
 				4D1000000000000000000009 /* CanvasEditingWorkflowReducer.swift */,
 				A000000000000000000000E5 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift */,
 				1686F75A86724FBA8A0DAAEB /* CanvasEditingWorkflowReducer+StrokeWorkflow.swift */,
+				A000000000000000000000E8 /* CanvasEditingWorkflowReducer+TransformWorkflow.swift */,
+				A000000000000000000000E9 /* CanvasEditingWorkflowReducer+WorkflowObjects.swift */,
 				A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */,
 				F30000000000000000000011 /* ApplicationWorkspaceBridge.swift */,
 				F30000000000000000000012 /* WorkspaceDocumentBridge.swift */,
@@ -910,6 +916,8 @@
 				976C75F756004B609A33D822 /* DocumentFeature+SelectionGeometryOps.swift in Sources */,
 				7B1D7B5CA1C44D498EB4D001 /* DocumentFeature+DocumentMutationFeedbackMapper.swift in Sources */,
 				A000000000000000000000E4 /* CanvasEditingWorkflowReducer+SelectionWorkflow.swift in Sources */,
+				A000000000000000000000E6 /* CanvasEditingWorkflowReducer+TransformWorkflow.swift in Sources */,
+				A000000000000000000000E7 /* CanvasEditingWorkflowReducer+WorkflowObjects.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,
 				A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */,

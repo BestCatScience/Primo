@@ -66,46 +66,6 @@ package struct DocumentEngineRuntimeComposition: Sendable {
         self.renderingOperations = renderingOperations
         self.surfaceHandleReleaser = surfaceHandleReleaser
     }
-
-    package func withOverrides(
-        queryGateway: DocumentQueryGateway? = nil,
-        renderGateway: DocumentRenderGateway? = nil,
-        dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
-        mutationGateway: DocumentMutationGateway? = nil,
-        strokeGateway: StrokeInputGateway? = nil,
-        historyGateway: DocumentHistoryGateway? = nil,
-        persistenceGateway: DocumentPersistenceGateway? = nil,
-        exportGateway: DocumentExportGateway? = nil,
-        textLayerGateway: TextLayerGateway? = nil,
-        layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
-        editingGateway: DocumentEditingGateway? = nil,
-        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
-        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
-        layerTransformOperations: DocumentLayerTransformOperations? = nil,
-        renderingOperations: DocumentRenderingOperations? = nil,
-        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
-    ) -> DocumentEngineRuntimeComposition {
-        DocumentEngineRuntimeComposition(
-            queryGateway: queryGateway ?? self.queryGateway,
-            renderGateway: renderGateway ?? self.renderGateway,
-            dirtyUpdateQueue: dirtyUpdateQueue ?? self.dirtyUpdateQueue,
-            mutationGateway: mutationGateway ?? self.mutationGateway,
-            strokeGateway: strokeGateway ?? self.strokeGateway,
-            historyGateway: historyGateway ?? self.historyGateway,
-            persistenceGateway: persistenceGateway ?? self.persistenceGateway,
-            exportGateway: exportGateway ?? self.exportGateway,
-            textLayerGateway: textLayerGateway ?? self.textLayerGateway,
-            layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
-            editingGateway: editingGateway ?? self.editingGateway,
-            strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
-            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
-            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
-            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
-            renderingOperations: renderingOperations ?? self.renderingOperations,
-            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
-        )
-    }
 }
 
 package enum DocumentEngineRuntimeCompositionFactory {

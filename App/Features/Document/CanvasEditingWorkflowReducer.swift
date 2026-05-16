@@ -67,6 +67,25 @@ struct CanvasEditingWorkflowReducer: Reducer {
         DocumentWorkflowCommandValidator()
     }
 
+    var strokeWorkflow: CanvasStrokeWorkflow {
+        CanvasStrokeWorkflow(reducer: self)
+    }
+
+    var transformWorkflow: CanvasTransformWorkflow {
+        CanvasTransformWorkflow(reducer: self)
+    }
+
+    var selectionWorkflow: CanvasSelectionWorkflow {
+        CanvasSelectionWorkflow(
+            reducer: self,
+            transformWorkflow: transformWorkflow
+        )
+    }
+
+    var paperSyncWorkflow: CanvasPaperSyncWorkflow {
+        CanvasPaperSyncWorkflow(paperStylePort: paperStylePort)
+    }
+
     enum EditingAction: Equatable {
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
@@ -85,46 +104,22 @@ struct CanvasEditingWorkflowReducer: Reducer {
     }
 
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        if let effect = strokeWorkflow.reduce(state: &state, action: action) {
+            return effect
+        }
+        if let effect = selectionWorkflow.reduce(state: &state, action: action) {
+            return effect
+        }
+
         switch action {
         case let .editing(editingAction):
             return reduceEditingAction(editingAction, state: &state)
-
-        case .brushPalette(.delegate(.clearSelection)):
-            state.canvas.clearSelectionState()
-            return .none
-
-        case .brushPalette(.delegate(.invertSelection)):
-            handleInvertSelection(state: &state)
-            return .none
-
-        case let .brushPalette(.delegate(.expandSelection(expansion))):
-            handleAdjustSelection(state: &state, expansion: max(expansion, 1))
-            return .none
-
-        case let .brushPalette(.delegate(.contractSelection(contraction))):
-            handleAdjustSelection(state: &state, expansion: -max(contraction, 1))
-            return .none
 
         case .canvas(.delegate(.requestUndo)):
             return .send(.lifecycle(.undoRequested))
 
         case .canvas(.delegate(.requestRedo)):
             return .send(.lifecycle(.redoRequested))
-
-        case .canvas(.delegate(.beginStroke)),
-             .canvas(.delegate(.appendSamples)),
-             .canvas(.delegate(.previewShapeStroke)),
-             .canvas(.delegate(.endStroke)),
-             .canvas(.delegate(.cancelStroke)),
-             .canvas(.delegate(.commitStroke)),
-             .canvas(.delegate(.blurSamples)),
-             .canvas(.delegate(.endBlurStroke)),
-             .canvas(.delegate(.cancelBlurStroke)),
-             .canvas(.delegate(.fill)),
-             .canvas(.delegate(.previewSelectionMove)),
-             .canvas(.delegate(.applySelectionMove)),
-             .canvas(.delegate(.cancelSelectionMove)):
-            return routeDocumentEditorEditingAction(state: &state, action: action) ?? .none
 
         case .canvas(.delegate(.toggleBrushAndEraser)):
             state.toggleBrushAndEraser()
@@ -138,21 +133,15 @@ struct CanvasEditingWorkflowReducer: Reducer {
             state.applyColorSampled(sampledColor)
             return .none
 
-        case let .canvas(.delegate(.lassoSelect(points))):
-            return handleLassoSelection(state: &state, points: points)
-
-        case let .canvas(.delegate(.autoSelect(sample))):
-            return handleAutoSelection(state: &state, sample: sample)
-
         case .brushPalette(.binding(\.paper.color)),
              .brushPalette(.binding(\.paper.isTransparent)):
             let paperStyle = state.syncBrushPalettePaperBinding()
-            return synchronizePaperStyleEffect(paperStyle)
+            return paperSyncWorkflow.synchronize(paperStyle)
 
         case .layerSidebar(.binding(\.paperColor)),
              .layerSidebar(.binding(\.transparentPaper)):
             let paperStyle = state.syncLayerSidebarPaperBinding()
-            return synchronizePaperStyleEffect(paperStyle)
+            return paperSyncWorkflow.synchronize(paperStyle)
 
         default:
             return .none
@@ -173,11 +162,9 @@ struct CanvasEditingWorkflowReducer: Reducer {
         case let .toolLongPressed(tool):
             state.selectTool(tool, showsBrushSettingsPopover: tool == .brush || tool == .erase)
             return .none
-        case let .featherSelectionRequested(radius):
-            handleFeatherSelection(state: &state, radius: max(radius, 1))
-            return .none
-        case let .colorRangeSelectionRequested(request):
-            return handleColorRangeSelectionRequest(state: &state, request: request)
+        case .featherSelectionRequested,
+             .colorRangeSelectionRequested:
+            return selectionWorkflow.reduce(state: &state, action: .editing(action)) ?? .none
         }
     }
 }

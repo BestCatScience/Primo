@@ -15,7 +15,11 @@ private extension Result where Success == DocumentCommandOutcome, Failure == Doc
 
 package extension DocumentRuntime {
     init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
-        let services = DocumentRuntimeServices(composition: composition)
+        let previewServices = DocumentPreviewServices(composition: composition)
+        let mutationServices = DocumentMutationServices(
+            composition: composition,
+            previewServices: previewServices
+        )
         let presentationBroadcaster = DocumentRuntimePresentationBroadcaster {
             composition.queryGateway.lightweightPresentation()
         }
@@ -44,15 +48,15 @@ package extension DocumentRuntime {
             case let .canvas(command):
                 switch command {
                 case let .createSized(size):
-                    return mutationOutcome(services.canvasCommands.createCanvas(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvasCommands.createCanvas(size.width, size.height).map { .completed })
                 case let .resizeSized(size):
-                    return mutationOutcome(services.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
                 case let .resizeExtentSized(size):
-                    return mutationOutcome(services.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
                 case let .initializeImported(request, layerName):
-                    return mutationOutcome(services.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
+                    return mutationOutcome(mutationServices.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
                 case .compositeSurface:
-                    return services.canvasCommands.compositeSurface()
+                    return mutationServices.canvasCommands.compositeSurface()
                         .map(DocumentCommandOutcome.compositeSurface)
                         .getOrFailureOutcome()
                 case let .setPaperStyle(style):

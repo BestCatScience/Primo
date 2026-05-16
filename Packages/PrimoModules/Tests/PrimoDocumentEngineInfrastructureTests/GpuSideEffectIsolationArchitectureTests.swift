@@ -1553,6 +1553,20 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
+        let workflowObjects = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer+WorkflowObjects.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let transformWorkflow = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "App/Features/Document/CanvasEditingWorkflowReducer+TransformWorkflow.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
         let dependencies = try String(
             contentsOf: repoRoot.appendingPathComponent(
                 "App/Features/Document/DocumentDependencyKeys.swift",
@@ -1599,7 +1613,19 @@ struct GpuSideEffectIsolationArchitectureTests {
         ] {
             #expect(reducer.contains(dependency), "Canvas editing reducer should inject \(dependency)")
         }
-        #expect(strokeWorkflow.contains(".run { [paperStylePort] _ in"))
+        for workflow in [
+            "struct CanvasStrokeWorkflow",
+            "struct CanvasSelectionWorkflow",
+            "struct CanvasTransformWorkflow",
+            "struct CanvasPaperSyncWorkflow"
+        ] {
+            #expect(workflowObjects.contains(workflow), "Canvas editing workflow routing should be split into \(workflow)")
+        }
+        #expect(reducer.contains("strokeWorkflow.reduce(state: &state, action: action)"))
+        #expect(reducer.contains("selectionWorkflow.reduce(state: &state, action: action)"))
+        #expect(workflowObjects.contains(".run { [paperStylePort] _ in"))
+        #expect(transformWorkflow.contains("handlePreviewLayerMoveWithTransform"))
+        #expect(transformWorkflow.contains("handleApplyLayerMoveWithTransform"))
         #expect(!strokeWorkflow.contains(".run { [canvasStrokeWorkflowAccess]"))
 
         let adapterExpectations: [(String, String, [String])] = [

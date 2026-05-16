@@ -11,6 +11,56 @@ import PrimoDocumentRuntimeLive
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
+private extension DocumentEngineRuntimeComposition {
+    func withTestHistoryGateway(
+        _ historyGateway: DocumentHistoryGateway
+    ) -> DocumentEngineRuntimeComposition {
+        DocumentEngineRuntimeComposition(
+            queryGateway: queryGateway,
+            renderGateway: renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue,
+            mutationGateway: mutationGateway,
+            strokeGateway: strokeGateway,
+            historyGateway: historyGateway,
+            persistenceGateway: persistenceGateway,
+            exportGateway: exportGateway,
+            textLayerGateway: textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway,
+            editingGateway: editingGateway,
+            strokeSessionUseCase: strokeSessionUseCase,
+            canvasPreviewOperations: canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations,
+            renderingOperations: renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser
+        )
+    }
+
+    func withTestSurfaceHandleReleaser(
+        _ surfaceHandleReleaser: DocumentSurfaceHandleReleaser
+    ) -> DocumentEngineRuntimeComposition {
+        DocumentEngineRuntimeComposition(
+            queryGateway: queryGateway,
+            renderGateway: renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue,
+            mutationGateway: mutationGateway,
+            strokeGateway: strokeGateway,
+            historyGateway: historyGateway,
+            persistenceGateway: persistenceGateway,
+            exportGateway: exportGateway,
+            textLayerGateway: textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway,
+            editingGateway: editingGateway,
+            strokeSessionUseCase: strokeSessionUseCase,
+            canvasPreviewOperations: canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations,
+            renderingOperations: renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser
+        )
+    }
+}
+
 struct DocumentRuntimeCompositionTests {
     private final class MutableRuntime: @unchecked Sendable {
         var value: Int
@@ -140,12 +190,12 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
-    func compositionOverridesReturnNewBoundaryWhilePreservingSharedRuntime() throws {
+    func testFixtureOverrideReturnsNewBoundaryWhilePreservingSharedRuntime() throws {
         let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
             gpuOperations: DocumentGpuOperationGatewayFactory.live()
         )
-        let overridden = runtime.withOverrides(
-            historyGateway: DocumentHistoryGateway(
+        let overridden = runtime.withTestHistoryGateway(
+            DocumentHistoryGateway(
                 canUndo: { .success(false) },
                 canRedo: { .success(false) },
                 undo: { .failure(.noUndoState) },
@@ -174,7 +224,11 @@ struct DocumentRuntimeCompositionTests {
         let compositionURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift"
         )
+        let runtimeCompositionURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift"
+        )
         let body = try String(contentsOf: compositionURL, encoding: .utf8)
+        let runtimeBody = try String(contentsOf: runtimeCompositionURL, encoding: .utf8)
 
         #expect(body.contains("package struct DocumentEngineRuntimeComposition"))
         #expect(body.contains("package let queryGateway: DocumentQueryGateway"))
@@ -182,9 +236,9 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("package let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
         #expect(body.contains("package let mutationGateway: DocumentMutationGateway"))
         #expect(body.contains("package let strokeGateway: StrokeInputGateway"))
-        #expect(body.contains("package func withOverrides("))
+        #expect(!body.contains("func withOverrides("))
+        #expect(!runtimeBody.contains("func withOverrides("))
         #expect(!body.contains("public let queryGateway: DocumentQueryGateway"))
-        #expect(!body.contains("public func withOverrides("))
         #expect(!body.contains("public var queryGateway: DocumentQueryGateway"))
     }
 
@@ -271,6 +325,65 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface("))
         #expect(body.contains("SwiftDocumentRuntime.compositePNGData("))
         #expect(body.contains("forMaterializedSnapshot: $0"))
+    }
+
+    @Test
+    func liveFactoryBuildsCapabilityGatewaysThroughFocusedHelpers() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let factoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+        let body = try String(contentsOf: factoryURL, encoding: .utf8)
+
+        #expect(body.contains("let queryGateway = makeQueryGateway(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let mutationGateway = makeMutationGateway(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let strokeGateway = makeStrokeGateway(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let persistenceGateway = makePersistenceGateway("))
+        #expect(body.contains("let exportGateway = makeExportGateway("))
+        #expect(body.contains("private static func makeQueryGateway("))
+        #expect(body.contains("private static func makeMutationGateway("))
+        #expect(body.contains("private static func makeStrokeGateway("))
+        #expect(body.contains("private static func makePersistenceGateway("))
+        #expect(body.contains("private static func makeExportGateway("))
+    }
+
+    @Test
+    func runtimeServicesAreSplitIntoCapabilityGroups() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let facadeURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift"
+        )
+        let assemblyURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeServiceAssembly.swift"
+        )
+        let facadeBody = try String(contentsOf: facadeURL, encoding: .utf8)
+        let assemblyBody = try String(contentsOf: assemblyURL, encoding: .utf8)
+
+        #expect(!facadeBody.contains("struct DocumentRuntimeServices"))
+        for services in [
+            "DocumentPresentationServices",
+            "DocumentMutationServices",
+            "DocumentPreviewServices",
+            "DocumentPersistenceServices"
+        ] {
+            #expect(facadeBody.contains("package struct \(services): Sendable"))
+            #expect(assemblyBody.contains("package extension \(services)"))
+        }
+        #expect(assemblyBody.contains("let presentationServices = DocumentPresentationServices(composition: composition)"))
+        #expect(assemblyBody.contains("let previewServices = DocumentPreviewServices(composition: composition)"))
+        #expect(assemblyBody.contains("let mutationServices = DocumentMutationServices("))
+        #expect(assemblyBody.contains("let persistenceServices = DocumentPersistenceServices(composition: composition)"))
+        #expect(!assemblyBody.contains("DocumentRuntimeServices(composition: composition)"))
     }
 
     @Test
@@ -587,8 +700,8 @@ struct DocumentRuntimeCompositionTests {
         let composition = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
             gpuOperations: DocumentGpuOperationGatewayFactory.live()
         )
-            .withOverrides(
-                surfaceHandleReleaser: DocumentSurfaceHandleReleaser { handle in
+            .withTestSurfaceHandleReleaser(
+                DocumentSurfaceHandleReleaser { handle in
                     releasedHandles.append(handle)
                 }
             )

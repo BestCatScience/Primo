@@ -71,18 +71,7 @@ package enum DocumentEngineFactory {
             )
         )
 
-        let queryGateway = DocumentQueryGateway(
-            lightweightPresentation: {
-                runtimeExecutor.performValue(operation: "lightweightPresentation") {
-                    $0.lightweightPresentation()
-                }
-            },
-            presentation: {
-                runtimeExecutor.performValue(operation: "presentation") {
-                    $0.presentation()
-                }
-            }
-        )
+        let queryGateway = makeQueryGateway(runtimeExecutor: runtimeExecutor)
         let renderGateway = DocumentRenderGateway(
             compositePixelData: {
                 runtimeExecutor.performValue(operation: "compositePixelData") {
@@ -118,88 +107,9 @@ package enum DocumentEngineFactory {
             }
         )
 
-        let mutationGateway = DocumentMutationGateway(
-            resizeCanvas: { width, height in
-                performResizeCanvas(width: width, height: height, runtimeExecutor: runtimeExecutor)
-            },
-            resizeCanvasExtent: { width, height in
-                performResizeCanvasExtent(width: width, height: height, runtimeExecutor: runtimeExecutor)
-            },
-            addLayer: { name in runtimeExecutor.performResult(operation: "addLayer") { $0.addLayer(name: name) } },
-            deleteLayer: { index in runtimeExecutor.performResult(operation: "deleteLayer") { $0.deleteLayer(index: index) } },
-            setActiveLayer: { index in runtimeExecutor.performResult(operation: "setActiveLayer") { $0.setActiveLayer(index: index) } },
-            setLayerName: { index, name in runtimeExecutor.performResult(operation: "setLayerName") { $0.setLayerName(index: index, name: name) } },
-            setLayerVisibility: { index, isVisible in
-                runtimeExecutor.performResult(operation: "setLayerVisibility") {
-                    $0.setLayerVisibility(index: index, isVisible: isVisible)
-                }
-            },
-            revealLayerForEditing: { index in runtimeExecutor.performResult(operation: "revealLayerForEditing") { $0.revealLayerForEditing(index: index) } },
-            replaceLayerPixels: { index, data in runtimeExecutor.performResult(operation: "replaceLayerPixels") { $0.replaceLayerPixels(index: index, data: data) } },
-            replaceLayerPixelsInRect: { index, rect, data in
-                runtimeExecutor.performResult(operation: "replaceLayerPixelsInRect") {
-                    $0.replaceLayerPixels(index: index, in: rect, data: data)
-                }
-            },
-            applyLayerSurfaceMutation: { index, payload in
-                runtimeExecutor.performResult(operation: "applyLayerSurfaceMutation") {
-                    $0.applyLayerSurfaceMutation(index: index, payload: payload)
-                }
-            },
-            applyLayerMutation: { index, payload in
-                runtimeExecutor.performResult(operation: "applyLayerMutation") {
-                    $0.applyLayerMutation(index: index, payload: payload)
-                }
-            },
-            applyTextLayerMutation: { index, textLayer, payload in
-                runtimeExecutor.performResult(operation: "applyTextLayerMutation") {
-                    $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload)
-                }
-            },
-            replaceLayerMask: { index, data in runtimeExecutor.performResult(operation: "replaceLayerMask") { $0.replaceLayerMask(index: index, data: data) } },
-            clearLayerMask: { index in runtimeExecutor.performResult(operation: "clearLayerMask") { $0.clearLayerMask(index: index) } },
-            applyLayerMask: { index in runtimeExecutor.performResult(operation: "applyLayerMask") { $0.applyLayerMask(index: index) } },
-            clearLayer: { index in runtimeExecutor.performResult(operation: "clearLayer") { $0.clearLayer(index: index) } },
-            applyLayerProcessing: { index, request in
-                performLayerProcessing(index: index, request: request, runtimeExecutor: runtimeExecutor)
-            }
-        )
+        let mutationGateway = makeMutationGateway(runtimeExecutor: runtimeExecutor)
 
-        let strokeGateway = StrokeInputGateway(
-            beginStroke: { sample, brush in
-                runtimeExecutor.performMutation(operation: "beginStroke") {
-                    $0.beginStroke(sample: sample, brush: brush)
-                }
-            },
-            appendStroke: { sample in
-                runtimeExecutor.performMutation(operation: "appendStroke") {
-                    $0.appendStroke(sample: sample)
-                }
-            },
-            endStroke: {
-                performCurrentStrokeCommit(runtimeExecutor: runtimeExecutor)
-            },
-            cancelStroke: {
-                runtimeExecutor.performMutation(operation: "cancelStroke") {
-                    $0.cancelStroke()
-                }
-            },
-            blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeExecutor: runtimeExecutor)
-            },
-            endBlurStroke: { runtimeExecutor.performResult(operation: "endBlurStroke") { $0.endBlurStroke() } },
-            cancelBlurStroke: {
-                runtimeExecutor.performMutation(operation: "cancelBlurStroke") {
-                    $0.cancelBlurStroke()
-                }
-            },
-            fill: { sample, brush in
-                performFill(sample: sample, brush: brush, runtimeExecutor: runtimeExecutor)
-            },
-            applyGpuStrokeSurface: { samples, brush, layerIndex in
-                performStrokeCommit(samples: samples, brush: brush, layerIndex: layerIndex, runtimeExecutor: runtimeExecutor)
-            }
-        )
+        let strokeGateway = makeStrokeGateway(runtimeExecutor: runtimeExecutor)
 
         let historyGateway = DocumentHistoryGateway(
             canUndo: { runtimeExecutor.performValue(operation: "canUndo") { $0.canUndo() } },
@@ -213,91 +123,17 @@ package enum DocumentEngineFactory {
             }
         )
 
-        let persistenceGateway = DocumentPersistenceGateway(
-            saveProject: { url, paperStyle in
-                let snapshot = try runtimeExecutor.performThrowing(
-                    operation: "saveProject"
-                ) {
-                    $0.projectSaveSnapshot(paperStyle: paperStyle)
-                }
-                try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
-            },
-            loadProject: { url in
-                let runtime = try SwiftDocumentRuntime.loadProject(
-                    from: url,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    uuidClient: uuidClient,
-                    gpuServices: gpuServices
-                )
-                let loadedProject = LoadedPaintProject(
-                    presentation: runtime.presentation(),
-                    paperStyle: runtime.currentPaperStyle
-                )
-                try runtimeExecutor.replaceRuntimeResult(
-                    with: runtime,
-                    operation: "loadProject"
-                ).get()
-                return loadedProject
-            },
-            setPaperStyle: { style in
-                runtimeExecutor.performMutation(operation: "setPaperStyle") {
-                    $0.setPaperStyle(style)
-                }
-            },
-            newCanvas: { width, height in
-                runtimeExecutor.replaceRuntimeResult(
-                    with: SwiftDocumentRuntime(
-                        width: width,
-                        height: height,
-                        fileClient: fileClient,
-                        dateClient: dateClient,
-                        uuidClient: uuidClient,
-                        gpuServices: gpuServices
-                    ),
-                    operation: "newCanvas"
-                )
-            },
-            prewarmDrawingResources: {
-                runtimeExecutor.performValue(operation: "prewarmDrawingResources") {
-                    $0.materializedSnapshot()
-                }.map {
-                    _ = SwiftDocumentRuntime.compositeSurface(
-                        forMaterializedSnapshot: $0,
-                        gpuServices: gpuServices
-                    )
-                }
-            }
+        let persistenceGateway = makePersistenceGateway(
+            runtimeExecutor: runtimeExecutor,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient,
+            gpuServices: gpuServices
         )
 
-        let exportGateway = DocumentExportGateway(
-            compositeSurface: { style in
-                runtimeExecutor.performValue(operation: "exportCompositeSurface") {
-                    $0.materializedSnapshot()
-                }.map {
-                    SwiftDocumentRuntime.compositeExportSurface(
-                        forMaterializedSnapshot: $0,
-                        paperStyle: style,
-                        gpuServices: gpuServices
-                    )
-                }
-            },
-            compositePNGData: { style in
-                runtimeExecutor.performValue(operation: "compositePNGData") {
-                    $0.materializedSnapshot()
-                }.map {
-                    SwiftDocumentRuntime.compositePNGData(
-                        forMaterializedSnapshot: $0,
-                        paperStyle: style,
-                        gpuServices: gpuServices
-                    )
-                }
-            },
-            timelapseCapture: {
-                runtimeExecutor.performValue(operation: "timelapseCapture") {
-                    $0.timelapseCapture()
-                }
-            }
+        let exportGateway = makeExportGateway(
+            runtimeExecutor: runtimeExecutor,
+            gpuServices: gpuServices
         )
 
         let textLayerGateway = TextLayerGateway(
@@ -411,6 +247,269 @@ package enum DocumentEngineFactory {
                 }
             },
             mergeLayerDown: { index in runtimeExecutor.performResult(operation: "mergeLayerDown") { $0.mergeLayerDown(index: index) } }
+        )
+    }
+
+    private static func makeQueryGateway(
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
+    ) -> DocumentQueryGateway {
+        DocumentQueryGateway(
+            lightweightPresentation: {
+                runtimeExecutor.performValue(operation: "lightweightPresentation") {
+                    $0.lightweightPresentation()
+                }
+            },
+            presentation: {
+                runtimeExecutor.performValue(operation: "presentation") {
+                    $0.presentation()
+                }
+            }
+        )
+    }
+
+    private static func makeMutationGateway(
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
+    ) -> DocumentMutationGateway {
+        DocumentMutationGateway(
+            resizeCanvas: { width, height in
+                performResizeCanvas(width: width, height: height, runtimeExecutor: runtimeExecutor)
+            },
+            resizeCanvasExtent: { width, height in
+                performResizeCanvasExtent(width: width, height: height, runtimeExecutor: runtimeExecutor)
+            },
+            addLayer: { name in
+                runtimeExecutor.performResult(operation: "addLayer") {
+                    $0.addLayer(name: name)
+                }
+            },
+            deleteLayer: { index in
+                runtimeExecutor.performResult(operation: "deleteLayer") {
+                    $0.deleteLayer(index: index)
+                }
+            },
+            setActiveLayer: { index in
+                runtimeExecutor.performResult(operation: "setActiveLayer") {
+                    $0.setActiveLayer(index: index)
+                }
+            },
+            setLayerName: { index, name in
+                runtimeExecutor.performResult(operation: "setLayerName") {
+                    $0.setLayerName(index: index, name: name)
+                }
+            },
+            setLayerVisibility: { index, isVisible in
+                runtimeExecutor.performResult(operation: "setLayerVisibility") {
+                    $0.setLayerVisibility(index: index, isVisible: isVisible)
+                }
+            },
+            revealLayerForEditing: { index in
+                runtimeExecutor.performResult(operation: "revealLayerForEditing") {
+                    $0.revealLayerForEditing(index: index)
+                }
+            },
+            replaceLayerPixels: { index, data in
+                runtimeExecutor.performResult(operation: "replaceLayerPixels") {
+                    $0.replaceLayerPixels(index: index, data: data)
+                }
+            },
+            replaceLayerPixelsInRect: { index, rect, data in
+                runtimeExecutor.performResult(operation: "replaceLayerPixelsInRect") {
+                    $0.replaceLayerPixels(index: index, in: rect, data: data)
+                }
+            },
+            applyLayerSurfaceMutation: { index, payload in
+                runtimeExecutor.performResult(operation: "applyLayerSurfaceMutation") {
+                    $0.applyLayerSurfaceMutation(index: index, payload: payload)
+                }
+            },
+            applyLayerMutation: { index, payload in
+                runtimeExecutor.performResult(operation: "applyLayerMutation") {
+                    $0.applyLayerMutation(index: index, payload: payload)
+                }
+            },
+            applyTextLayerMutation: { index, textLayer, payload in
+                runtimeExecutor.performResult(operation: "applyTextLayerMutation") {
+                    $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload)
+                }
+            },
+            replaceLayerMask: { index, data in
+                runtimeExecutor.performResult(operation: "replaceLayerMask") {
+                    $0.replaceLayerMask(index: index, data: data)
+                }
+            },
+            clearLayerMask: { index in
+                runtimeExecutor.performResult(operation: "clearLayerMask") {
+                    $0.clearLayerMask(index: index)
+                }
+            },
+            applyLayerMask: { index in
+                runtimeExecutor.performResult(operation: "applyLayerMask") {
+                    $0.applyLayerMask(index: index)
+                }
+            },
+            clearLayer: { index in
+                runtimeExecutor.performResult(operation: "clearLayer") {
+                    $0.clearLayer(index: index)
+                }
+            },
+            applyLayerProcessing: { index, request in
+                performLayerProcessing(index: index, request: request, runtimeExecutor: runtimeExecutor)
+            }
+        )
+    }
+
+    private static func makeStrokeGateway(
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>
+    ) -> StrokeInputGateway {
+        StrokeInputGateway(
+            beginStroke: { sample, brush in
+                runtimeExecutor.performMutation(operation: "beginStroke") {
+                    $0.beginStroke(sample: sample, brush: brush)
+                }
+            },
+            appendStroke: { sample in
+                runtimeExecutor.performMutation(operation: "appendStroke") {
+                    $0.appendStroke(sample: sample)
+                }
+            },
+            endStroke: {
+                performCurrentStrokeCommit(runtimeExecutor: runtimeExecutor)
+            },
+            cancelStroke: {
+                runtimeExecutor.performMutation(operation: "cancelStroke") {
+                    $0.cancelStroke()
+                }
+            },
+            blurStroke: { samples, brush, layerIndex, captureTimelapse in
+                performBlur(
+                    samples: samples,
+                    brush: brush,
+                    layerIndex: layerIndex,
+                    captureTimelapse: captureTimelapse,
+                    runtimeExecutor: runtimeExecutor
+                )
+            },
+            endBlurStroke: {
+                runtimeExecutor.performResult(operation: "endBlurStroke") {
+                    $0.endBlurStroke()
+                }
+            },
+            cancelBlurStroke: {
+                runtimeExecutor.performMutation(operation: "cancelBlurStroke") {
+                    $0.cancelBlurStroke()
+                }
+            },
+            fill: { sample, brush in
+                performFill(sample: sample, brush: brush, runtimeExecutor: runtimeExecutor)
+            },
+            applyGpuStrokeSurface: { samples, brush, layerIndex in
+                performStrokeCommit(
+                    samples: samples,
+                    brush: brush,
+                    layerIndex: layerIndex,
+                    runtimeExecutor: runtimeExecutor
+                )
+            }
+        )
+    }
+
+    private static func makePersistenceGateway(
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>,
+        fileClient: PrimoCoreTypes.FileClient,
+        dateClient: PrimoCoreTypes.DateClient,
+        uuidClient: PrimoCoreTypes.UUIDClient,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentPersistenceGateway {
+        DocumentPersistenceGateway(
+            saveProject: { url, paperStyle in
+                let snapshot = try runtimeExecutor.performThrowing(
+                    operation: "saveProject"
+                ) {
+                    $0.projectSaveSnapshot(paperStyle: paperStyle)
+                }
+                try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
+            },
+            loadProject: { url in
+                let runtime = try SwiftDocumentRuntime.loadProject(
+                    from: url,
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient,
+                    gpuServices: gpuServices
+                )
+                let loadedProject = LoadedPaintProject(
+                    presentation: runtime.presentation(),
+                    paperStyle: runtime.currentPaperStyle
+                )
+                try runtimeExecutor.replaceRuntimeResult(
+                    with: runtime,
+                    operation: "loadProject"
+                ).get()
+                return loadedProject
+            },
+            setPaperStyle: { style in
+                runtimeExecutor.performMutation(operation: "setPaperStyle") {
+                    $0.setPaperStyle(style)
+                }
+            },
+            newCanvas: { width, height in
+                runtimeExecutor.replaceRuntimeResult(
+                    with: SwiftDocumentRuntime(
+                        width: width,
+                        height: height,
+                        fileClient: fileClient,
+                        dateClient: dateClient,
+                        uuidClient: uuidClient,
+                        gpuServices: gpuServices
+                    ),
+                    operation: "newCanvas"
+                )
+            },
+            prewarmDrawingResources: {
+                runtimeExecutor.performValue(operation: "prewarmDrawingResources") {
+                    $0.materializedSnapshot()
+                }.map {
+                    _ = SwiftDocumentRuntime.compositeSurface(
+                        forMaterializedSnapshot: $0,
+                        gpuServices: gpuServices
+                    )
+                }
+            }
+        )
+    }
+
+    private static func makeExportGateway(
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentExportGateway {
+        DocumentExportGateway(
+            compositeSurface: { style in
+                runtimeExecutor.performValue(operation: "exportCompositeSurface") {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositeExportSurface(
+                        forMaterializedSnapshot: $0,
+                        paperStyle: style,
+                        gpuServices: gpuServices
+                    )
+                }
+            },
+            compositePNGData: { style in
+                runtimeExecutor.performValue(operation: "compositePNGData") {
+                    $0.materializedSnapshot()
+                }.map {
+                    SwiftDocumentRuntime.compositePNGData(
+                        forMaterializedSnapshot: $0,
+                        paperStyle: style,
+                        gpuServices: gpuServices
+                    )
+                }
+            },
+            timelapseCapture: {
+                runtimeExecutor.performValue(operation: "timelapseCapture") {
+                    $0.timelapseCapture()
+                }
+            }
         )
     }
 
