@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
@@ -39,11 +40,24 @@ extension DocumentFeature {
             gpuOperations: DocumentRenderingWorkflow,
             to state: inout DocumentEditingState
         ) -> Bool {
-            guard let composite = gpuOperations.compositedPreviewPixelData(
+            guard
+                let validatedActiveLayerIndex = DocumentLayerMutationContext(
+                    revision: DocumentRevision(baseSnapshot.revision),
+                    layerCount: baseSnapshot.layers.count,
+                    folderIDs: [],
+                    isLayerLocked: { _ in false }
+                ).existingLayerIndex(activeLayerIndex),
+                let adjustedActiveLayerSurface = RgbaSurface(
+                    width: baseSnapshot.width,
+                    height: baseSnapshot.height,
+                    data: adjustedActiveLayerPixels
+                ),
+                let composite = gpuOperations.compositedPreviewPixelData(
                 baseSnapshot,
-                activeLayerIndex,
-                adjustedActiveLayerPixels
-            ).value else {
+                    activeLayerIndex: validatedActiveLayerIndex,
+                    adjustedActiveLayerPixels: adjustedActiveLayerSurface
+                ).value
+            else {
                 return false
             }
 

@@ -41,7 +41,8 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result = service.clearLayer(2)
+        let index = EditableLayerIndex(2)
+        let result = service.clearLayer(index)
 
         expectFailure(result, .invalidLayerIndex(2))
         #expect(recorder.events.isEmpty)
@@ -56,14 +57,15 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result = service.applyLayerMask(0)
+        let index = EditableLayerIndex(0)
+        let result = service.applyLayerMask(index)
 
         expectFailure(result, .layerLocked(0))
         #expect(recorder.events.isEmpty)
     }
 
     @Test
-    func layerContentCommandsRejectInvalidProcessingTransformBeforeMutationGateways() {
+    func layerContentCommandsRejectInvalidProcessingTransformBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
@@ -71,8 +73,9 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let result = service.applyLayerProcessing(
-            0,
+            index,
             request: .transform(
                 translation: .zero,
                 scale: 0,
@@ -86,7 +89,7 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func layerContentCommandsRejectNonFiniteProcessingTransformBeforeMutationGateways() {
+    func layerContentCommandsRejectNonFiniteProcessingTransformBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
@@ -94,8 +97,9 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let result = service.applyLayerProcessing(
-            0,
+            index,
             request: .transform(
                 translation: CGSize(width: CGFloat.nan, height: 0),
                 scale: 1,
@@ -109,7 +113,7 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func layerContentCommandsRejectOutOfBoundsProcessingTransformSelectionBeforeMutationGateways() {
+    func layerContentCommandsRejectOutOfBoundsProcessingTransformSelectionBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
@@ -124,8 +128,9 @@ struct DocumentMutationWorkflowServiceTests {
             mode: .rectangle
         )
 
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
         let result = service.applyLayerProcessing(
-            0,
+            index,
             request: .transform(
                 translation: .zero,
                 scale: 1,
@@ -139,7 +144,7 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func layerContentCommandsRejectInvalidPixelPayloadBeforeMutationGateways() {
+    func layerContentCommandsRejectInvalidPixelPayloadBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
@@ -147,17 +152,19 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result = service.replaceLayerPixels(0, pixelData: Data(repeating: 0xff, count: 3))
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
+        let pixelData = try #require(LayerPixelData(width: 2, height: 1, rgba: Data(repeating: 0xff, count: 8)))
+        let result = service.replaceLayerPixels(LayerPixelReplacementCommand(index: index, pixelData: pixelData))
 
         expectFailure(
             result,
-            .gpu(.invalidPayloadSize(operation: "replaceLayerPixels", expected: 4, actual: 3))
+            .gpu(.invalidPayloadSize(operation: "replaceLayerPixels", expected: 4, actual: 8))
         )
         #expect(recorder.events.isEmpty)
     }
 
     @Test
-    func layerContentCommandsRejectInvalidMaskPayloadBeforeMutationGateways() {
+    func layerContentCommandsRejectInvalidMaskPayloadBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(
             documentQueryGateway: queryGateway(layerCount: 1),
@@ -165,7 +172,9 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result = service.replaceLayerMask(0, maskData: Data(repeating: 0xff, count: 2))
+        let index = try #require(editableLayerIndex(0, layerCount: 1))
+        let mask = try #require(LayerMaskData(width: 2, height: 1, bytes: Data(repeating: 0xff, count: 2)))
+        let result = service.replaceLayerMask(index, mask: mask)
 
         expectFailure(
             result,
@@ -175,7 +184,7 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
-    func layerContentCommandsRejectStaleValidatedIndexesBeforeMutationGateways() {
+    func layerContentCommandsRejectStaleValidatedIndexesBeforeMutationGateways() throws {
         let recorder = MutationRecorder()
         let revision = RevisionSequence([DocumentRevision(1), DocumentRevision(2)])
         let service = DocumentMutationWorkflowService(
@@ -190,7 +199,8 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        let result = service.clearLayer(0)
+        let index = try #require(editableLayerIndex(0, revision: DocumentRevision(1), layerCount: 1))
+        let result = service.clearLayer(index)
 
         expectFailure(result, .staleLayerIndex(
             index: 0,
@@ -261,13 +271,19 @@ struct DocumentMutationWorkflowServiceTests {
             documentLayerEffectsGateway: .unused
         )
 
-        try service.replaceLayerPixels(0, pixelData: Data(repeating: 1, count: 4)).get()
-        try service.setTextLayer(1, textLayer: textLayer).get()
-        try service.applyLayerProcessing(2, request: LayerProcessingRequest.luminanceToAlpha).get()
-        try service.clearLayer(3).get()
-        try service.replaceLayerMask(4, maskData: Data([2])).get()
-        try service.clearLayerMask(5).get()
-        try service.applyLayerMask(6).get()
+        let indexes = try (0..<7).map { rawValue in
+            try #require(editableLayerIndex(rawValue, layerCount: 7))
+        }
+        let pixelData = try #require(LayerPixelData(width: 1, height: 1, rgba: Data(repeating: 1, count: 4)))
+        let mask = try #require(LayerMaskData(width: 1, height: 1, bytes: Data([2])))
+
+        try service.replaceLayerPixels(LayerPixelReplacementCommand(index: indexes[0], pixelData: pixelData)).get()
+        try service.setTextLayer(indexes[1], textLayer: textLayer).get()
+        try service.applyLayerProcessing(indexes[2], request: LayerProcessingRequest.luminanceToAlpha).get()
+        try service.clearLayer(indexes[3]).get()
+        try service.replaceLayerMask(indexes[4], mask: mask).get()
+        try service.clearLayerMask(indexes[5]).get()
+        try service.applyLayerMask(indexes[6]).get()
 
         #expect(recorder.events == [
             "replacePixels:0",

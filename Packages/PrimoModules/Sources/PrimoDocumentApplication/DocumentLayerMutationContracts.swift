@@ -88,7 +88,7 @@ public struct DocumentLayerMutationContext: Sendable {
     }
 
     public func anchorLayerIndex(_ rawValue: Int?) -> LayerAnchorIndex? {
-        guard let rawValue else { return LayerAnchorIndex(nil) }
+        guard let rawValue else { return LayerAnchorIndex(nil, revision: revision) }
         return existingLayerIndex(rawValue).map { LayerAnchorIndex($0) }
     }
 }
@@ -115,9 +115,16 @@ public struct ExistingFolderID: Hashable, Sendable {
 
 public struct LayerAnchorIndex: Hashable, Sendable {
     public let rawValue: Int?
+    public let revision: DocumentRevision
 
     package init(_ layerIndex: ExistingLayerIndex?) {
         self.rawValue = layerIndex?.rawValue
+        self.revision = layerIndex?.revision ?? .initial
+    }
+
+    package init(_ rawValue: Int?, revision: DocumentRevision) {
+        self.rawValue = rawValue
+        self.revision = revision
     }
 }
 
@@ -300,7 +307,10 @@ public struct LayerStructureCommandValidator: Sendable {
                 }
                 return .success(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex))
             }
-            return .success(.createFolder(name: name, anchorLayerIndex: LayerAnchorIndex(nil)))
+            guard let anchorLayerIndex = context.anchorLayerIndex(nil) else {
+                return .failure(.invalidLayerIndex(-1))
+            }
+            return .success(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex))
         case let .deleteFolder(folderID):
             guard let folderID = context.existingFolderID(folderID) else {
                 return .failure(.invalidFolderID(folderID))

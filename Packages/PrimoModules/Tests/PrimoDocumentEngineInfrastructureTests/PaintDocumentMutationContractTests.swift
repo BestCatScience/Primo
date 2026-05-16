@@ -200,6 +200,30 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
+    func createFolderRejectsStaleLayerAnchorIndex() throws {
+        let runtime = DocumentEngineFactory.live()
+        let anchor = try #require(DocumentLayerMutationContext(
+            layerCount: 1,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        ).anchorLayerIndex(0))
+
+        _ = try runtime.mutationGateway.addLayer("Ink").get()
+        let currentRevision = try runtime.queryGateway.lightweightPresentation().get().revision
+
+        switch runtime.createFolder("Group", anchor) {
+        case .success:
+            Issue.record("Expected stale layer anchor failure")
+        case let .failure(failure):
+            #expect(failure == .staleLayerIndex(
+                index: 0,
+                validationRevision: anchor.revision,
+                currentRevision: currentRevision
+            ))
+        }
+    }
+
+    @Test
     func replaceLayerPixelsRejectsEmptyInput() {
         let runtime = DocumentEngineFactory.live()
         expectFailure(runtime.mutationGateway.replaceLayerPixels(0, Data()), .emptyInput)

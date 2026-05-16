@@ -358,7 +358,16 @@ package enum DocumentEngineFactory {
             editingGateway: editingGateway,
             duplicateLayer: { index, name in runtimeExecutor.performResult(operation: "duplicateLayer") { $0.duplicateLayer(index: index, name: name) } },
             moveLayer: { index, destination in runtimeExecutor.performResult(operation: "moveLayer") { $0.moveLayer(from: index, to: destination) } },
-            createFolder: { name, anchor in runtimeExecutor.performResult(operation: "createFolder") { $0.createFolder(name: name, anchorLayerIndex: anchor) } },
+            createFolder: { name, anchor in
+                runtimeExecutor.performResult(operation: "createFolder") { runtime in
+                    let gateway = RuntimeDocumentEditorGateway(
+                        runtime: runtime,
+                        currentPresentation: runtime.lightweightPresentation()
+                    )
+                    return gateway.createFolder(name: name, anchorLayerIndex: anchor)
+                        .mapError(mapDocumentEditorFailure)
+                }
+            },
             deleteFolder: { folderID in runtimeExecutor.performResult(operation: "deleteFolder") { $0.deleteFolder(folderID: folderID) } },
             setFolderVisibility: { folderID, isVisible in
                 runtimeExecutor.performResult(operation: "setFolderVisibility") {
@@ -715,7 +724,8 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult {
-        runtime.createFolder(name: name, anchorLayerIndex: anchorLayerIndex)
+        if let failure = validateFreshLayerAnchorIndex(anchorLayerIndex) { return .failure(failure) }
+        return runtime.createFolder(name: name, anchorLayerIndex: anchorLayerIndex)
             .mapError(mapDocumentRuntimeFailure)
     }
 
@@ -882,6 +892,23 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
         }
         guard currentFolderIDs.contains(folderID.rawValue) else {
             return .invalidFolderID(folderID.rawValue)
+        }
+        return nil
+    }
+
+    private func validateFreshLayerAnchorIndex(_ index: LayerAnchorIndex) -> DocumentLayerMutationFailure? {
+        guard index.revision == currentPresentation.revision else {
+            return .staleLayerIndex(
+                index: index.rawValue ?? -1,
+                validationRevision: index.revision,
+                currentRevision: currentPresentation.revision
+            )
+        }
+        guard let rawValue = index.rawValue else {
+            return nil
+        }
+        guard currentPresentation.layerRows.contains(where: { $0.index == rawValue }) else {
+            return .invalidLayerIndex(rawValue)
         }
         return nil
     }

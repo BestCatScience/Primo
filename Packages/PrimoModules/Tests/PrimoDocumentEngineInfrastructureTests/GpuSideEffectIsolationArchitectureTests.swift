@@ -713,8 +713,8 @@ struct GpuSideEffectIsolationArchitectureTests {
                 "\(signature) should not remain public after typed content commands exist"
             )
         }
-        #expect(workflow.contains("LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData)"))
-        #expect(workflow.contains("LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData)"))
+        #expect(!workflow.contains("LayerPixelData(width: geometry.width, height: geometry.height, rgba: pixelData)"))
+        #expect(!workflow.contains("LayerMaskData(width: geometry.width, height: geometry.height, bytes: maskData)"))
     }
 
     @Test
@@ -920,6 +920,10 @@ struct GpuSideEffectIsolationArchitectureTests {
             (
                 path: "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/GpuPreviewAdapters.swift",
                 accessLevel: "package"
+            ),
+            (
+                path: "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/GpuCanvasPreviewRendererAdapter.swift",
+                accessLevel: "package"
             )
         ]
         let adapterNames = [
@@ -971,6 +975,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "public func resizeCanvas(_ size: ValidCanvasSize)",
             "public func resizeCanvasExtent(_ size: ValidCanvasSize)",
             "public func compositedPaperPreviewRGBA( _ surface: RgbaSurface, _ paperStyle: CanvasPaperStyle )",
+            "public func compositedPreviewPixelData( _ snapshot: MetalDocumentSnapshot, activeLayerIndex: ExistingLayerIndex, adjustedActiveLayerPixels: RgbaSurface )",
             "public func processedLayerPixelData( _ source: RgbaSurface, _ request: LayerProcessingRequest )",
             "public func alphaMask(_ surface: RgbaSurface)",
             "public func croppedSelectionMask(_ mask: MaskSurface)",
@@ -1011,6 +1016,7 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         let removedRawSurfaceFunctionNames: Set<String> = [
             "compositedPaperPreviewRGBA",
+            "compositedPreviewPixelData",
             "processedLayerPixelData",
             "alphaMask",
             "croppedSelectionMask",
@@ -1038,6 +1044,14 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(
             publicRawSurfaceFunctions.isEmpty,
             "Public raw Data + width + height rendering APIs should be removed once typed RgbaSurface/MaskSurface overloads exist: \(publicRawSurfaceFunctions.map(\.signature))"
+        )
+        #expect(
+            !publicCallables.contains {
+                $0.name == "compositedPreviewPixelData" &&
+                    $0.hasParameter(named: "activeLayerIndex", type: "Int") &&
+                    $0.hasParameter(named: "adjustedActiveLayerPixels", type: "Data")
+            },
+            "Public composited preview rendering should accept ExistingLayerIndex and RgbaSurface instead of raw Int/Data"
         )
         #expect(
             !publicCallables.contains { $0.name == "makeColorRangeSelection" && $0.hasParameter(named: "activeLayerIndex", type: "Int") },
@@ -1183,6 +1197,69 @@ struct GpuSideEffectIsolationArchitectureTests {
                 "\(signature) should be removed instead of kept as a deprecated raw compatibility shim"
             )
         }
+    }
+
+    @Test
+    func residualPackageRawLayerAPIBaselineDoesNotGrow() throws {
+        let repoRoot = try Self.repoRoot()
+        let facadeBody = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let workflowBody = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        let layerEditingBody = try #require(Self.typeBody(named: "LayerEditingRuntime", in: facadeBody))
+        let textLayerServiceBody = try #require(Self.typeBody(named: "DocumentTextLayerService", in: facadeBody))
+        let mutationWorkflowBody = try #require(Self.typeBody(named: "DocumentMutationWorkflowService", in: workflowBody))
+
+        let layerEditingRawPackage = Set(Self.rawLayerPackageCallableSignatures(in: layerEditingBody))
+        let expectedLayerEditingRawPackage: Set<String> = []
+        #expect(
+            layerEditingRawPackage == expectedLayerEditingRawPackage,
+            "LayerEditingRuntime raw package API baseline changed. Remove or rename raw shims intentionally; do not add new ones. Actual: \(layerEditingRawPackage.sorted())"
+        )
+
+        let textLayerRawPackage = Set(Self.rawLayerPackageCallableSignatures(in: textLayerServiceBody))
+        let expectedTextLayerRawPackage: Set<String> = []
+        #expect(
+            textLayerRawPackage == expectedTextLayerRawPackage,
+            "DocumentTextLayerService raw package API baseline changed. Actual: \(textLayerRawPackage.sorted())"
+        )
+
+        let workflowRawPackage = Set(Self.rawLayerPackageCallableSignatures(in: mutationWorkflowBody))
+        let expectedWorkflowRawPackage: Set<String> = [
+            "package func assignLayer(_ index: Int, toFolder folderID: Int?)",
+            "package func createFolder(named name: String, afterLayerAt activeLayerIndex: Int?)",
+            "package func deleteFolder(_ folderID: Int)",
+            "package func deleteLayer(_ index: Int)",
+            "package func duplicateLayer(_ index: Int, named duplicateName: String)",
+            "package func mergeLayerDown(_ index: Int)",
+            "package func moveLayer(_ index: Int, to destinationIndex: Int)",
+            "package func setActiveLayer(_ index: Int)",
+            "package func setFolderExpanded(_ folderID: Int, isExpanded: Bool)",
+            "package func setFolderName(_ folderID: Int, name: String)",
+            "package func setFolderVisibility(_ folderID: Int, visible: Bool)",
+            "package func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool)",
+            "package func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode)",
+            "package func setLayerClipped(_ index: Int, isClipped: Bool)",
+            "package func setLayerLocked(_ index: Int, isLocked: Bool)",
+            "package func setLayerName(_ index: Int, name: String)",
+            "package func setLayerOpacity(_ index: Int, opacity: Double)",
+            "package func setLayerVisibility(_ index: Int, visible: Bool)"
+        ]
+        #expect(
+            workflowRawPackage == expectedWorkflowRawPackage,
+            "DocumentMutationWorkflowService raw package API baseline changed. Actual: \(workflowRawPackage.sorted())"
+        )
     }
 
     @Test
@@ -1384,13 +1461,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        let adapters = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/DocumentRuntimeAdapters.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
+        let adapters = try Self.documentRuntimeAdapterSources(repoRoot: repoRoot)
         let validation = try String(
             contentsOf: repoRoot.appendingPathComponent(
                 "App/Features/Document/DocumentWorkflowValidation.swift",
@@ -1473,13 +1544,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        let adapters = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/DocumentRuntimeAdapters.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
+        let adapters = try Self.documentRuntimeAdapterSources(repoRoot: repoRoot)
 
         for port in [
             "protocol StrokePreviewPort",
@@ -1835,13 +1900,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        let adapters = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/DocumentRuntimeAdapters.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
+        let adapters = try Self.documentRuntimeAdapterSources(repoRoot: repoRoot)
 
         #expect(mutationContracts.contains("public struct EditableLayerIndex"))
         let editableLayerIndex = try #require(Self.declarationBody(named: "EditableLayerIndex", in: mutationContracts))
@@ -2678,6 +2737,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         let repoRoot = try Self.repoRoot()
         let adapterFiles = [
             "App/Features/Document/DocumentRuntimeAdapters.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Canvas.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Layer.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PersistenceExport.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PreviewRendering.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Stroke.swift",
             "App/Features/Document/DocumentWorkflowValidation.swift"
         ]
 
@@ -2999,6 +3063,50 @@ struct GpuSideEffectIsolationArchitectureTests {
                 guard let accessLevel else { return true }
                 return callable.accessLevel == accessLevel
             }
+    }
+
+    private static func documentRuntimeAdapterSources(repoRoot: URL) throws -> String {
+        try [
+            "App/Features/Document/DocumentRuntimeAdapters.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Canvas.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Layer.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PersistenceExport.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+PreviewRendering.swift",
+            "App/Features/Document/DocumentRuntimeAdapters+Stroke.swift"
+        ].map { relativePath in
+            try String(
+                contentsOf: repoRoot.appendingPathComponent(relativePath, isDirectory: false),
+                encoding: .utf8
+            )
+        }.joined(separator: "\n")
+    }
+
+    private static func rawLayerPackageCallableSignatures(in source: String) -> [String] {
+        let rawLayerParameterNames: Set<String> = [
+            "index",
+            "layerIndex",
+            "activeLayerIndex",
+            "destinationIndex",
+            "folderID"
+        ]
+        let rawPayloadParameterNames: Set<String> = [
+            "pixelData",
+            "maskData"
+        ]
+        return Self.callables(accessLevel: "package", in: source)
+            .filter { callable in
+                callable.parameters.contains { parameter in
+                    rawLayerParameterNames.contains(parameter.semanticName) &&
+                        (parameter.type == "Int" || parameter.type == "Int?")
+                } ||
+                    callable.parameters.contains { parameter in
+                        rawPayloadParameterNames.contains(parameter.semanticName) &&
+                            parameter.type == "Data"
+                    }
+            }
+            .map(\.signature)
+            .map(Self.normalizedSignature)
+            .sorted()
     }
 
     private static func normalizedSignature(_ signature: String) -> String {

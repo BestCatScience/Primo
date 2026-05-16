@@ -51,6 +51,11 @@
 		A00000000000000000000121 /* PaintDocumentDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000123 /* PaintDocumentDependencies.swift */; };
 		A00000000000000000000124 /* DocumentRuntimeCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000129 /* DocumentRuntimeCapabilities.swift */; };
 		A00000000000000000000125 /* DocumentRuntimeAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000012A /* DocumentRuntimeAdapters.swift */; };
+		A0000000000000000000012E /* DocumentRuntimeAdapters+Stroke.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000133 /* DocumentRuntimeAdapters+Stroke.swift */; };
+		A0000000000000000000012F /* DocumentRuntimeAdapters+Layer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000134 /* DocumentRuntimeAdapters+Layer.swift */; };
+		A00000000000000000000130 /* DocumentRuntimeAdapters+Canvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000135 /* DocumentRuntimeAdapters+Canvas.swift */; };
+		A00000000000000000000131 /* DocumentRuntimeAdapters+PersistenceExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000136 /* DocumentRuntimeAdapters+PersistenceExport.swift */; };
+		A00000000000000000000132 /* DocumentRuntimeAdapters+PreviewRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000137 /* DocumentRuntimeAdapters+PreviewRendering.swift */; };
 		A00000000000000000000126 /* DocumentApplicationEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000012B /* DocumentApplicationEnvironment.swift */; };
 		A00000000000000000000127 /* DocumentDependencyKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000012C /* DocumentDependencyKeys.swift */; };
 		A00000000000000000000128 /* DocumentWorkflowValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000012D /* DocumentWorkflowValidation.swift */; };
@@ -262,6 +267,11 @@
 		A0000000000000000000012B /* DocumentApplicationEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentApplicationEnvironment.swift; sourceTree = "<group>"; };
 		A0000000000000000000012C /* DocumentDependencyKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDependencyKeys.swift; sourceTree = "<group>"; };
 		A0000000000000000000012D /* DocumentWorkflowValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkflowValidation.swift; sourceTree = "<group>"; };
+		A00000000000000000000133 /* DocumentRuntimeAdapters+Stroke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentRuntimeAdapters+Stroke.swift"; sourceTree = "<group>"; };
+		A00000000000000000000134 /* DocumentRuntimeAdapters+Layer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentRuntimeAdapters+Layer.swift"; sourceTree = "<group>"; };
+		A00000000000000000000135 /* DocumentRuntimeAdapters+Canvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentRuntimeAdapters+Canvas.swift"; sourceTree = "<group>"; };
+		A00000000000000000000136 /* DocumentRuntimeAdapters+PersistenceExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentRuntimeAdapters+PersistenceExport.swift"; sourceTree = "<group>"; };
+		A00000000000000000000137 /* DocumentRuntimeAdapters+PreviewRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentRuntimeAdapters+PreviewRendering.swift"; sourceTree = "<group>"; };
 		A00000000000000000000019 /* BrushPaletteFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001A /* LayerSidebarFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001B /* CanvasFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeature.swift; sourceTree = "<group>"; };
@@ -623,6 +633,11 @@
 				A0000000000000000000012B /* DocumentApplicationEnvironment.swift */,
 				A0000000000000000000012C /* DocumentDependencyKeys.swift */,
 				A0000000000000000000012A /* DocumentRuntimeAdapters.swift */,
+				A00000000000000000000133 /* DocumentRuntimeAdapters+Stroke.swift */,
+				A00000000000000000000134 /* DocumentRuntimeAdapters+Layer.swift */,
+				A00000000000000000000135 /* DocumentRuntimeAdapters+Canvas.swift */,
+				A00000000000000000000136 /* DocumentRuntimeAdapters+PersistenceExport.swift */,
+				A00000000000000000000137 /* DocumentRuntimeAdapters+PreviewRendering.swift */,
 				A00000000000000000000129 /* DocumentRuntimeCapabilities.swift */,
 				A0000000000000000000012D /* DocumentWorkflowValidation.swift */,
 				A00000000000000000000123 /* PaintDocumentDependencies.swift */,
@@ -935,6 +950,11 @@
 				A00000000000000000000126 /* DocumentApplicationEnvironment.swift in Sources */,
 				A00000000000000000000127 /* DocumentDependencyKeys.swift in Sources */,
 				A00000000000000000000125 /* DocumentRuntimeAdapters.swift in Sources */,
+				A0000000000000000000012E /* DocumentRuntimeAdapters+Stroke.swift in Sources */,
+				A0000000000000000000012F /* DocumentRuntimeAdapters+Layer.swift in Sources */,
+				A00000000000000000000130 /* DocumentRuntimeAdapters+Canvas.swift in Sources */,
+				A00000000000000000000131 /* DocumentRuntimeAdapters+PersistenceExport.swift in Sources */,
+				A00000000000000000000132 /* DocumentRuntimeAdapters+PreviewRendering.swift in Sources */,
 				A00000000000000000000124 /* DocumentRuntimeCapabilities.swift in Sources */,
 				A00000000000000000000128 /* DocumentWorkflowValidation.swift in Sources */,
 				A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */,

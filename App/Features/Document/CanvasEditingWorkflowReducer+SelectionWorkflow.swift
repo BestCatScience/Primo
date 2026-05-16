@@ -158,10 +158,21 @@ extension CanvasEditingWorkflowReducer {
             let session = selectionMoveSession(in: &state),
             let movedLayerPixels = compositedSelectionMovePixels(session: session, offset: roundedOffset),
             let baseSnapshot = state.canvas.selectionMoveBaseSnapshot ?? state.canvas.renderSnapshot,
+            let layerIndex = DocumentLayerMutationContext(
+                revision: DocumentRevision(baseSnapshot.revision),
+                layerCount: baseSnapshot.layers.count,
+                folderIDs: [],
+                isLayerLocked: { _ in false }
+            ).existingLayerIndex(session.layerIndex),
+            let movedLayerSurface = RgbaSurface(
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                data: movedLayerPixels
+            ),
             let composite = documentRenderingWorkflow.compositedPreviewPixelData(
                 baseSnapshot,
-                session.layerIndex,
-                movedLayerPixels
+                activeLayerIndex: layerIndex,
+                adjustedActiveLayerPixels: movedLayerSurface
             ).value,
             let update = IncrementalLayerUpdate(
                 validatingID: UUID(),

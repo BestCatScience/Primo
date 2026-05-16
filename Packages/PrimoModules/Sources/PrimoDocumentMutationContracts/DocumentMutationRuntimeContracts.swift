@@ -580,7 +580,7 @@ public struct DocumentMutationGateway: Sendable {
     package let clearLayer: @Sendable (Int) -> DocumentMutationResult
     package let applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
 
-    public init(
+    package init(
         resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
         resizeCanvasExtent: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
         addLayer: @escaping @Sendable (String) -> DocumentIndexedMutationResult,
