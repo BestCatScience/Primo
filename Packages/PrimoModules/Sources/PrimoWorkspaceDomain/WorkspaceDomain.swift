@@ -481,7 +481,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
     ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
         do {
             try workspaceBackingStore.saveProject(
-                requestPayload.activeTab.backingStoreURL.fileURL,
+                WritableProjectLocation(requestPayload.activeTab.backingStoreURL),
                 requestPayload.paperStyle
             )
             try workspaceBackingStore.persistAutosaveSnapshot(
@@ -505,7 +505,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
     ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
         do {
             try workspaceBackingStore.saveProject(
-                requestPayload.activeTab.backingStoreURL.fileURL,
+                WritableProjectLocation(requestPayload.activeTab.backingStoreURL),
                 requestPayload.paperStyle
             )
             let savedURL = try workspaceBackingStore.persistProjectSnapshot(
@@ -565,7 +565,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
         let tabID = identityGenerator.generateTabID()
         do {
             try workspaceBackingStore.saveProject(
-                requestPayload.activeTab.backingStoreURL.fileURL,
+                WritableProjectLocation(requestPayload.activeTab.backingStoreURL),
                 requestPayload.paperStyle
             )
             let backingStoreURL = try workspaceBackingStore.createTabBackingStoreURL(tabID)
@@ -606,7 +606,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
     ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
         do {
             try workspaceBackingStore.saveProject(
-                requestPayload.activeTab.backingStoreURL.fileURL,
+                WritableProjectLocation(requestPayload.activeTab.backingStoreURL),
                 requestPayload.paperStyle
             )
             return .success(.documentReplacementPrepared(requestPayload.activeTab.id))
@@ -656,7 +656,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
             var issues: [WorkspacePersistenceIssue] = []
             if requestPayload.persistsToBackingStore {
                 try workspaceBackingStore.saveProject(
-                    requestPayload.activeTab.backingStoreURL.fileURL,
+                    WritableProjectLocation(requestPayload.activeTab.backingStoreURL),
                     requestPayload.paperStyle
                 )
             }
@@ -699,7 +699,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
             var issues: [WorkspacePersistenceIssue] = []
             if let activeTab = requestPayload.activeTab {
                 try workspaceBackingStore.saveProject(
-                    activeTab.activeTab.backingStoreURL.fileURL,
+                    WritableProjectLocation(activeTab.activeTab.backingStoreURL),
                     activeTab.paperStyle
                 )
             }
@@ -1025,7 +1025,7 @@ public struct WorkspaceProjectLoadUseCase<LoadedProject>: Sendable where LoadedP
         request: WorkspaceProjectLoadRequest
     ) -> Result<WorkspaceProjectLoadResult<LoadedProject>, WorkspaceProjectLoadFailure> {
         do {
-            let loaded = try projectLoader.loadProject(operation.fileURL)
+            let loaded = try projectLoader.loadProject(ProjectPackageURL(operation.fileURL))
             let issues = cleanupService.discardWorkspaceItemIfNeeded(operation.removeWorkspaceItemOnSuccess)
             return .success(.project(loaded, issues))
         } catch {
@@ -1042,7 +1042,7 @@ public struct WorkspaceProjectLoadUseCase<LoadedProject>: Sendable where LoadedP
         _ operation: WorkspaceImportedProjectLoadOperation,
         request: WorkspaceProjectLoadRequest
     ) -> Result<WorkspaceProjectLoadResult<LoadedProject>, WorkspaceProjectLoadFailure> {
-        switch documentImport.stageImportedDocument(.init(sourceURL: operation.sourceURL)) {
+        switch documentImport.stageImportedDocument(.init(source: SecurityScopedResourceLease(operation.sourceURL))) {
         case let .failure(error):
             return .failure(
                 WorkspaceProjectLoadFailure(
@@ -1052,7 +1052,7 @@ public struct WorkspaceProjectLoadUseCase<LoadedProject>: Sendable where LoadedP
             )
         case let .success(staged):
             do {
-                let loaded = try projectLoader.loadProject(staged.stagedProjectURL.fileURL)
+                let loaded = try projectLoader.loadProject(ProjectPackageURL(staged.stagedProjectURL))
                 let issues = cleanupService.discardImportedStaging(staged.stagedProjectURL)
                 return .success(.imported(loaded, staged.suggestedTitle, issues))
             } catch {

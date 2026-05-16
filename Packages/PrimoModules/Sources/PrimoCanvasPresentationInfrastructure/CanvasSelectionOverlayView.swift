@@ -4,6 +4,7 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import UIKit
 
+@MainActor
 final class CanvasSelectionOverlayView: UIView {
     private let selectionWhiteLayer = CAShapeLayer()
     private let selectionBlackLayer = CAShapeLayer()

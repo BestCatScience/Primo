@@ -108,7 +108,7 @@ struct WorkspaceApplicationServicesTests {
         )
 
         try services.backingStoreGateway.saveProject(
-            URL(fileURLWithPath: "/tmp/project.atelier"),
+            WritableProjectLocation(URL(fileURLWithPath: "/tmp/project.atelier")),
             CanvasPaperStyle.default
         )
         let generatedURL = try services.backingStoreGateway.createTabBackingStoreURL(activeTab.id)

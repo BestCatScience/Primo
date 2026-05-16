@@ -20,11 +20,11 @@ struct DocumentProjectPreviewLoaderTests {
         let runtime = DocumentEngineFactory.live()
         runtime.persistenceGateway.newCanvas(2, 2)
         try replaceLayer(in: runtime, rgba: [255, 0, 0, 255])
-        try runtime.persistenceGateway.saveProject(firstURL, .default)
+        try runtime.persistenceGateway.saveProject(WritableProjectLocation(firstURL), .default)
 
         runtime.persistenceGateway.newCanvas(2, 2)
         try replaceLayer(in: runtime, rgba: [0, 0, 255, 255])
-        try runtime.persistenceGateway.saveProject(secondURL, .default)
+        try runtime.persistenceGateway.saveProject(WritableProjectLocation(secondURL), .default)
 
         try replaceLayer(in: runtime, rgba: [255, 0, 0, 255])
 
@@ -54,7 +54,7 @@ struct DocumentProjectPreviewLoaderTests {
         let initialRuntime = DocumentEngineFactory.live()
         initialRuntime.persistenceGateway.newCanvas(2, 2)
         try replaceLayer(in: initialRuntime, rgba: [255, 0, 0, 255])
-        try initialRuntime.persistenceGateway.saveProject(projectURL, .default)
+        try initialRuntime.persistenceGateway.saveProject(WritableProjectLocation(projectURL), .default)
         let originalFingerprint = try fileFingerprint(at: projectURL)
 
         let failingRuntime = DocumentEngineFactory.live(
@@ -65,7 +65,7 @@ struct DocumentProjectPreviewLoaderTests {
         try replaceLayer(in: failingRuntime, rgba: [0, 0, 255, 255])
 
         #expect(throws: Error.self) {
-            try failingRuntime.persistenceGateway.saveProject(projectURL, .default)
+            try failingRuntime.persistenceGateway.saveProject(WritableProjectLocation(projectURL), .default)
         }
 
         #expect(try fileFingerprint(at: projectURL) == originalFingerprint)

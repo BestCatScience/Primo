@@ -5,6 +5,7 @@ import PrimoDocumentDomain
 import QuartzCore
 import UIKit
 
+@MainActor
 final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegate {
     private weak var hostView: UIView?
     private var context: Context?

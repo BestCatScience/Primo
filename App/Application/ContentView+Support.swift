@@ -6,6 +6,7 @@ import PrimoDocumentRuntime
 import SwiftUI
 import UIKit
 
+@MainActor
 struct SurfacePreviewView: UIViewRepresentable {
     let surface: DocumentCompositeSurface?
     var opacity: CGFloat = 1.0

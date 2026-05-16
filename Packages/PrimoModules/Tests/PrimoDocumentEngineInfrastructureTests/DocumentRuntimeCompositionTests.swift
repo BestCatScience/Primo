@@ -320,7 +320,7 @@ struct DocumentRuntimeCompositionTests {
 
         #expect(body.contains("let snapshot = try runtimeExecutor.performThrowing("))
         #expect(body.contains("$0.projectSaveSnapshot(paperStyle: paperStyle)"))
-        #expect(body.contains("try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)"))
+        #expect(body.contains("try snapshot.write(to: location.fileURL, fileClient: fileClient, uuidClient: uuidClient)"))
         #expect(!body.contains("try runtimeExecutor.perform { session in\n                    try session.saveProject"))
         #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface("))
         #expect(body.contains("SwiftDocumentRuntime.compositePNGData("))
@@ -477,6 +477,30 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func lockedRuntimeExecutorRejectsReentrantCallbackAccessAndKeepsOuterMutation() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+        var callbackResult: Result<Int, DocumentMutationFailure>?
+
+        let callback = {
+            executor.performValue(operation: "callbackQuery") { runtime in
+                runtime.value
+            }
+        }
+        let result = executor.performMutation(operation: "outerMutation") { runtime in
+            runtime.value = 7
+            callbackResult = callback()
+            runtime.value = 8
+        }
+
+        guard case .success = result else {
+            Issue.record("Expected outer mutation to keep ownership of the runtime")
+            return
+        }
+        #expect(callbackResult == .failure(.rawAPIUnavailable(operation: "Reentrant document runtime access: callbackQuery")))
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(8))
+    }
+
+    @Test
     func lockedRuntimeExecutorValueBoundaryRejectsNestedMutationAccess() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
 
@@ -564,6 +588,91 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func lockedRuntimeExecutorSerializesSimultaneousMutationsWithoutOverlap() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeConcurrencyProbe())
+        let failures = LockedValues<DocumentMutationFailure>()
+
+        DispatchQueue.concurrentPerform(iterations: 64) { _ in
+            let result = executor.performMutation(operation: "simultaneousMutation") { runtime in
+                runtime.enterMutationCriticalSection()
+            }
+            if case let .failure(failure) = result {
+                failures.append(failure)
+            }
+        }
+
+        let snapshot = executor.performValue(operation: "read") { runtime in
+            (
+                mutationCount: runtime.mutationCount,
+                maximumActiveMutations: runtime.maximumActiveMutations,
+                activeMutations: runtime.activeMutations
+            )
+        }
+        #expect(failures.values.isEmpty)
+        if case let .success(snapshot) = snapshot {
+            #expect(snapshot.mutationCount == 64)
+            #expect(snapshot.maximumActiveMutations == 1)
+            #expect(snapshot.activeMutations == 0)
+        } else {
+            Issue.record("Expected serialized mutation snapshot")
+        }
+    }
+
+    @Test
+    func lockedRuntimeExecutorBlocksQueryDuringGpuApplySection() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+        let applyStarted = DispatchSemaphore(value: 0)
+        let releaseApply = DispatchSemaphore(value: 0)
+        let applyFinished = DispatchSemaphore(value: 0)
+        let queryFinished = DispatchSemaphore(value: 0)
+        let applyResults = LockedValues<DocumentMutationResult>()
+        let queryResults = LockedValues<Result<Int, DocumentMutationFailure>>()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result: DocumentMutationResult = executor.performResult(operation: "applyGpuPayload") { runtime in
+                applyStarted.signal()
+                _ = releaseApply.wait(timeout: .now() + 2)
+                runtime.value = 42
+                return .success(())
+            }
+            applyResults.append(result)
+            applyFinished.signal()
+        }
+
+        guard applyStarted.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected GPU apply section to enter the runtime boundary")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            queryResults.append(
+                executor.performValue(operation: "queryDuringGpuApply") { runtime in
+                    runtime.value
+                }
+            )
+            queryFinished.signal()
+        }
+
+        #expect(queryFinished.wait(timeout: .now() + 0.1) == .timedOut)
+        releaseApply.signal()
+
+        guard applyFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected GPU apply section to finish")
+            return
+        }
+        guard queryFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected query to resume after GPU apply releases the runtime boundary")
+            return
+        }
+        #expect(applyResults.values.count == 1)
+        if case .success = applyResults.values.first {
+        } else {
+            Issue.record("Expected GPU apply mutation to succeed")
+        }
+        #expect(queryResults.values == [.success(42)])
+    }
+
+    @Test
     func lockedRuntimeExecutorReplacementUsesSameSynchronousBoundary() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
 
@@ -611,6 +720,85 @@ struct DocumentRuntimeCompositionTests {
             return
         }
         #expect(executor.performValue(operation: "read") { $0.value } == .success(42))
+    }
+
+    @Test
+    func lockedRuntimeExecutorReplacementDuringQueryWaitsAndPreservesQuerySnapshot() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+        let queryStarted = DispatchSemaphore(value: 0)
+        let releaseQuery = DispatchSemaphore(value: 0)
+        let queryFinished = DispatchSemaphore(value: 0)
+        let replacementFinished = DispatchSemaphore(value: 0)
+        let queryResults = LockedValues<Result<Int, DocumentMutationFailure>>()
+        let replacementResults = LockedValues<DocumentMutationResult>()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = executor.performValue(operation: "longQuery") { runtime in
+                let snapshot = runtime.value
+                queryStarted.signal()
+                _ = releaseQuery.wait(timeout: .now() + 2)
+                return snapshot
+            }
+            queryResults.append(result)
+            queryFinished.signal()
+        }
+
+        guard queryStarted.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected in-flight query to start")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            replacementResults.append(
+                executor.replaceRuntimeResult(with: RuntimeCounter(value: 99), operation: "replaceDuringQuery")
+            )
+            replacementFinished.signal()
+        }
+
+        #expect(replacementFinished.wait(timeout: .now() + 0.1) == .timedOut)
+        releaseQuery.signal()
+
+        guard queryFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected in-flight query to finish")
+            return
+        }
+        guard replacementFinished.wait(timeout: .now() + 2) == .success else {
+            Issue.record("Expected replacement to finish after query releases the runtime boundary")
+            return
+        }
+        #expect(queryResults.values == [.success(1)])
+        if case .success = replacementResults.values.first {
+        } else {
+            Issue.record("Expected runtime replacement to succeed")
+        }
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(99))
+    }
+
+    @Test
+    func lockedRuntimeExecutorUnlocksAfterResultFailure() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter(value: 1))
+
+        let failure: DocumentMutationResult = executor.performResult(operation: "failingMutation") { _ in
+            .failure(.emptyInput)
+        }
+        if case let .failure(documentFailure) = failure {
+            #expect(documentFailure == .emptyInput)
+        } else {
+            Issue.record("Expected explicit failure result")
+        }
+
+        let mutation = executor.performMutation(operation: "afterFailure") { runtime in
+            runtime.value = 5
+        }
+        guard case .success = mutation else {
+            Issue.record("Expected later mutation to acquire the runtime boundary after failure")
+            return
+        }
+        guard case .success = executor.replaceRuntimeResult(with: RuntimeCounter(value: 6), operation: "replaceAfterFailure") else {
+            Issue.record("Expected later replacement to acquire the runtime boundary after failure")
+            return
+        }
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(6))
     }
 
     @Test
@@ -749,7 +937,9 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeBlurPlan\")"))
         #expect(body.contains("let mutationResult = performGpuPayloadApply(\n                operation: \"applyBlurPlan\""))
         #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
-        #expect(body.contains("if !didTransferPayloadOwnershipToRuntime {\n                gpuServices.release(handle)\n            }"))
+        #expect(body.contains("let payloadLease = GpuMutationPayloadLease(handle: handle, services: gpuServices)"))
+        #expect(body.contains("payloadLease.withTransferredOwnership"))
+        #expect(!body.contains("didTransferPayloadOwnershipToRuntime"))
     }
 
     @Test
@@ -794,6 +984,20 @@ private final class RuntimeCounter {
 
     init(value: Int = 0) {
         self.value = value
+    }
+}
+
+private final class RuntimeConcurrencyProbe {
+    private(set) var mutationCount = 0
+    private(set) var activeMutations = 0
+    private(set) var maximumActiveMutations = 0
+
+    func enterMutationCriticalSection() {
+        activeMutations += 1
+        maximumActiveMutations = max(maximumActiveMutations, activeMutations)
+        Thread.sleep(forTimeInterval: 0.001)
+        mutationCount += 1
+        activeMutations -= 1
     }
 }
 

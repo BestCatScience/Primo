@@ -47,10 +47,10 @@ public struct DocumentWorkspacePreview: Equatable, Sendable {
 }
 
 public struct DocumentWorkspacePreviewGateway: Sendable {
-    public let loadProjectPreview: @Sendable (URL) throws -> DocumentWorkspacePreview
+    public let loadProjectPreview: @Sendable (ProjectPackageURL) throws -> DocumentWorkspacePreview
 
     public init(
-        loadProjectPreview: @escaping @Sendable (URL) throws -> DocumentWorkspacePreview
+        loadProjectPreview: @escaping @Sendable (ProjectPackageURL) throws -> DocumentWorkspacePreview
     ) {
         self.loadProjectPreview = loadProjectPreview
     }

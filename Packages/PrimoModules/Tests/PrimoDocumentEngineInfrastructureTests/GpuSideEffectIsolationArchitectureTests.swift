@@ -3260,6 +3260,61 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func persistenceContractsExposeTypedProjectLocationsInsteadOfRawURLs() throws {
+        let repoRoot = try Self.repoRoot()
+        let domain = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentDomain/WorkspaceDocumentTypes.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let workspaceContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentContracts/WorkspaceGateways.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let persistenceContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentPersistenceContracts/DocumentPersistenceRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let runtimeFacade = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let workspaceRuntimeContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoWorkspaceApplication/WorkspaceRuntimeContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        for typeName in ["ProjectPackageURL", "WritableProjectLocation", "SecurityScopedResourceLease"] {
+            #expect(domain.contains("public struct \(typeName):"))
+        }
+
+        let checkedContracts = workspaceContracts + "\n" + persistenceContracts + "\n" + workspaceRuntimeContracts
+        #expect(checkedContracts.contains("WritableProjectLocation, CanvasPaperStyle"))
+        #expect(checkedContracts.contains("ProjectPackageURL) throws"))
+        #expect(checkedContracts.contains("SecurityScopedResourceLease"))
+        #expect(!checkedContracts.contains("(URL, CanvasPaperStyle)"))
+        #expect(!checkedContracts.contains("(URL) throws -> LoadedPaintProject"))
+        #expect(!checkedContracts.contains("(URL) throws -> DocumentWorkspacePreview"))
+
+        #expect(!runtimeFacade.contains("public func saveProject(_ url: URL"))
+        #expect(!runtimeFacade.contains("public func loadProject(_ url: URL"))
+    }
+
+    @Test
     func metalShadersAreOwnedByRuntimePackage() throws {
         let repoRoot = try Self.repoRoot()
         let appShader = repoRoot.appendingPathComponent("App/Rendering/PaintShaders.metal", isDirectory: false)

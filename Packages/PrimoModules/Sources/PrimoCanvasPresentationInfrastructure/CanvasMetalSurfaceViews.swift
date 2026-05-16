@@ -7,6 +7,7 @@ import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 import UIKit
 
+@MainActor
 public final class CanvasRenderSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
     private let driver = CanvasRenderSurfaceDriver()
@@ -52,6 +53,7 @@ public final class CanvasRenderSurfaceView: UIView {
     }
 }
 
+@MainActor
 public final class CanvasPixelSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
 

@@ -4,6 +4,7 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import UIKit
 
+@MainActor
 final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
     private let loupeView = UIView()
     private let surfaceView = CanvasPixelSurfaceView()

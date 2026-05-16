@@ -23,6 +23,11 @@ final class GpuMutationPayloadLease: @unchecked Sendable {
         return adoptedHandle
     }
 
+    func withTransferredOwnership<Result>(_ body: () -> Result) -> Result {
+        _ = adoptHandle()
+        return body()
+    }
+
     func releaseNow() {
         releaseRemainingHandle()
     }

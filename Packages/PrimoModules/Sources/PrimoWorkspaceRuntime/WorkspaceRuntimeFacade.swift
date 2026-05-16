@@ -61,9 +61,9 @@ public enum WorkspaceRuntimeFactory {
             dateClient: dateClient,
             uuidClient: uuidClient,
             previewGateway: DocumentWorkspacePreviewGateway(
-                loadProjectPreview: { url in
+                loadProjectPreview: { packageURL in
                     let preview = try DocumentProjectPreviewLoader.loadPreview(
-                        from: url,
+                        from: packageURL.fileURL,
                         fileClient: fileClient,
                         dateClient: dateClient,
                         uuidClient: uuidClient

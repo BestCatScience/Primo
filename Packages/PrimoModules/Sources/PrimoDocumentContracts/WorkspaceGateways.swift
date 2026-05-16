@@ -2,11 +2,17 @@ import Foundation
 import PrimoDocumentDomain
 
 public struct ImportedDocumentStageRequest: Equatable, Sendable {
-    public let sourceURL: URL
+    public let source: SecurityScopedResourceLease
+
+    public init(source: SecurityScopedResourceLease) {
+        self.source = source
+    }
 
     public init(sourceURL: URL) {
-        self.sourceURL = sourceURL
+        self.init(source: SecurityScopedResourceLease(sourceURL))
     }
+
+    public var sourceURL: URL { source.fileURL }
 }
 
 public struct ImportedDocumentStageResult: Equatable, Sendable {
@@ -34,7 +40,7 @@ public enum ImportedDocumentStageFailure: LocalizedError, Equatable, Sendable {
 }
 
 public struct WorkspaceBackingStoreGateway: Sendable {
-    public let saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
+    public let saveProject: @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void
     public let persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
     public let createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
     public let persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
@@ -43,7 +49,7 @@ public struct WorkspaceBackingStoreGateway: Sendable {
     public let removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
 
     public init(
-        saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
+        saveProject: @escaping @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void,
         persistProjectSnapshot: @escaping @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath,
         createTabBackingStoreURL: @escaping @Sendable (UUID) throws -> DocumentProjectPath,
         persistAutosaveSnapshot: @escaping @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void,
@@ -59,6 +65,7 @@ public struct WorkspaceBackingStoreGateway: Sendable {
         self.persistSaveHistorySnapshot = persistSaveHistorySnapshot
         self.removeWorkspaceItem = removeWorkspaceItem
     }
+
 }
 
 public struct WorkspaceCatalogGateway: Sendable {
@@ -105,10 +112,10 @@ public struct DocumentImportGateway: Sendable {
 }
 
 public struct ProjectLoadingGateway<LoadedProject>: Sendable {
-    public let loadProject: @Sendable (URL) throws -> LoadedProject
+    public let loadProject: @Sendable (ProjectPackageURL) throws -> LoadedProject
 
     public init(
-        loadProject: @escaping @Sendable (URL) throws -> LoadedProject
+        loadProject: @escaping @Sendable (ProjectPackageURL) throws -> LoadedProject
     ) {
         self.loadProject = loadProject
     }

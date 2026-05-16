@@ -150,6 +150,49 @@ struct CanvasRenderSessionTests {
         #expect(simdColorBody.contains("Float(color.alpha)"))
     }
 
+    @Test
+    func presentationViewSurfacesDeclareMainActorAffinity() throws {
+        let containerSource = try String(
+            contentsOf: canvasPresentationContainerViewSourceURL(),
+            encoding: .utf8
+        )
+        let surfaceSource = try String(
+            contentsOf: canvasMetalSurfaceViewsSourceURL(),
+            encoding: .utf8
+        )
+        let loupeSource = try String(
+            contentsOf: canvasEyedropperLoupeViewSourceURL(),
+            encoding: .utf8
+        )
+        let navigationSource = try String(
+            contentsOf: canvasNavigationGestureAdapterSourceURL(),
+            encoding: .utf8
+        )
+        let selectionSource = try String(
+            contentsOf: canvasSelectionOverlayViewSourceURL(),
+            encoding: .utf8
+        )
+
+        #expect(containerSource.contains("@MainActor\npublic final class CanvasPresentationContainerView"))
+        #expect(surfaceSource.contains("@MainActor\npublic final class CanvasRenderSurfaceView"))
+        #expect(surfaceSource.contains("@MainActor\npublic final class CanvasPixelSurfaceView"))
+        #expect(loupeSource.contains("@MainActor\nfinal class CanvasEyedropperLoupeView"))
+        #expect(navigationSource.contains("@MainActor\nfinal class CanvasNavigationGestureAdapter"))
+        #expect(selectionSource.contains("@MainActor\nfinal class CanvasSelectionOverlayView"))
+    }
+
+    @Test
+    func renderSessionKeepsGpuResourceLifetimeBackgroundCapable() throws {
+        let source = try String(
+            contentsOf: canvasRenderSessionSourceURL(),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("public final class CanvasRenderSession"))
+        #expect(!source.contains("@MainActor\npublic final class CanvasRenderSession"))
+        #expect(source.contains("public func adoptTransferredResources(for update: RenderFrameUpdate)"))
+    }
+
     private func update(handle: MetalBufferHandle?) -> RenderFrameUpdate {
         RenderFrameUpdate(
             snapshot: nil,
@@ -195,6 +238,38 @@ struct CanvasRenderSessionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift")
+    }
+
+    private func canvasMetalSurfaceViewsSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasMetalSurfaceViews.swift")
+    }
+
+    private func canvasEyedropperLoupeViewSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasEyedropperLoupeView.swift")
+    }
+
+    private func canvasNavigationGestureAdapterSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasNavigationGestureAdapter.swift")
+    }
+
+    private func canvasSelectionOverlayViewSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasSelectionOverlayView.swift")
     }
 }
 

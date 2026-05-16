@@ -35,7 +35,7 @@ struct TimelapseExportServiceTests {
     }
 
     @Test
-    func timelapseReplayConstructionKeepsLiveGpuServicesBehindConvenienceBoundary() throws {
+    func timelapseReplayConstructionRequiresInjectedGpuServices() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -51,8 +51,10 @@ struct TimelapseExportServiceTests {
         let engineLive = try String(contentsOf: engineLiveURL, encoding: .utf8)
         let exportService = try String(contentsOf: exportServiceURL, encoding: .utf8)
 
+        #expect(engineLive.contains("package final class DocumentTimelapseReplayService"))
+        #expect(engineLive.contains("init(\n        canvasSize: CGSize,"))
         #expect(engineLive.contains("gpuServices: DocumentRuntimeGpuServices"))
-        #expect(engineLive.contains("gpuServices: DocumentRuntimeGpuServicesFactory.live()"))
+        #expect(!engineLive.contains("public convenience init(\n        canvasSize: CGSize,"))
         #expect(engineLive.contains("gpuServices: gpuServices"))
         #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServicesFactory.live()"))
         #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServices"))

@@ -19,7 +19,7 @@ extension WorkspaceFeature {
         DocumentImportGateway(
             stageImportedDocument: { request in
                 documentImportClient.stageImportedDocument(
-                    ImportedDocumentStageRequest(sourceURL: request.sourceURL)
+                    ImportedDocumentStageRequest(source: request.source)
                 )
             },
             discardStagedDocument: { stagedProjectURL in
@@ -30,8 +30,8 @@ extension WorkspaceFeature {
 
     var workspaceProjectLoaderGateway: ProjectLoadingGateway<LoadedPaintProject> {
         ProjectLoadingGateway(
-            loadProject: { url in
-                try documentPersistenceGateway.loadProject(url)
+            loadProject: { packageURL in
+                try documentPersistenceGateway.loadProject(packageURL)
             }
         )
     }

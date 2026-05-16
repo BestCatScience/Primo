@@ -66,9 +66,9 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
             dateClient: dateClient,
             uuidClient: uuidClient,
             previewGateway: DocumentWorkspacePreviewGateway(
-                loadProjectPreview: { url in
+                loadProjectPreview: { packageURL in
                     let preview = try DocumentAppProjectPreviewSupport.loadPreview(
-                        from: url,
+                        from: packageURL.fileURL,
                         fileClient: fileClient,
                         dateClient: dateClient,
                         uuidClient: uuidClient

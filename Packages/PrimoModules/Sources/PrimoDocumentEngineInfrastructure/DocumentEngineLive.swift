@@ -421,17 +421,17 @@ package enum DocumentEngineFactory {
         gpuServices: DocumentRuntimeGpuServices
     ) -> DocumentPersistenceGateway {
         DocumentPersistenceGateway(
-            saveProject: { url, paperStyle in
+            saveProject: { location, paperStyle in
                 let snapshot = try runtimeExecutor.performThrowing(
                     operation: "saveProject"
                 ) {
                     $0.projectSaveSnapshot(paperStyle: paperStyle)
                 }
-                try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
+                try snapshot.write(to: location.fileURL, fileClient: fileClient, uuidClient: uuidClient)
             },
-            loadProject: { url in
+            loadProject: { packageURL in
                 let runtime = try SwiftDocumentRuntime.loadProject(
-                    from: url,
+                    from: packageURL.fileURL,
                     fileClient: fileClient,
                     dateClient: dateClient,
                     uuidClient: uuidClient,
@@ -781,15 +781,11 @@ package enum DocumentEngineFactory {
         runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>,
         _ body: (SwiftDocumentRuntime) -> DocumentMutationResult
     ) -> DocumentMutationResult {
-        var didTransferPayloadOwnershipToRuntime = false
-        defer {
-            if !didTransferPayloadOwnershipToRuntime {
-                gpuServices.release(handle)
-            }
-        }
+        let payloadLease = GpuMutationPayloadLease(handle: handle, services: gpuServices)
         return runtimeExecutor.performResult(operation: operation) { runtime in
-            didTransferPayloadOwnershipToRuntime = true
-            return body(runtime)
+            payloadLease.withTransferredOwnership {
+                body(runtime)
+            }
         }
     }
 }
@@ -1030,23 +1026,8 @@ private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> Do
     DocumentLayerMutationFailure(coreFailure: failure.coreFailure)
 }
 
-public final class DocumentTimelapseReplayService: @unchecked Sendable {
+package final class DocumentTimelapseReplayService: @unchecked Sendable {
     private let stateExecutor: LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>
-
-    public convenience init(
-        canvasSize: CGSize,
-        fileClient: PrimoCoreTypes.FileClient = .live,
-        dateClient: PrimoCoreTypes.DateClient = .live,
-        uuidClient: PrimoCoreTypes.UUIDClient = .live
-    ) {
-        self.init(
-            canvasSize: canvasSize,
-            fileClient: fileClient,
-            dateClient: dateClient,
-            uuidClient: uuidClient,
-            gpuServices: DocumentRuntimeGpuServicesFactory.live()
-        )
-    }
 
     init(
         canvasSize: CGSize,
@@ -1069,7 +1050,7 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
         )
     }
 
-    public func replaySurface(_ operation: TimelapseOperation) -> DocumentCompositeSurface? {
+    package func replaySurface(_ operation: TimelapseOperation) -> DocumentCompositeSurface? {
         try? stateExecutor.performThrowing(operation: "replayTimelapseOperation") { state in
             state.runtime.replayTimelapseOperation(operation, folderIDMap: &state.folderIDMap)
             return state.runtime.timelapseCompositeSurface()
@@ -1079,7 +1060,7 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
     // Legacy convenience retained for callers that still expect CGImage.
     // Replay/export code should prefer `replaySurface(_:)`.
     @available(*, deprecated, message: "Prefer replaySurface(_:) for live replay paths.")
-    public func replay(_ operation: TimelapseOperation) -> CGImage? {
+    package func replay(_ operation: TimelapseOperation) -> CGImage? {
         guard let surface = replaySurface(operation) else { return nil }
         let result = stateExecutor.performValue(operation: "timelapseReplayCGImage") {
             $0.runtime.cgImage(from: surface.pixelData, width: surface.width, height: surface.height)

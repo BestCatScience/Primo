@@ -93,8 +93,8 @@ struct DocumentWorkspaceClientAutosaveTests {
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000222")! }),
             previewGateway: DocumentWorkspacePreviewGateway(
-                loadProjectPreview: { url in
-                    recorder.record(url)
+                loadProjectPreview: { packageURL in
+                    recorder.record(packageURL.fileURL)
                     return DocumentWorkspacePreview(
                         canvasSize: CGSize(width: 2, height: 3),
                         layerCount: 4,
@@ -144,8 +144,8 @@ struct DocumentWorkspaceClientAutosaveTests {
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000222")! }),
             previewGateway: DocumentWorkspacePreviewGateway(
-                loadProjectPreview: { url in
-                    recorder.record(url)
+                loadProjectPreview: { packageURL in
+                    recorder.record(packageURL.fileURL)
                     throw DocumentWorkspaceCatalogError.projectLoadFailed("preview unavailable")
                 }
             )

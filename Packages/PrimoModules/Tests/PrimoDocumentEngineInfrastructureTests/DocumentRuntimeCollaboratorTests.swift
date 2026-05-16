@@ -113,6 +113,37 @@ struct DocumentRuntimeCollaboratorTests {
     }
 
     @Test
+    func gpuMutationPayloadLeaseReleasesHandleWhenOwnershipIsNotTransferred() {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+
+        do {
+            _ = GpuMutationPayloadLease(handle: handle, services: services)
+        }
+
+        #expect(box.releasedHandles == [handle])
+    }
+
+    @Test
+    func gpuMutationPayloadLeaseSuppressesReleaseAfterTransferredOwnership() {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        var didEnterTransferBody = false
+
+        do {
+            let lease = GpuMutationPayloadLease(handle: handle, services: services)
+            lease.withTransferredOwnership {
+                didEnterTransferBody = true
+            }
+        }
+
+        #expect(didEnterTransferBody)
+        #expect(box.releasedHandles.isEmpty)
+    }
+
+    @Test
     func applyLayerSurfaceMutationReleasesGpuPayloadHandleOnEarlyFailure() {
         let box = CollaboratorGpuBox()
         let services = box.services()

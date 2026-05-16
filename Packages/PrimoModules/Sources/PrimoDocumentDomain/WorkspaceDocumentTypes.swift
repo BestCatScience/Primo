@@ -97,6 +97,51 @@ public struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
     public var path: String { fileURL.path }
 }
 
+public struct ProjectPackageURL: Hashable, Codable, Sendable, Identifiable {
+    public let fileURL: URL
+
+    public init(_ fileURL: URL) {
+        self.fileURL = fileURL.standardizedFileURL
+    }
+
+    public init(_ projectPath: DocumentProjectPath) {
+        self.init(projectPath.fileURL)
+    }
+
+    public var id: URL { fileURL }
+    public var projectPath: DocumentProjectPath { DocumentProjectPath(fileURL) }
+    public var displayName: String { projectPath.displayName }
+    public var path: String { fileURL.path }
+}
+
+public struct WritableProjectLocation: Hashable, Codable, Sendable, Identifiable {
+    public let fileURL: URL
+
+    public init(_ fileURL: URL) {
+        self.fileURL = fileURL.standardizedFileURL
+    }
+
+    public init(_ projectPath: DocumentProjectPath) {
+        self.init(projectPath.fileURL)
+    }
+
+    public var id: URL { fileURL }
+    public var projectPath: DocumentProjectPath { DocumentProjectPath(fileURL) }
+    public var displayName: String { projectPath.displayName }
+    public var path: String { fileURL.path }
+}
+
+public struct SecurityScopedResourceLease: Hashable, Codable, Sendable, Identifiable {
+    public let fileURL: URL
+
+    public init(_ fileURL: URL) {
+        self.fileURL = fileURL.standardizedFileURL
+    }
+
+    public var id: URL { fileURL }
+    public var path: String { fileURL.path }
+}
+
 public struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
     public let rawValue: String
 

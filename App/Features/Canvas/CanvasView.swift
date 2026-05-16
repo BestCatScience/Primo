@@ -5,6 +5,7 @@ import PrimoDocumentRuntime
 import PrimoDocumentDomain
 import SwiftUI
 
+@MainActor
 struct CanvasView: UIViewRepresentable {
     @Dependency(\.documentPreviewRenderingCapability) var previewRenderingCapability
 

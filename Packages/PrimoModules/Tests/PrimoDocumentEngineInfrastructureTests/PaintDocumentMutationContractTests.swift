@@ -119,10 +119,10 @@ struct PaintDocumentMutationContractTests {
 
         expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
         expectSuccess(runtime.setFolderName(folderID, "References"))
-        try runtime.persistenceGateway.saveProject(projectURL, .default)
+        try runtime.persistenceGateway.saveProject(WritableProjectLocation(projectURL), .default)
 
         let loaded = DocumentEngineFactory.live()
-        _ = try loaded.persistenceGateway.loadProject(projectURL)
+        _ = try loaded.persistenceGateway.loadProject(ProjectPackageURL(projectURL))
 
         #expect(try loaded.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Ink")
         #expect(folder(in: loaded, id: folderID)?.name == "References")
