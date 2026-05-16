@@ -283,7 +283,7 @@ struct DocumentContentServiceTests {
                 resizeCanvasExtent: { _, _ in .success(()) },
                 addLayer: { name in
                     recorder.record("addLayer:\(name)")
-                    return .success(3)
+                    return .success(DocumentCreatedLayerIndex(3))
                 },
                 deleteLayer: { index in
                     recorder.record("deleteLayer:\(index)")
@@ -338,7 +338,7 @@ struct DocumentContentServiceTests {
             documentMutationGateway: DocumentMutationGateway(
                 resizeCanvas: { _, _ in .success(()) },
                 resizeCanvasExtent: { _, _ in .success(()) },
-                addLayer: { _ in .success(5) },
+                addLayer: { _ in .success(DocumentCreatedLayerIndex(5)) },
                 deleteLayer: { _ in .success(()) },
                 setActiveLayer: { index in
                     recorder.record("setActiveLayer:\(index)")
@@ -522,7 +522,7 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
         resizeCanvasExtent: { _, _ in .success(()) },
         addLayer: { _ in
             recorder.record("addLayer")
-            return .success(1)
+            return .success(DocumentCreatedLayerIndex(1))
         },
         deleteLayer: { _ in
             recorder.record("deleteLayer")

@@ -30,7 +30,7 @@ struct DocumentMutationWorkflowServiceTests {
         let sourceIndex = try #require(existingLayerIndex(1, layerCount: 2))
         let index = try service.duplicateLayer(sourceIndex, named: "Copy").get()
 
-        #expect(index == 4)
+        #expect(index.rawValue == 4)
     }
 
     @Test
@@ -388,7 +388,15 @@ private func expectFailure(_ result: DocumentMutationResult, _ expected: Documen
     #expect(failure == expected)
 }
 
-private func expectFailure(_ result: DocumentIndexedMutationResult, _ expected: DocumentMutationFailure) {
+private func expectFailure(_ result: DocumentCreatedLayerMutationResult, _ expected: DocumentMutationFailure) {
+    guard case let .failure(failure) = result else {
+        Issue.record("Expected \(expected)")
+        return
+    }
+    #expect(failure == expected)
+}
+
+private func expectFailure(_ result: DocumentCreatedFolderMutationResult, _ expected: DocumentMutationFailure) {
     guard case let .failure(failure) = result else {
         Issue.record("Expected \(expected)")
         return

@@ -60,11 +60,6 @@ package extension DocumentRuntime {
                 }
             case let .layer(command):
                 switch command {
-                case let .edit(request):
-                    return mutationOutcome(
-                        composition.editingGateway.execute(request)
-                            .map { _ in .completed }
-                    )
                 case let .mergeExistingLayerDown(index):
                     return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index.rawValue).map { .completed })
                 case let .setEditableTextLayer(index, textLayer):

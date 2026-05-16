@@ -692,10 +692,10 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         for token in [
-            "public enum LayerContentMutationCommand",
+            "package enum LayerContentMutationCommand",
             "public enum ValidatedLayerContentMutationCommand",
             "public protocol LayerContentGateway",
-            "public struct LayerContentMutationUseCase"
+            "package struct LayerContentMutationUseCase"
         ] {
             #expect(contentContracts.contains(token))
         }
@@ -1141,6 +1141,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             #expect(layerCommandBody.contains(typedCase), "DocumentLayerCommand should preserve typed public case \(typedCase)")
         }
         for rawCase in [
+            "case edit(DocumentEditingRequest)",
             "case mergeLayerDown(Int)",
             "case setTextLayer(index: Int, TextLayerData)",
             "case applyProcessing(index: Int, LayerProcessingRequest)"
@@ -1970,6 +1971,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let layerContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift")
         let contentContracts = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift")
         let editorUseCase = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentEditorUseCase.swift")
+        let editingGateway = try read("Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentEditingGateway.swift")
         let engineLive = try read("Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift")
         let readme = try read("README.md")
 
@@ -1984,6 +1986,14 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(engineLive.contains("Authoritative stale validation"))
         #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
         #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: EditableLayerIndex)"))
+        #expect(layerContracts.contains("package enum LayerStructureCommand"))
+        #expect(layerContracts.contains("package enum LayerAttributeCommand"))
+        #expect(contentContracts.contains("package enum LayerContentMutationCommand"))
+        #expect(editorUseCase.contains("package enum DocumentEditorRequest"))
+        #expect(editingGateway.contains("package typealias DocumentEditingRequest"))
+        #expect(!layerContracts.contains("public enum LayerStructureCommand"))
+        #expect(!layerContracts.contains("public enum LayerAttributeCommand"))
+        #expect(!contentContracts.contains("public enum LayerContentMutationCommand"))
         #expect(readme.contains("App validation は preflight、runtime validation は本契約"))
         #expect(readme.contains("authoritative validation"))
     }
@@ -1998,7 +2008,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        #expect(engineLive.contains("@Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult"))
+        #expect(engineLive.contains("@Sendable (String, LayerAnchorIndex) -> DocumentCreatedFolderMutationResult"))
+        #expect(engineLive.contains("@Sendable (Int, String) -> DocumentCreatedLayerMutationResult"))
         #expect(engineLive.contains("@Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult"))
 
         let runtimeComposition = try String(
@@ -2643,6 +2654,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         let repoRoot = try Self.repoRoot()
         let checkedFiles = [
             "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift"
@@ -2679,6 +2691,10 @@ struct GpuSideEffectIsolationArchitectureTests {
                 contentsOf: repoRoot.appendingPathComponent(file, isDirectory: false),
                 encoding: .utf8
             )
+            #expect(!body.contains("DocumentIndexedMutationResult"), "\(file) should not expose untyped indexed mutation results")
+            #expect(!body.contains("DocumentLayerIndexedMutationResult"), "\(file) should not expose untyped indexed mutation results")
+            #expect(!body.contains("Result<Int, DocumentMutationFailure>"), "\(file) should not return raw Int mutation results")
+            #expect(!body.contains("Result<Int, DocumentLayerMutationFailure>"), "\(file) should not return raw Int layer mutation results")
             for callable in Self.callables(accessLevel: "public", in: body)
                 where callable.kind == "func" &&
                     mutationMethodPrefixes.contains(where: callable.name.hasPrefix)

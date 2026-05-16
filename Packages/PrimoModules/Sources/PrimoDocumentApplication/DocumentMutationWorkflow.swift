@@ -62,7 +62,7 @@ public struct DocumentMutationWorkflowService: Sendable {
     private let documentEditingGateway: DocumentEditingGateway
     private let documentLayerEffectsGateway: DocumentLayerEffectsGateway
 
-    public init(
+    package init(
         documentQueryGateway: DocumentQueryGateway,
         documentEditingGateway: DocumentEditingGateway,
         documentLayerEffectsGateway: DocumentLayerEffectsGateway
@@ -72,13 +72,13 @@ public struct DocumentMutationWorkflowService: Sendable {
         self.documentLayerEffectsGateway = documentLayerEffectsGateway
     }
 
-    public func addLayer(named name: String) -> DocumentIndexedMutationResult {
-        executeIndexed(.structure(.addLayer(name: name)))
+    public func addLayer(named name: String) -> DocumentCreatedLayerMutationResult {
+        executeCreatedLayer(.structure(.addLayer(name: name)))
     }
 
-    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentCreatedFolderMutationResult {
         requireCurrent(anchorLayerIndex).flatMap { anchorLayerIndex in
-            executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)))
+            executeCreatedFolder(.structure(.createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)))
         }
     }
 
@@ -94,9 +94,9 @@ public struct DocumentMutationWorkflowService: Sendable {
         }
     }
 
-    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult {
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentCreatedLayerMutationResult {
         requireCurrent(index).flatMap { index in
-            executeIndexed(.structure(.duplicateLayer(index: index.rawValue, name: duplicateName)))
+            executeCreatedLayer(.structure(.duplicateLayer(index: index.rawValue, name: duplicateName)))
         }
     }
 
@@ -407,12 +407,21 @@ public struct DocumentMutationWorkflowService: Sendable {
         documentEditingGateway.execute(request).map { _ in () }
     }
 
-    private func executeIndexed(_ request: DocumentEditingRequest) -> DocumentIndexedMutationResult {
+    private func executeCreatedLayer(_ request: DocumentEditingRequest) -> DocumentCreatedLayerMutationResult {
         documentEditingGateway.execute(request).flatMap { result in
             guard case let .structure(plan) = result, let index = plan.resultingIndex else {
                 return .failure(.bridgeMutationFailed("documentEditingGateway"))
             }
-            return .success(index)
+            return .success(DocumentCreatedLayerIndex(index))
+        }
+    }
+
+    private func executeCreatedFolder(_ request: DocumentEditingRequest) -> DocumentCreatedFolderMutationResult {
+        documentEditingGateway.execute(request).flatMap { result in
+            guard case let .structure(plan) = result, let folderID = plan.resultingIndex else {
+                return .failure(.bridgeMutationFailed("documentEditingGateway"))
+            }
+            return .success(DocumentCreatedFolderID(folderID))
         }
     }
 

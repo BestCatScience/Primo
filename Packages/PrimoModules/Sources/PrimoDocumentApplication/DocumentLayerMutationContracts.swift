@@ -3,7 +3,8 @@ import PrimoDocumentMutationContracts
 import PrimoDocumentDomain
 
 public typealias DocumentLayerMutationResult = Result<Void, DocumentLayerMutationFailure>
-public typealias DocumentLayerIndexedMutationResult = Result<Int, DocumentLayerMutationFailure>
+public typealias DocumentLayerCreatedMutationResult = Result<DocumentCreatedLayerIndex, DocumentLayerMutationFailure>
+public typealias DocumentFolderCreatedMutationResult = Result<DocumentCreatedFolderID, DocumentLayerMutationFailure>
 public typealias DocumentLayerAddSelectionResult = Result<AddedAndSelectedLayer, DocumentLayerMutationFailure>
 
 // Application mutation validation is an authoritative contract boundary:
@@ -137,7 +138,7 @@ public struct ValidatedLayerOpacity: Equatable, Sendable {
     }
 }
 
-public enum LayerStructureCommand: Equatable, Sendable {
+package enum LayerStructureCommand: Equatable, Sendable {
     case addLayer(name: String)
     case duplicateLayer(index: Int, name: String)
     case deleteLayer(index: Int)
@@ -147,7 +148,7 @@ public enum LayerStructureCommand: Equatable, Sendable {
     case assignLayerToFolder(index: Int, folderID: Int?)
 }
 
-public enum LayerAttributeCommand: Equatable, Sendable {
+package enum LayerAttributeCommand: Equatable, Sendable {
     case setActiveLayer(index: Int)
     case setLayerName(index: Int, name: String)
     case setLayerVisibility(index: Int, isVisible: Bool)
@@ -227,14 +228,15 @@ public struct LayerStructureMutationPlan: Equatable, Sendable {
 }
 
 public struct AddedAndSelectedLayer: Equatable, Sendable {
-    public let selectedIndex: Int
+    public let selectedLayerIndex: DocumentCreatedLayerIndex
+    public var selectedIndex: Int { selectedLayerIndex.rawValue }
 
-    private init(selectedIndex: Int) {
-        self.selectedIndex = selectedIndex
+    private init(selectedLayerIndex: DocumentCreatedLayerIndex) {
+        self.selectedLayerIndex = selectedLayerIndex
     }
 
-    public static func addedAndSelected(index: Int) -> AddedAndSelectedLayer {
-        AddedAndSelectedLayer(selectedIndex: index)
+    public static func addedAndSelected(_ index: DocumentCreatedLayerIndex) -> AddedAndSelectedLayer {
+        AddedAndSelectedLayer(selectedLayerIndex: index)
     }
 }
 
@@ -248,10 +250,10 @@ public struct LayerAttributeMutationPlan: Equatable, Sendable {
 
 public protocol LayerStructureGateway: Sendable {
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult
     func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult
 }
@@ -270,10 +272,10 @@ public protocol LayerAttributeGateway: Sendable {
     func setFolderName(_ name: String, folderID: ExistingFolderID) -> DocumentLayerMutationResult
 }
 
-public struct LayerStructureCommandValidator: Sendable {
-    public init() {}
+package struct LayerStructureCommandValidator: Sendable {
+    package init() {}
 
-    public func validated(
+    package func validated(
         _ command: LayerStructureCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerStructureCommand, DocumentLayerMutationFailure> {
@@ -331,7 +333,7 @@ public struct LayerStructureCommandValidator: Sendable {
         }
     }
 
-    public func validate(
+    package func validate(
         _ command: LayerStructureCommand,
         in context: DocumentLayerMutationContext
     ) -> DocumentLayerMutationFailure? {
@@ -339,10 +341,10 @@ public struct LayerStructureCommandValidator: Sendable {
     }
 }
 
-public struct LayerAttributeCommandValidator: Sendable {
-    public init() {}
+package struct LayerAttributeCommandValidator: Sendable {
+    package init() {}
 
-    public func validated(
+    package func validated(
         _ command: LayerAttributeCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerAttributeCommand, DocumentLayerMutationFailure> {
@@ -382,7 +384,7 @@ public struct LayerAttributeCommandValidator: Sendable {
         }
     }
 
-    public func validate(
+    package func validate(
         _ command: LayerAttributeCommand,
         in context: DocumentLayerMutationContext
     ) -> DocumentLayerMutationFailure? {

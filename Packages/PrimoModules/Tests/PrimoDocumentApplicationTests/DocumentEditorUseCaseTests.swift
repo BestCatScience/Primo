@@ -12,7 +12,7 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
 
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         addedLayerNames.append(name)
-        return .success(.addedAndSelected(index: 2))
+        return .success(.addedAndSelected(DocumentCreatedLayerIndex(2)))
     }
 
     func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {
@@ -20,10 +20,10 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
         return .success(())
     }
 
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { .failure(.bridgeMutationFailed("unused")) }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult { .failure(.bridgeMutationFailed("unused")) }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult { .success(1) }
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult { .success(DocumentCreatedFolderID(1)) }
     func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult { .success(()) }
 

@@ -106,11 +106,11 @@ protocol StrokeCommitPort: Sendable {
 }
 
 protocol LayerMutationWorkflowSubmitting: Sendable {
-    func addLayer(named name: String) -> DocumentIndexedMutationResult
-    func createFolder(named name: String, afterLayerAt activeLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult
+    func addLayer(named name: String) -> DocumentCreatedLayerMutationResult
+    func createFolder(named name: String, afterLayerAt activeLayerIndex: LayerAnchorIndex) -> DocumentCreatedFolderMutationResult
     func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult
     func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult
-    func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult
+    func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentCreatedLayerMutationResult
     func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult
     func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult
     func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult

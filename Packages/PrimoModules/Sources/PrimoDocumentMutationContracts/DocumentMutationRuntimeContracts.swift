@@ -6,7 +6,24 @@ import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 
 public typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
-public typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
+public typealias DocumentCreatedLayerMutationResult = Result<DocumentCreatedLayerIndex, DocumentMutationFailure>
+public typealias DocumentCreatedFolderMutationResult = Result<DocumentCreatedFolderID, DocumentMutationFailure>
+
+public struct DocumentCreatedLayerIndex: Equatable, Sendable {
+    public let rawValue: Int
+
+    package init(_ rawValue: Int) {
+        self.rawValue = rawValue
+    }
+}
+
+public struct DocumentCreatedFolderID: Equatable, Sendable {
+    public let rawValue: Int
+
+    package init(_ rawValue: Int) {
+        self.rawValue = rawValue
+    }
+}
 
 public struct EditableLayerIndex: Equatable, Sendable {
     public let rawValue: Int
@@ -564,7 +581,7 @@ public enum LayerProcessingRequest: Equatable, Sendable {
 package struct DocumentMutationGateway: Sendable {
     private let resizeCanvasHandler: @Sendable (Int, Int) -> DocumentMutationResult
     private let resizeCanvasExtentHandler: @Sendable (Int, Int) -> DocumentMutationResult
-    private let addLayerHandler: @Sendable (String) -> DocumentIndexedMutationResult
+    private let addLayerHandler: @Sendable (String) -> DocumentCreatedLayerMutationResult
     private let deleteLayerHandler: @Sendable (Int) -> DocumentMutationResult
     private let setActiveLayerHandler: @Sendable (Int) -> DocumentMutationResult
     private let setLayerNameHandler: @Sendable (Int, String) -> DocumentMutationResult
@@ -584,7 +601,7 @@ package struct DocumentMutationGateway: Sendable {
     package init(
         resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
         resizeCanvasExtent: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
-        addLayer: @escaping @Sendable (String) -> DocumentIndexedMutationResult,
+        addLayer: @escaping @Sendable (String) -> DocumentCreatedLayerMutationResult,
         deleteLayer: @escaping @Sendable (Int) -> DocumentMutationResult,
         setActiveLayer: @escaping @Sendable (Int) -> DocumentMutationResult,
         setLayerName: @escaping @Sendable (Int, String) -> DocumentMutationResult,
@@ -629,7 +646,7 @@ package struct DocumentMutationGateway: Sendable {
         resizeCanvasExtentHandler(width, height)
     }
 
-    package func addLayer(_ name: String) -> DocumentIndexedMutationResult {
+    package func addLayer(_ name: String) -> DocumentCreatedLayerMutationResult {
         addLayerHandler(name)
     }
 

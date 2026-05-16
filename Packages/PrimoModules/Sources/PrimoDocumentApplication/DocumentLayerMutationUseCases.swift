@@ -1,14 +1,14 @@
 import Foundation
 import PrimoDocumentDomain
 
-public struct LayerStructureUseCase: Sendable {
+package struct LayerStructureUseCase: Sendable {
     private let validator: LayerStructureCommandValidator
 
-    public init(validator: LayerStructureCommandValidator = .init()) {
+    package init(validator: LayerStructureCommandValidator = .init()) {
         self.validator = validator
     }
 
-    public func execute(
+    package func execute(
         _ command: LayerStructureCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerStructureGateway
@@ -42,9 +42,9 @@ public struct LayerStructureUseCase: Sendable {
             case let .success(duplicatedIndex):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: duplicatedIndex,
-                        indexMutation: .duplication(sourceIndex: index.rawValue, duplicatedIndex: duplicatedIndex),
-                        lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex, name: name.rawValue)
+                        resultingIndex: duplicatedIndex.rawValue,
+                        indexMutation: .duplication(sourceIndex: index.rawValue, duplicatedIndex: duplicatedIndex.rawValue),
+                        lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex.rawValue, name: name.rawValue)
                     )
                 )
             }
@@ -82,9 +82,9 @@ public struct LayerStructureUseCase: Sendable {
             case let .success(folderID):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: folderID,
+                        resultingIndex: folderID.rawValue,
                         lifecycleEvent: .createFolder(
-                            folderID: folderID,
+                            folderID: folderID.rawValue,
                             name: name.rawValue,
                             anchorLayerIndex: anchorLayerIndex.rawValue
                         )
@@ -122,14 +122,14 @@ public struct LayerStructureUseCase: Sendable {
     }
 }
 
-public struct LayerAttributeUseCase: Sendable {
+package struct LayerAttributeUseCase: Sendable {
     private let validator: LayerAttributeCommandValidator
 
-    public init(validator: LayerAttributeCommandValidator = .init()) {
+    package init(validator: LayerAttributeCommandValidator = .init()) {
         self.validator = validator
     }
 
-    public func execute(
+    package func execute(
         _ command: LayerAttributeCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerAttributeGateway

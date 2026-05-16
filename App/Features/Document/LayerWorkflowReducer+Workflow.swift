@@ -285,7 +285,7 @@ extension LayerWorkflowReducer {
                 layerWorkflowService.addLayer(named: layerName)
             },
             onSuccess: { newLayerIndex, state in
-                state.canvas.activateLayerForEditing(newLayerIndex)
+                state.canvas.activateLayerForEditing(newLayerIndex.rawValue)
             }
         )
     }

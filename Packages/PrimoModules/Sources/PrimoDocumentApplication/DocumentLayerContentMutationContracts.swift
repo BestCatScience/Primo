@@ -135,7 +135,7 @@ private extension CGRect {
 // Content commands join the same authoritative validation path as structure
 // and attribute commands: the use case emits revision-aware EditableLayerIndex
 // values, and the live gateway rejects stale indexes before raw mutation.
-public enum LayerContentMutationCommand: Equatable, Sendable {
+package enum LayerContentMutationCommand: Equatable, Sendable {
     case replacePixels(index: Int, pixelData: LayerPixelData)
     case setTextLayer(index: Int, textLayer: TextLayerData)
     case clear(index: Int)
@@ -169,10 +169,10 @@ public protocol LayerContentGateway: Sendable {
     func applyLayerMask(index: EditableLayerIndex) -> DocumentLayerMutationResult
 }
 
-public struct LayerContentMutationCommandValidator: Sendable {
-    public init() {}
+package struct LayerContentMutationCommandValidator: Sendable {
+    package init() {}
 
-    public func validated(
+    package func validated(
         _ command: LayerContentMutationCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerContentMutationCommand, DocumentLayerMutationFailure> {
@@ -221,14 +221,14 @@ public struct LayerContentMutationCommandValidator: Sendable {
     }
 }
 
-public struct LayerContentMutationUseCase: Sendable {
+package struct LayerContentMutationUseCase: Sendable {
     private let validator: LayerContentMutationCommandValidator
 
-    public init(validator: LayerContentMutationCommandValidator = .init()) {
+    package init(validator: LayerContentMutationCommandValidator = .init()) {
         self.validator = validator
     }
 
-    public func execute(
+    package func execute(
         _ command: LayerContentMutationCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerContentGateway

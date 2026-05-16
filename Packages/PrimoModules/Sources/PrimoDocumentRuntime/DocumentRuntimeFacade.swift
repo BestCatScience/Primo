@@ -143,7 +143,6 @@ public enum DocumentCanvasCommand: Sendable {
 }
 
 public enum DocumentLayerCommand: Sendable {
-    case edit(DocumentEditingRequest)
     case mergeExistingLayerDown(ExistingLayerIndex)
     case setEditableTextLayer(index: EditableLayerIndex, TextLayerData)
     case applyEditableProcessing(index: EditableLayerIndex, LayerProcessingRequest)
@@ -644,11 +643,11 @@ public struct LayerStructureEditingRuntime: Sendable {
         self.mutationWorkflow = services.mutationWorkflow
     }
 
-    public func addLayer(named name: String) -> DocumentIndexedMutationResult { mutationWorkflow.addLayer(named: name) }
-    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
+    public func addLayer(named name: String) -> DocumentCreatedLayerMutationResult { mutationWorkflow.addLayer(named: name) }
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentCreatedFolderMutationResult { mutationWorkflow.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
     public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { mutationWorkflow.deleteFolder(folderID) }
     public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.deleteLayer(index) }
-    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentCreatedLayerMutationResult { mutationWorkflow.duplicateLayer(index, named: duplicateName) }
     public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.moveLayer(index, to: destinationIndex) }
     public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { mutationWorkflow.assignLayer(index, toFolder: folderID) }
     public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { mutationWorkflow.mergeLayerDown(index) }
@@ -897,11 +896,11 @@ public struct LayerEditingRuntime: Sendable {
         self.previewLease = LayerPreviewLeaseRuntime(services: services)
     }
 
-    public func addLayer(named name: String) -> DocumentIndexedMutationResult { structure.addLayer(named: name) }
-    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult { structure.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
+    public func addLayer(named name: String) -> DocumentCreatedLayerMutationResult { structure.addLayer(named: name) }
+    public func createFolder(named name: String, afterLayerAt anchorLayerIndex: LayerAnchorIndex) -> DocumentCreatedFolderMutationResult { structure.createFolder(named: name, afterLayerAt: anchorLayerIndex) }
     public func deleteFolder(_ folderID: ExistingFolderID) -> DocumentMutationResult { structure.deleteFolder(folderID) }
     public func deleteLayer(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.deleteLayer(index) }
-    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentIndexedMutationResult { structure.duplicateLayer(index, named: duplicateName) }
+    public func duplicateLayer(_ index: ExistingLayerIndex, named duplicateName: String) -> DocumentCreatedLayerMutationResult { structure.duplicateLayer(index, named: duplicateName) }
     public func moveLayer(_ index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentMutationResult { structure.moveLayer(index, to: destinationIndex) }
     public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult { structure.assignLayer(index, toFolder: folderID) }
     public func mergeLayerDown(_ index: ExistingLayerIndex) -> DocumentMutationResult { structure.mergeLayerDown(index) }

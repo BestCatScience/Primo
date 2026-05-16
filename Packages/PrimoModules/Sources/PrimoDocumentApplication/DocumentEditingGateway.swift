@@ -1,19 +1,19 @@
 import Foundation
 import PrimoDocumentMutationContracts
 
-public typealias DocumentEditingRequest = DocumentEditorRequest
+package typealias DocumentEditingRequest = DocumentEditorRequest
 public typealias DocumentEditingResult = DocumentEditorResult
 
-public struct DocumentEditingGateway: Sendable {
+package struct DocumentEditingGateway: Sendable {
     private let executeImpl: @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
 
-    public init(
+    package init(
         execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
     ) {
         self.executeImpl = execute
     }
 
-    public func execute(_ request: DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> {
+    package func execute(_ request: DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> {
         executeImpl(request)
     }
 }

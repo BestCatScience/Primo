@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentMutationContracts
 import Testing
 
 struct DocumentLayerMutationUseCaseTests {
@@ -30,7 +31,7 @@ struct DocumentLayerMutationUseCaseTests {
             folderIDs: [4],
             isLayerLocked: { _ in false }
         )
-        let gateway = StructureGatewayStub(duplicateLayerResult: .success(5))
+        let gateway = StructureGatewayStub(duplicateLayerResult: .success(DocumentCreatedLayerIndex(5)))
 
         let result = useCase.execute(
             .duplicateLayer(index: 1, name: "Copy"),
@@ -75,7 +76,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayRecorder(
-            addLayerResult: .success(.addedAndSelected(index: 3))
+            addLayerResult: .success(.addedAndSelected(DocumentCreatedLayerIndex(3)))
         )
 
         let result = useCase.execute(
@@ -193,15 +194,15 @@ struct DocumentLayerMutationUseCaseTests {
 }
 
 private struct StructureGatewayStub: LayerStructureGateway {
-    var addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(index: 0))
-    var duplicateLayerResult: DocumentLayerIndexedMutationResult = .success(5)
-    var createFolderResult: DocumentLayerIndexedMutationResult = .success(9)
+    var addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(DocumentCreatedLayerIndex(0)))
+    var duplicateLayerResult: DocumentLayerCreatedMutationResult = .success(DocumentCreatedLayerIndex(5))
+    var createFolderResult: DocumentFolderCreatedMutationResult = .success(DocumentCreatedFolderID(9))
 
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult { addLayerResult }
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { duplicateLayerResult }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult { duplicateLayerResult }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult { createFolderResult }
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult { createFolderResult }
     func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult { .success(()) }
 }
@@ -211,7 +212,7 @@ private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructur
     var addedLayerNames: [String] = []
 
     init(
-        addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(index: 0))
+        addLayerResult: DocumentLayerAddSelectionResult = .success(.addedAndSelected(DocumentCreatedLayerIndex(0)))
     ) {
         self.addLayerResult = addLayerResult
     }
@@ -221,10 +222,10 @@ private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructur
         return addLayerResult
     }
 
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { .success(5) }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult { .success(DocumentCreatedLayerIndex(5)) }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult { .success(9) }
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult { .success(DocumentCreatedFolderID(9)) }
     func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult { .success(()) }
 }

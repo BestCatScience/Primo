@@ -301,8 +301,8 @@ struct PaintDocumentMutationContractTests {
         expectSuccess(runtime.mutationGateway.replaceLayerPixels(0, lower))
         switch runtime.mutationGateway.addLayer("Upper") {
         case let .success(index):
-            expectSuccess(runtime.mutationGateway.replaceLayerPixels(index, upper))
-            let result = runtime.mergeLayerDown(index)
+            expectSuccess(runtime.mutationGateway.replaceLayerPixels(index.rawValue, upper))
+            let result = runtime.mergeLayerDown(index.rawValue)
             if PrimoMetalDocumentProcessingClient.shared.isAvailable {
                 expectSuccess(result)
                 let merged = try runtime.renderGateway.pixelDataForLayer(0).get()
@@ -330,7 +330,7 @@ struct PaintDocumentMutationContractTests {
         let upperIndex: Int
         switch runtime.mutationGateway.addLayer("Upper") {
         case let .success(index):
-            upperIndex = index
+            upperIndex = index.rawValue
         case let .failure(failure):
             Issue.record("Expected addLayer success, got \(String(describing: failure))")
             return
@@ -644,7 +644,7 @@ struct PaintDocumentMutationContractTests {
         ).anchorLayerIndex(0)
         switch runtime.createFolder(name, anchor!) {
         case let .success(folderID):
-            return folderID
+            return folderID.rawValue
         case let .failure(failure):
             Issue.record("Expected folder creation success, got \(String(describing: failure))")
             return nil

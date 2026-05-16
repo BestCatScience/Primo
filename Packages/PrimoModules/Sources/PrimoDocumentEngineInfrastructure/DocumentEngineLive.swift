@@ -24,9 +24,9 @@ package struct DocumentEngineLive: Sendable {
     package let textLayerGateway: TextLayerGateway
     package let editingGateway: DocumentEditingGateway
 
-    package let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
+    package let duplicateLayer: @Sendable (Int, String) -> DocumentCreatedLayerMutationResult
     package let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
-    package let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult
+    package let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentCreatedFolderMutationResult
     package let deleteFolder: @Sendable (Int) -> DocumentMutationResult
     package let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
     package let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
@@ -694,7 +694,7 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
     // current presentation revision, even when the app already preflighted.
     func addLayerAndSelect(name: String) -> DocumentLayerAddSelectionResult {
         runtime.addLayer(name: name)
-            .map { AddedAndSelectedLayer.addedAndSelected(index: $0) }
+            .map { AddedAndSelectedLayer.addedAndSelected($0) }
             .mapError(mapDocumentRuntimeFailure)
     }
 
@@ -704,7 +704,7 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
             .mapError(mapDocumentRuntimeFailure)
     }
 
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult {
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult {
         if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
         return runtime.duplicateLayer(index: index.rawValue, name: name)
             .mapError(mapDocumentRuntimeFailure)
@@ -723,7 +723,7 @@ private struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
             .mapError(mapDocumentRuntimeFailure)
     }
 
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult {
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult {
         if let failure = validateFreshLayerAnchorIndex(anchorLayerIndex) { return .failure(failure) }
         return runtime.createFolder(name: name, anchorLayerIndex: anchorLayerIndex)
             .mapError(mapDocumentRuntimeFailure)

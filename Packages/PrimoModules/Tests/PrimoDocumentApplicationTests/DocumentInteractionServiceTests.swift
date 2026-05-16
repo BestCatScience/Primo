@@ -207,7 +207,7 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
     DocumentMutationGateway(
         resizeCanvas: { _, _ in .success(()) },
         resizeCanvasExtent: { _, _ in .success(()) },
-        addLayer: { _ in .success(0) },
+        addLayer: { _ in .success(DocumentCreatedLayerIndex(0)) },
         deleteLayer: { _ in .success(()) },
         setActiveLayer: { index in
             recorder.record("setActiveLayer:\(index)")

@@ -3,7 +3,7 @@ import Foundation
 // DocumentEditorUseCase is the authoritative application contract for document
 // editing requests. App preflight may fail early for UX, but this boundary
 // always validates against a fresh mutation context before the gateway runs.
-public enum DocumentEditorRequest: Equatable, Sendable {
+package enum DocumentEditorRequest: Equatable, Sendable {
     case structure(LayerStructureCommand)
     case attribute(LayerAttributeCommand)
     case content(LayerContentMutationCommand)
@@ -17,12 +17,12 @@ public enum DocumentEditorResult: Equatable, Sendable {
 
 public protocol DocumentEditorGateway: LayerStructureGateway, LayerAttributeGateway, LayerContentGateway {}
 
-public struct DocumentEditorUseCase: Sendable {
+package struct DocumentEditorUseCase: Sendable {
     private let structureUseCase: LayerStructureUseCase
     private let attributeUseCase: LayerAttributeUseCase
     private let contentUseCase: LayerContentMutationUseCase
 
-    public init(
+    package init(
         structureUseCase: LayerStructureUseCase = .init(),
         attributeUseCase: LayerAttributeUseCase = .init(),
         contentUseCase: LayerContentMutationUseCase = .init()
@@ -32,7 +32,7 @@ public struct DocumentEditorUseCase: Sendable {
         self.contentUseCase = contentUseCase
     }
 
-    public func execute(
+    package func execute(
         _ request: DocumentEditorRequest,
         in context: DocumentLayerMutationContext,
         gateway: any DocumentEditorGateway

@@ -326,7 +326,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
-    func addLayer(name: String) -> DocumentIndexedMutationResult {
+    func addLayer(name: String) -> DocumentCreatedLayerMutationResult {
         let before = undoSnapshot()
         guard let geometry = store.snapshot.pixelGeometry,
               let layer = SwiftDocumentLayerRecord(
@@ -358,7 +358,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .addLayer(name: name))
-        return .success(index)
+        return .success(DocumentCreatedLayerIndex(index))
     }
 
     func setActiveLayer(index: Int) -> DocumentMutationResult {
@@ -997,7 +997,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         gpuServices.release(handle)
     }
 
-    func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
+    func duplicateLayer(index: Int, name: String) -> DocumentCreatedLayerMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard let geometry = store.snapshot.pixelGeometry else {
             return .failure(.bridgeMutationFailed("duplicateLayerInvalidStoreGeometry"))
@@ -1020,7 +1020,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
-        return .success(duplicatedIndex)
+        return .success(DocumentCreatedLayerIndex(duplicatedIndex))
     }
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
@@ -1058,11 +1058,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
-    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentIndexedMutationResult {
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentCreatedFolderMutationResult {
         createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)
     }
 
-    private func createFolder(name: String, anchorLayerIndex: Int?) -> DocumentIndexedMutationResult {
+    private func createFolder(name: String, anchorLayerIndex: Int?) -> DocumentCreatedFolderMutationResult {
         if let anchorLayerIndex, !store.snapshot.layers.indices.contains(anchorLayerIndex) {
             return .failure(.invalidLayerIndex(anchorLayerIndex))
         }
@@ -1091,7 +1091,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 anchorLayerIndex: anchorLayerIndex.map { .unchecked($0) }
             )
         )
-        return .success(id)
+        return .success(DocumentCreatedFolderID(id))
     }
 
     func deleteFolder(folderID: Int) -> DocumentMutationResult {
@@ -1815,7 +1815,7 @@ extension SwiftDocumentRuntime {
             _ = mergeLayerDown(index: index.rawValue)
         case let .createFolder(folderID, name, anchorLayerIndex):
             if let resolved = try? createFolder(name: name, anchorLayerIndex: anchorLayerIndex?.rawValue).get() {
-                folderIDMap[folderID] = resolved
+                folderIDMap[folderID] = resolved.rawValue
             }
         case let .deleteFolder(folderID):
             if let resolved = folderIDMap[folderID] { _ = deleteFolder(folderID: resolved) }

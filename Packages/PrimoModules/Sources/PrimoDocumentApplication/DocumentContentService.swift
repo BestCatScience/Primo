@@ -339,7 +339,7 @@ public struct DocumentContentService: Sendable {
         case let .newLayer(name):
             switch documentMutationGateway.addLayer(name) {
             case let .success(index):
-                return .success((index, true, originalActiveLayerIndex))
+                return .success((index.rawValue, true, originalActiveLayerIndex))
             case let .failure(failure):
                 return .failure(failure)
             }
