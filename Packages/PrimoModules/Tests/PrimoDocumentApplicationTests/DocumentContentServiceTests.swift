@@ -509,7 +509,7 @@ private func editableLayerIndex(
 ) -> EditableLayerIndex? {
     DocumentLayerMutationContext(
         revision: revision,
-        layerCount: layerCount,
+        layerIndexes: 0..<layerCount,
         folderIDs: [],
         isLayerLocked: { lockedLayerIndexes.contains($0) }
     )

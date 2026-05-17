@@ -539,7 +539,7 @@ private func editableLayerIndex(
 ) -> EditableLayerIndex? {
     DocumentLayerMutationContext(
         revision: revision,
-        layerCount: layerCount,
+        layerIndexes: 0..<layerCount,
         folderIDs: [],
         canvasGeometry: PixelGeometry(width: 1, height: 1),
         isLayerLocked: { lockedLayerIndexes.contains($0) }
@@ -554,7 +554,7 @@ private func existingLayerIndex(
 ) -> ExistingLayerIndex? {
     DocumentLayerMutationContext(
         revision: revision,
-        layerCount: layerCount,
+        layerIndexes: 0..<layerCount,
         folderIDs: [],
         canvasGeometry: PixelGeometry(width: 1, height: 1),
         isLayerLocked: { _ in false }
@@ -569,7 +569,7 @@ private func anchorLayerIndex(
 ) -> LayerAnchorIndex? {
     DocumentLayerMutationContext(
         revision: revision,
-        layerCount: layerCount,
+        layerIndexes: 0..<layerCount,
         folderIDs: [],
         canvasGeometry: PixelGeometry(width: 1, height: 1),
         isLayerLocked: { _ in false }

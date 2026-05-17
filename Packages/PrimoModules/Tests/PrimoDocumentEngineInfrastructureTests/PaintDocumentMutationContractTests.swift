@@ -203,7 +203,7 @@ struct PaintDocumentMutationContractTests {
     func createFolderRejectsStaleLayerAnchorIndex() throws {
         let runtime = DocumentEngineFactory.live()
         let anchor = try #require(DocumentLayerMutationContext(
-            layerCount: 1,
+            layerIndexes: 0..<1,
             folderIDs: [],
             isLayerLocked: { _ in false }
         ).anchorLayerIndex(0))
@@ -638,7 +638,7 @@ struct PaintDocumentMutationContractTests {
 
     private func createdFolderID(in runtime: DocumentEngineLive, name: String) -> Int? {
         let anchor = DocumentLayerMutationContext(
-            layerCount: 1,
+            layerIndexes: 0..<1,
             folderIDs: [],
             isLayerLocked: { _ in false }
         ).anchorLayerIndex(0)

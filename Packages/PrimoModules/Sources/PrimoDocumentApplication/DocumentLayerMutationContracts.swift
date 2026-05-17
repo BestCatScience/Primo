@@ -18,10 +18,6 @@ public struct DocumentLayerMutationContext: Sendable {
     public let canvasGeometry: PixelGeometry?
     public let isLayerLocked: @Sendable (Int) -> Bool
 
-    public var layerCount: Int {
-        layerIndexes.count
-    }
-
     public init(
         revision: DocumentRevision = .initial,
         layerIndexes: LayerIndexSet,
@@ -48,37 +44,6 @@ public struct DocumentLayerMutationContext: Sendable {
             layerIndexes: LayerIndexSet(layerIndexes),
             folderIDs: folderIDs,
             canvasGeometry: canvasGeometry,
-            isLayerLocked: isLayerLocked
-        )
-    }
-
-    public init(
-        revision: DocumentRevision = .initial,
-        layerCount: Int,
-        folderIDs: Set<Int>,
-        canvasGeometry: PixelGeometry? = nil,
-        isLayerLocked: @escaping @Sendable (Int) -> Bool
-    ) {
-        self.init(
-            revision: revision,
-            layerIndexes: .contiguous(count: layerCount),
-            folderIDs: folderIDs,
-            canvasGeometry: canvasGeometry,
-            isLayerLocked: isLayerLocked
-        )
-    }
-
-    public init(
-        revision: DocumentRevision = .initial,
-        layerCount: Int,
-        folderIDs: Set<Int>,
-        isLayerLocked: @escaping @Sendable (Int) -> Bool
-    ) {
-        self.init(
-            revision: revision,
-            layerCount: layerCount,
-            folderIDs: folderIDs,
-            canvasGeometry: nil,
             isLayerLocked: isLayerLocked
         )
     }

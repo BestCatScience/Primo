@@ -133,7 +133,7 @@ struct SelectionWorkflowServiceTests {
 
         let layerIndex = try #require(
             DocumentLayerMutationContext(
-                layerCount: 3,
+                layerIndexes: 0..<3,
                 folderIDs: [],
                 isLayerLocked: { _ in false }
             ).existingLayerIndex(2)

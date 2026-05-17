@@ -3114,7 +3114,8 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         let layerContext = try #require(Self.declarationBody(named: "DocumentLayerMutationContext", in: layerContracts))
         #expect(layerContext.contains("public let layerIndexes: LayerIndexSet"))
-        #expect(layerContext.contains("public var layerCount: Int"))
+        #expect(!layerContext.contains("layerCount: Int"))
+        #expect(!layerContext.contains("public var layerCount"))
         #expect(layerContext.contains("public func containsLayerIndex(_ rawValue: Int) -> Bool"))
         #expect(layerContext.contains("guard containsLayerIndex(rawValue) else"))
         #expect(layerContext.contains("layerIndexes: layerIndexes"))

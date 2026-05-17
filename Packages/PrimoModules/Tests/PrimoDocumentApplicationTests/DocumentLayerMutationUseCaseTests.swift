@@ -9,7 +9,7 @@ struct DocumentLayerMutationUseCaseTests {
     func mutationContextEmbedsRevisionInValidatedLayerIndexes() throws {
         let context = DocumentLayerMutationContext(
             revision: DocumentRevision(42),
-            layerCount: 3,
+            layerIndexes: 0..<3,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -27,7 +27,7 @@ struct DocumentLayerMutationUseCaseTests {
     func structureUseCaseBuildsDuplicatePlanAndIndexMutation() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 3,
+            layerIndexes: 0..<3,
             folderIDs: [4],
             isLayerLocked: { _ in false }
         )
@@ -49,7 +49,7 @@ struct DocumentLayerMutationUseCaseTests {
     func structureUseCasePropagatesAtomicAddLayerFailure() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 1,
+            layerIndexes: 0..<1,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -71,7 +71,7 @@ struct DocumentLayerMutationUseCaseTests {
     func structureUseCaseBuildsAddLayerPlanFromAtomicAddLayer() throws {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 1,
+            layerIndexes: 0..<1,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -95,7 +95,7 @@ struct DocumentLayerMutationUseCaseTests {
     func structureUseCasePropagatesDuplicateFailureWithoutSentinelIndex() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -116,7 +116,7 @@ struct DocumentLayerMutationUseCaseTests {
     func structureUseCasePropagatesCreateFolderFailureWithoutSentinelID() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -137,7 +137,7 @@ struct DocumentLayerMutationUseCaseTests {
     func attributeUseCaseRejectsInvalidOpacity() {
         let useCase = LayerAttributeUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -155,7 +155,7 @@ struct DocumentLayerMutationUseCaseTests {
     func attributeUseCaseProducesBlendModeLifecycleEvent() {
         let useCase = LayerAttributeUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -175,7 +175,7 @@ struct DocumentLayerMutationUseCaseTests {
     func attributeUseCasePropagatesSetterFailureWithoutLifecycleEvent() {
         let useCase = LayerAttributeUseCase()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )

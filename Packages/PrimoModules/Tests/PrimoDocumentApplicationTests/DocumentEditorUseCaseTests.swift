@@ -84,7 +84,7 @@ struct DocumentEditorUseCaseTests {
         let useCase = DocumentEditorUseCase()
         let gateway = DocumentEditorGatewaySpy()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -111,7 +111,7 @@ struct DocumentEditorUseCaseTests {
         let useCase = DocumentEditorUseCase()
         let gateway = DocumentEditorGatewaySpy()
         let context = DocumentLayerMutationContext(
-            layerCount: 3,
+            layerIndexes: 0..<3,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -133,7 +133,7 @@ struct DocumentEditorUseCaseTests {
         let useCase = DocumentEditorUseCase()
         let gateway = DocumentEditorGatewaySpy()
         let context = DocumentLayerMutationContext(
-            layerCount: 3,
+            layerIndexes: 0..<3,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -154,7 +154,7 @@ struct DocumentEditorUseCaseTests {
         let useCase = DocumentEditorUseCase()
         let gateway = DocumentEditorGatewaySpy()
         let context = DocumentLayerMutationContext(
-            layerCount: 2,
+            layerIndexes: 0..<2,
             folderIDs: [],
             isLayerLocked: { _ in false }
         )
@@ -174,7 +174,7 @@ struct DocumentEditorUseCaseTests {
         let useCase = DocumentEditorUseCase()
         let gateway = DocumentEditorGatewaySpy()
         let context = DocumentLayerMutationContext(
-            layerCount: 1,
+            layerIndexes: 0..<1,
             folderIDs: [],
             isLayerLocked: { $0 == 0 }
         )
