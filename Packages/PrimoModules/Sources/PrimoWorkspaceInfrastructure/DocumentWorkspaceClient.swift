@@ -428,7 +428,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         label: String
     ) throws -> DocumentWorkspacePreview {
         do {
-            return try previewGateway.loadProjectPreview(ProjectPackageURL(projectURL))
+            return try previewGateway.loadProjectPreview(ProjectPackageLocation(projectURL))
         } catch {
             throw DocumentWorkspaceCatalogError.projectLoadFailed(
                 "Could not load \(label) at \(projectURL.lastPathComponent): \(error.localizedDescription)"

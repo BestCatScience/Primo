@@ -1025,7 +1025,7 @@ public struct WorkspaceProjectLoadUseCase<LoadedProject>: Sendable where LoadedP
         request: WorkspaceProjectLoadRequest
     ) -> Result<WorkspaceProjectLoadResult<LoadedProject>, WorkspaceProjectLoadFailure> {
         do {
-            let loaded = try projectLoader.loadProject(ProjectPackageURL(operation.fileURL))
+            let loaded = try projectLoader.loadProject(ProjectPackageLocation(operation.fileURL))
             let issues = cleanupService.discardWorkspaceItemIfNeeded(operation.removeWorkspaceItemOnSuccess)
             return .success(.project(loaded, issues))
         } catch {
@@ -1052,7 +1052,7 @@ public struct WorkspaceProjectLoadUseCase<LoadedProject>: Sendable where LoadedP
             )
         case let .success(staged):
             do {
-                let loaded = try projectLoader.loadProject(ProjectPackageURL(staged.stagedProjectURL))
+                let loaded = try projectLoader.loadProject(ProjectPackageLocation(staged.stagedProjectURL))
                 let issues = cleanupService.discardImportedStaging(staged.stagedProjectURL)
                 return .success(.imported(loaded, staged.suggestedTitle, issues))
             } catch {

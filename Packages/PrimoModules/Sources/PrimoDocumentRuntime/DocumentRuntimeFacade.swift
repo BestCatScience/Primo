@@ -277,14 +277,14 @@ public struct DocumentTextLayerService: Sendable {
 
 public struct DocumentPersistenceClient: Sendable {
     private let saveProjectHandler: @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void
-    private let loadProjectHandler: @Sendable (ProjectPackageURL) throws -> LoadedPaintProject
+    private let loadProjectHandler: @Sendable (ProjectPackageLocation) throws -> LoadedPaintProject
     private let setPaperStyleHandler: @Sendable (CanvasPaperStyle) -> DocumentMutationResult
     private let newCanvasHandler: @Sendable (Int, Int) -> DocumentMutationResult
     private let prewarmDrawingResourcesHandler: @Sendable () -> DocumentMutationResult
 
     public init(
         saveProject: @escaping @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void,
-        loadProject: @escaping @Sendable (ProjectPackageURL) throws -> LoadedPaintProject,
+        loadProject: @escaping @Sendable (ProjectPackageLocation) throws -> LoadedPaintProject,
         setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
         newCanvas: @escaping @Sendable (ValidCanvasSize) -> DocumentMutationResult,
         prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
@@ -303,7 +303,7 @@ public struct DocumentPersistenceClient: Sendable {
 
     package init(
         saveProject: @escaping @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void,
-        loadProject: @escaping @Sendable (ProjectPackageURL) throws -> LoadedPaintProject,
+        loadProject: @escaping @Sendable (ProjectPackageLocation) throws -> LoadedPaintProject,
         setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
         rawNewCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
         prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult
@@ -319,7 +319,7 @@ public struct DocumentPersistenceClient: Sendable {
         try saveProjectHandler(location, paperStyle)
     }
 
-    public func loadProject(_ packageURL: ProjectPackageURL) throws -> LoadedPaintProject {
+    public func loadProject(_ packageURL: ProjectPackageLocation) throws -> LoadedPaintProject {
         try loadProjectHandler(packageURL)
     }
 
@@ -1398,7 +1398,7 @@ public struct DocumentPersistenceRuntime: Sendable {
     }
 
     public func saveProject(_ location: WritableProjectLocation, _ paperStyle: CanvasPaperStyle) throws { try persistenceClient.saveProject(location, paperStyle) }
-    public func loadProject(_ packageURL: ProjectPackageURL) throws -> LoadedPaintProject { try persistenceClient.loadProject(packageURL) }
+    public func loadProject(_ packageURL: ProjectPackageLocation) throws -> LoadedPaintProject { try persistenceClient.loadProject(packageURL) }
     public func setPaperStyle(_ paperStyle: CanvasPaperStyle) -> DocumentMutationResult { persistenceClient.setPaperStyle(paperStyle) }
     public func newCanvas(_ size: ValidCanvasSize) -> DocumentMutationResult { persistenceClient.newCanvas(size) }
     package func newCanvas(_ width: Int, _ height: Int) -> DocumentMutationResult { persistenceClient.newCanvas(width, height) }

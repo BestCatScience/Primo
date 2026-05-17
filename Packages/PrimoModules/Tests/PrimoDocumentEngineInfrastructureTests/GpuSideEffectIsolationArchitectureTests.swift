@@ -3751,20 +3751,32 @@ struct GpuSideEffectIsolationArchitectureTests {
             encoding: .utf8
         )
 
-        for typeName in ["ProjectPackageURL", "WritableProjectLocation", "SecurityScopedResourceLease"] {
+        for typeName in ["ProjectPackageLocation", "WritableProjectLocation", "SecurityScopedResourceLease"] {
             #expect(domain.contains("public struct \(typeName):"))
         }
 
         let checkedContracts = workspaceContracts + "\n" + persistenceContracts + "\n" + workspaceRuntimeContracts
         #expect(checkedContracts.contains("WritableProjectLocation, CanvasPaperStyle"))
-        #expect(checkedContracts.contains("ProjectPackageURL) throws"))
+        #expect(checkedContracts.contains("ProjectPackageLocation) throws"))
         #expect(checkedContracts.contains("SecurityScopedResourceLease"))
+        #expect(!domain.contains("ProjectPackageURL"))
+        #expect(!checkedContracts.contains("ProjectPackageURL"))
         #expect(!checkedContracts.contains("(URL, CanvasPaperStyle)"))
         #expect(!checkedContracts.contains("(URL) throws -> LoadedPaintProject"))
         #expect(!checkedContracts.contains("(URL) throws -> DocumentWorkspacePreview"))
 
         #expect(!runtimeFacade.contains("public func saveProject(_ url: URL"))
         #expect(!runtimeFacade.contains("public func loadProject(_ url: URL"))
+    }
+
+    @Test
+    func appUIKitPresentationRepresentablesDeclareMainActorAffinity() throws {
+        let source = try Self.sourceBody("App/Application/ContentView+Support.swift")
+
+        #expect(source.contains("@MainActor\nstruct SurfacePreviewView: UIViewRepresentable"))
+        #expect(source.contains("@MainActor\nstruct ShareSheet: UIViewControllerRepresentable"))
+        #expect(source.contains("@MainActor\nstruct StudioPlainTextView: UIViewRepresentable"))
+        #expect(source.contains("@MainActor\n    final class Coordinator: NSObject, UITextViewDelegate"))
     }
 
     @Test

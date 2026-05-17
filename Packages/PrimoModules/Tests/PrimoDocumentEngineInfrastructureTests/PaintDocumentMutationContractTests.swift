@@ -122,7 +122,7 @@ struct PaintDocumentMutationContractTests {
         try runtime.persistenceGateway.saveProject(WritableProjectLocation(projectURL), .default)
 
         let loaded = DocumentEngineFactory.live()
-        _ = try loaded.persistenceGateway.loadProject(ProjectPackageURL(projectURL))
+        _ = try loaded.persistenceGateway.loadProject(ProjectPackageLocation(projectURL))
 
         #expect(try loaded.queryGateway.lightweightPresentation().get().layerRows.first?.name == "Ink")
         #expect(folder(in: loaded, id: folderID)?.name == "References")

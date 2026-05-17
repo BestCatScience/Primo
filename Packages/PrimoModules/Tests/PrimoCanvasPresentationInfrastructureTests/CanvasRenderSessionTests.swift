@@ -172,6 +172,10 @@ struct CanvasRenderSessionTests {
             contentsOf: canvasSelectionOverlayViewSourceURL(),
             encoding: .utf8
         )
+        let metalCanvasSource = try String(
+            contentsOf: primoMetalCanvasViewSourceURL(),
+            encoding: .utf8
+        )
 
         #expect(containerSource.contains("@MainActor\npublic final class CanvasPresentationContainerView"))
         #expect(surfaceSource.contains("@MainActor\npublic final class CanvasRenderSurfaceView"))
@@ -179,6 +183,7 @@ struct CanvasRenderSessionTests {
         #expect(loupeSource.contains("@MainActor\nfinal class CanvasEyedropperLoupeView"))
         #expect(navigationSource.contains("@MainActor\nfinal class CanvasNavigationGestureAdapter"))
         #expect(selectionSource.contains("@MainActor\nfinal class CanvasSelectionOverlayView"))
+        #expect(metalCanvasSource.contains("@MainActor\npublic final class PrimoMetalCanvasView"))
     }
 
     @Test

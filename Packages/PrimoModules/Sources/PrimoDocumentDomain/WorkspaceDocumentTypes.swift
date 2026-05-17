@@ -97,7 +97,7 @@ public struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
     public var path: String { fileURL.path }
 }
 
-public struct ProjectPackageURL: Hashable, Codable, Sendable, Identifiable {
+public struct ProjectPackageLocation: Hashable, Codable, Sendable, Identifiable {
     public let fileURL: URL
 
     public init(_ fileURL: URL) {

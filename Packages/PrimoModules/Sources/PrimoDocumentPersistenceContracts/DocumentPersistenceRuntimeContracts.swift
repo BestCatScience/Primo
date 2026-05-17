@@ -122,14 +122,14 @@ public enum TimelapseCaptureOutcome: Equatable, Sendable {
 
 public struct DocumentPersistenceGateway: Sendable {
     public let saveProject: @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void
-    public let loadProject: @Sendable (ProjectPackageURL) throws -> LoadedPaintProject
+    public let loadProject: @Sendable (ProjectPackageLocation) throws -> LoadedPaintProject
     public let setPaperStyle: @Sendable (CanvasPaperStyle) -> DocumentMutationResult
     public let newCanvas: @Sendable (Int, Int) -> DocumentMutationResult
     public let prewarmDrawingResources: @Sendable () -> DocumentMutationResult
 
     public init(
         saveProject: @escaping @Sendable (WritableProjectLocation, CanvasPaperStyle) throws -> Void,
-        loadProject: @escaping @Sendable (ProjectPackageURL) throws -> LoadedPaintProject,
+        loadProject: @escaping @Sendable (ProjectPackageLocation) throws -> LoadedPaintProject,
         setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> DocumentMutationResult,
         newCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
         prewarmDrawingResources: @escaping @Sendable () -> DocumentMutationResult

@@ -112,10 +112,10 @@ public struct DocumentImportGateway: Sendable {
 }
 
 public struct ProjectLoadingGateway<LoadedProject>: Sendable {
-    public let loadProject: @Sendable (ProjectPackageURL) throws -> LoadedProject
+    public let loadProject: @Sendable (ProjectPackageLocation) throws -> LoadedProject
 
     public init(
-        loadProject: @escaping @Sendable (ProjectPackageURL) throws -> LoadedProject
+        loadProject: @escaping @Sendable (ProjectPackageLocation) throws -> LoadedProject
     ) {
         self.loadProject = loadProject
     }

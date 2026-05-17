@@ -198,6 +198,7 @@ extension View {
     }
 }
 
+@MainActor
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
@@ -208,6 +209,7 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+@MainActor
 struct StudioPlainTextView: UIViewRepresentable {
     @Binding var text: String
     let textColor: UIColor
@@ -246,6 +248,7 @@ struct StudioPlainTextView: UIViewRepresentable {
         Coordinator(text: $text)
     }
 
+    @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         @Binding var text: String
 
