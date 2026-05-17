@@ -729,25 +729,53 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
     }
 }
 
+public struct GpuLayerMutationPayloadLease: Equatable, Sendable {
+    public let gpuBufferHandle: MetalBufferHandle
+
+    public init(gpuBufferHandle: MetalBufferHandle) {
+        self.gpuBufferHandle = gpuBufferHandle
+    }
+}
+
 public struct GpuLayerMutationPayload: Equatable, Sendable {
     public let canvasWidth: Int
     public let canvasHeight: Int
     public let dirtyRect: LayerPixelRect
-    public let gpuBufferHandle: MetalBufferHandle
+    public let gpuBufferLease: GpuLayerMutationPayloadLease
     public let fallbackPixelData: Data?
+
+    public var gpuBufferHandle: MetalBufferHandle {
+        gpuBufferLease.gpuBufferHandle
+    }
 
     init(
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,
-        gpuBufferHandle: MetalBufferHandle,
+        gpuBufferLease: GpuLayerMutationPayloadLease,
         fallbackPixelData: Data? = nil
     ) {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.dirtyRect = dirtyRect
-        self.gpuBufferHandle = gpuBufferHandle
+        self.gpuBufferLease = gpuBufferLease
         self.fallbackPixelData = fallbackPixelData
+    }
+
+    package static func unsafeUnchecked(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferLease: GpuLayerMutationPayloadLease,
+        fallbackPixelData: Data? = nil
+    ) -> Self {
+        Self(
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            dirtyRect: dirtyRect,
+            gpuBufferLease: gpuBufferLease,
+            fallbackPixelData: fallbackPixelData
+        )
     }
 
     package static func unsafeUnchecked(
@@ -761,9 +789,31 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: dirtyRect,
-            gpuBufferHandle: gpuBufferHandle,
+            gpuBufferLease: GpuLayerMutationPayloadLease(gpuBufferHandle: gpuBufferHandle),
             fallbackPixelData: fallbackPixelData
         )
+    }
+
+    public init?(
+        validatingCanvasWidth canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferLease: GpuLayerMutationPayloadLease,
+        fallbackPixelData: Data? = nil
+    ) {
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth,
+              dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard gpuBufferLease.gpuBufferHandle.isCompatible(with: canvasGeometry) else { return nil }
+        if let fallbackPixelData {
+            guard fallbackPixelData.count == canvasGeometry.rgbaByteCount else { return nil }
+        }
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.dirtyRect = dirtyRect
+        self.gpuBufferLease = gpuBufferLease
+        self.fallbackPixelData = fallbackPixelData
     }
 
     public init?(
@@ -773,19 +823,13 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
         gpuBufferHandle: MetalBufferHandle,
         fallbackPixelData: Data? = nil
     ) {
-        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
-        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
-        guard dirtyRect.originX + dirtyRect.width <= canvasWidth,
-              dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
-        guard gpuBufferHandle.isCompatible(with: canvasGeometry) else { return nil }
-        if let fallbackPixelData {
-            guard fallbackPixelData.count == canvasGeometry.rgbaByteCount else { return nil }
-        }
-        self.canvasWidth = canvasWidth
-        self.canvasHeight = canvasHeight
-        self.dirtyRect = dirtyRect
-        self.gpuBufferHandle = gpuBufferHandle
-        self.fallbackPixelData = fallbackPixelData
+        self.init(
+            validatingCanvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            dirtyRect: dirtyRect,
+            gpuBufferLease: GpuLayerMutationPayloadLease(gpuBufferHandle: gpuBufferHandle),
+            fallbackPixelData: fallbackPixelData
+        )
     }
 }
 

@@ -11,6 +11,11 @@ final class GpuMutationPayloadLease: @unchecked Sendable {
         self.releaseHandle = services.release
     }
 
+    init(payloadLease: GpuLayerMutationPayloadLease, services: DocumentRuntimeGpuServices) {
+        self.handle = payloadLease.gpuBufferHandle
+        self.releaseHandle = services.release
+    }
+
     deinit {
         releaseRemainingHandle()
     }

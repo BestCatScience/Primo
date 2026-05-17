@@ -117,7 +117,7 @@ extension DocumentFeature {
                     validatingCanvasWidth: mutation.surface.width,
                     canvasHeight: mutation.surface.height,
                     dirtyRect: mutation.dirtyRegion.layerPixelRect,
-                    gpuBufferHandle: mutation.surface.handle.buffer,
+                    gpuBufferLease: GpuLayerMutationPayloadLease(gpuBufferHandle: mutation.surface.handle.buffer),
                     fallbackPixelData: mutation.surface.pixelData
                 ) else {
                     return .failed(.inconsistentComposition(operation: "GPU stroke commit", reason: "invalid payload"))

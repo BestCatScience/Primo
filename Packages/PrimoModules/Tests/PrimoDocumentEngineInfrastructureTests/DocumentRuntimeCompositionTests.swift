@@ -577,6 +577,33 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func lockedRuntimeExecutorReentrantFailureReturnsBeforeOuterBoundaryReleases() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
+        var innerResult: DocumentMutationResult?
+        var outerStillExecuting = false
+
+        let outerResult = executor.performMutation(operation: "outer") { runtime in
+            innerResult = executor.performMutation(operation: "inner") { innerRuntime in
+                innerRuntime.value = 99
+            }
+            outerStillExecuting = true
+            runtime.value = 2
+        }
+
+        guard case .success = outerResult else {
+            Issue.record("Expected outer mutation to succeed")
+            return
+        }
+        if case let .failure(failure) = innerResult {
+            #expect(failure == .rawAPIUnavailable(operation: "Reentrant document runtime access: inner"))
+        } else {
+            Issue.record("Expected reentrant inner mutation to fail")
+        }
+        #expect(outerStillExecuting)
+        #expect(executor.performValue(operation: "read") { $0.value } == .success(2))
+    }
+
+    @Test
     func lockedRuntimeExecutorPerformResultRejectsReentrantAccessFromPerform() {
         let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeCounter())
         var innerResult: DocumentMutationResult?
@@ -738,6 +765,46 @@ struct DocumentRuntimeCompositionTests {
             #expect(snapshot.activeMutations == 0)
         } else {
             Issue.record("Expected serialized mutation snapshot")
+        }
+    }
+
+    @Test
+    func lockedRuntimeExecutorSerializesMixedConcurrentReadsAndMutations() {
+        let executor = LockedDocumentRuntimeExecutor(runtime: RuntimeConcurrencyProbe())
+        let failures = LockedValues<DocumentMutationFailure>()
+        let snapshots = LockedValues<(Int, Int)>()
+
+        DispatchQueue.concurrentPerform(iterations: 80) { iteration in
+            if iteration.isMultiple(of: 3) {
+                let result = executor.performValue(operation: "mixedRead") { runtime in
+                    (runtime.mutationCount, runtime.activeMutations)
+                }
+                switch result {
+                case let .success(snapshot):
+                    snapshots.append(snapshot)
+                case let .failure(failure):
+                    failures.append(failure)
+                }
+            } else {
+                let result = executor.performMutation(operation: "mixedMutation") { runtime in
+                    runtime.enterMutationCriticalSection()
+                }
+                if case let .failure(failure) = result {
+                    failures.append(failure)
+                }
+            }
+        }
+
+        #expect(failures.values.isEmpty)
+        #expect(snapshots.values.allSatisfy { $0.1 == 0 })
+        let finalSnapshot = executor.performValue(operation: "read") { runtime in
+            (runtime.mutationCount, runtime.maximumActiveMutations)
+        }
+        if case let .success(snapshot) = finalSnapshot {
+            #expect(snapshot.0 == 53)
+            #expect(snapshot.1 == 1)
+        } else {
+            Issue.record("Expected final executor snapshot")
         }
     }
 
@@ -1031,6 +1098,54 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func gpuLayerMutationPayloadStoresGpuOwnershipAsLease() throws {
+        let handle = try #require(MetalBufferHandle(validatingWidth: 2, height: 2, bytesPerRow: 8))
+        let lease = GpuLayerMutationPayloadLease(gpuBufferHandle: handle)
+        let payload = try #require(GpuLayerMutationPayload(
+            validatingCanvasWidth: 2,
+            canvasHeight: 2,
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
+            gpuBufferLease: lease,
+            fallbackPixelData: Data(repeating: 0, count: 16)
+        ))
+
+        #expect(payload.gpuBufferLease == lease)
+        #expect(payload.gpuBufferHandle == handle)
+    }
+
+    @Test
+    func gpuMutationPayloadLeaseReleasesPublicPayloadLeaseOnDeinit() {
+        let releasedHandles = LockedValues<MetalBufferHandle?>()
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+
+        do {
+            _ = GpuMutationPayloadLease(
+                payloadLease: GpuLayerMutationPayloadLease(gpuBufferHandle: handle),
+                services: gpuPayloadLeaseTestServices(releasedHandles: releasedHandles)
+            )
+        }
+
+        #expect(releasedHandles.values == [handle])
+    }
+
+    @Test
+    func gpuMutationPayloadLeaseSuppressesReleaseAfterTransferredOwnership() {
+        let releasedHandles = LockedValues<MetalBufferHandle?>()
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+
+        do {
+            let lease = GpuMutationPayloadLease(
+                payloadLease: GpuLayerMutationPayloadLease(gpuBufferHandle: handle),
+                services: gpuPayloadLeaseTestServices(releasedHandles: releasedHandles)
+            )
+            #expect(lease.borrowedHandle == handle)
+            #expect(lease.adoptHandle() == handle)
+        }
+
+        #expect(releasedHandles.values.isEmpty)
+    }
+
+    @Test
     func liveGatewayKeepsGpuWorkBetweenRuntimeLockSections() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -1063,6 +1178,7 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("let mutationResult = DocumentEngineGpuPayloadApplier.apply(\n                operation: \"applyBlurPlan\""))
         #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
         #expect(body.contains("let payloadLease = GpuMutationPayloadLease(handle: handle, services: gpuServices)"))
+        #expect(body.contains("let payloadLease = GpuMutationPayloadLease(payloadLease: payloadLease, services: gpuServices)"))
         #expect(body.contains("payloadLease.withTransferredOwnership"))
         #expect(!body.contains("didTransferPayloadOwnershipToRuntime"))
     }
@@ -1167,6 +1283,32 @@ private final class LockedValues<Value>: @unchecked Sendable {
         storage.append(value)
         lock.unlock()
     }
+}
+
+private func gpuPayloadLeaseTestServices(
+    releasedHandles: LockedValues<MetalBufferHandle?>
+) -> DocumentRuntimeGpuServices {
+    DocumentRuntimeGpuServices(
+        release: { releasedHandles.append($0) },
+        retain: { _ in true },
+        _materializedPixelData: { _ in nil },
+        _scaledPixelData: { _, _, _, _, _ in nil },
+        _scaledMaskData: { _, _, _, _, _ in nil },
+        _translatedPixelData: { _, _, _, _, _, _, _ in nil },
+        _translatedMaskData: { _, _, _, _, _, _, _ in nil },
+        _applyLayerMask: { _, _, _, _ in nil },
+        _processLayer: { _, _, _, _ in nil },
+        _mergeLayers: { _, _, _, _, _, _, _ in nil },
+        _rasterizeTextLayer: { _, _ in nil },
+        _blurPixels: { _, _, _, _, _, _ in nil },
+        _fillPixels: { _, _, _, _, _, _ in nil },
+        _commitStrokeMutation: { _, _, _, _, _, _, _, _ in nil },
+        _preservingExistingAlphaBufferHandle: { _, _, _, _, _ in nil },
+        _compositedPaperPreviewRGBA: { _, _, _, _ in nil },
+        _compositedIncrementalUpdate: { _, _ in nil },
+        _compositeDocumentSurface: { _ in nil },
+        _compositeDocumentBufferHandle: { _ in nil }
+    )
 }
 
 private func waitUntil(

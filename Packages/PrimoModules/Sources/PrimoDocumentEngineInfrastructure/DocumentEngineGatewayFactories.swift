@@ -795,4 +795,19 @@ enum DocumentEngineGpuPayloadApplier {
             }
         }
     }
+
+    static func apply(
+        operation: String,
+        gpuServices: DocumentRuntimeGpuServices,
+        payloadLease: GpuLayerMutationPayloadLease,
+        runtimeExecutor: LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>,
+        _ body: (SwiftDocumentRuntime) -> DocumentMutationResult
+    ) -> DocumentMutationResult {
+        let payloadLease = GpuMutationPayloadLease(payloadLease: payloadLease, services: gpuServices)
+        return runtimeExecutor.performResult(operation: operation) { runtime in
+            payloadLease.withTransferredOwnership {
+                body(runtime)
+            }
+        }
+    }
 }

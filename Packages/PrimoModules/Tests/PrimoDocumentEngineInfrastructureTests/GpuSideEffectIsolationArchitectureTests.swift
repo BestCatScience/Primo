@@ -3443,6 +3443,25 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func gpuLayerMutationPayloadRepresentsOwnershipWithLease() throws {
+        let presentationModels = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift"
+        )
+        let payloadLease = try #require(Self.typeBody(named: "GpuLayerMutationPayloadLease", in: presentationModels))
+        let payload = try #require(Self.typeBody(named: "GpuLayerMutationPayload", in: presentationModels))
+
+        #expect(payloadLease.contains("public let gpuBufferHandle: MetalBufferHandle"))
+        #expect(payload.contains("public let gpuBufferLease: GpuLayerMutationPayloadLease"))
+        #expect(payload.contains("public var gpuBufferHandle: MetalBufferHandle"))
+        #expect(!payload.contains("public let gpuBufferHandle: MetalBufferHandle"))
+
+        let runtimeLease = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/GpuMutationPayloadLease.swift"
+        )
+        #expect(runtimeLease.contains("init(payloadLease: GpuLayerMutationPayloadLease, services: DocumentRuntimeGpuServices)"))
+    }
+
+    @Test
     func primoMetalDocumentProcessingClientSerializesMutableCaches() throws {
         let body = try Self.sourceBody(
             "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift"

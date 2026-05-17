@@ -475,7 +475,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func applyLayerSurfaceMutation(index: Int, payload: GpuLayerMutationPayload) -> DocumentMutationResult {
-        let payloadLease = GpuMutationPayloadLease(handle: payload.gpuBufferHandle, services: gpuServices)
+        let payloadLease = GpuMutationPayloadLease(payloadLease: payload.gpuBufferLease, services: gpuServices)
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.gpu(.invalidPayloadSize(
@@ -488,7 +488,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             validatingCanvasWidth: payload.canvasWidth,
             canvasHeight: payload.canvasHeight,
             dirtyRect: payload.dirtyRect,
-            gpuBufferHandle: payload.gpuBufferHandle,
+            gpuBufferLease: payload.gpuBufferLease,
             fallbackPixelData: payload.fallbackPixelData
         ) != nil else {
             return .failure(.gpu(.invalidPayloadSize(
