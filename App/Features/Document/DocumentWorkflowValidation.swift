@@ -9,10 +9,12 @@ import PrimoDocumentPresentationContracts
 // DocumentEditingState. The UI snapshot can be stale, so this capability is
 // not the final contract; application and runtime validation must re-check it.
 struct LayerEditAuthorization: Equatable, Sendable {
+    let command: DocumentMutationCommand
     let existingLayerIndex: ExistingLayerIndex
     let editableLayerIndex: EditableLayerIndex
 
     init?(
+        command: DocumentMutationCommand,
         existingLayerIndex: ExistingLayerIndex,
         editableLayerIndex: EditableLayerIndex
     ) {
@@ -21,43 +23,26 @@ struct LayerEditAuthorization: Equatable, Sendable {
         else {
             return nil
         }
+        self.command = command
         self.existingLayerIndex = existingLayerIndex
         self.editableLayerIndex = editableLayerIndex
     }
 }
 
-struct ValidatedDocumentLayerMutationCommand: Equatable, Sendable {
-    let command: DocumentMutationCommand
-    let layer: LayerEditAuthorization
-
-    init(command: DocumentMutationCommand, layer: LayerEditAuthorization) {
-        self.command = command
-        self.layer = layer
-    }
-
-    var existingLayerIndex: ExistingLayerIndex {
-        layer.existingLayerIndex
-    }
-
-    var editableLayerIndex: EditableLayerIndex {
-        layer.editableLayerIndex
-    }
-}
-
 struct ValidatedLayerContentReplacementCommand: Equatable, Sendable {
-    let layer: ValidatedDocumentLayerMutationCommand
+    let layer: LayerEditAuthorization
     let pixelData: LayerPixelData
 }
 
 struct ValidatedBlurStrokeMutationCommand: Equatable, Sendable {
-    let layer: ValidatedDocumentLayerMutationCommand
+    let layer: LayerEditAuthorization
     let samples: [StylusSample]
     let brush: BrushRuntimeSettings
     let clearSelectionAfterBlur: Bool
 }
 
 struct ValidatedFillMutationCommand: Equatable, Sendable {
-    let layer: ValidatedDocumentLayerMutationCommand
+    let layer: LayerEditAuthorization
     let sample: StylusSample
     let brush: BrushRuntimeSettings
 }
@@ -68,7 +53,7 @@ struct DocumentWorkflowCommandValidator: Sendable {
     func editableLayerCommand(
         index: Int,
         in state: DocumentEditingState
-    ) -> Result<ValidatedDocumentLayerMutationCommand, DocumentMutationFailure> {
+    ) -> Result<LayerEditAuthorization, DocumentMutationFailure> {
         let command = DocumentMutationCommand.layer(index: index, requiresUnlocked: true)
         let validationContext = validationContext(for: state)
         if let issue = validator.validate(command, in: validationContext) {
@@ -82,17 +67,13 @@ struct DocumentWorkflowCommandValidator: Sendable {
             return .failure(.invalidLayerIndex(index))
         }
         guard let authorization = LayerEditAuthorization(
+            command: command,
             existingLayerIndex: existingLayerIndex,
             editableLayerIndex: editableLayerIndex
         ) else {
             return .failure(.invalidLayerIndex(index))
         }
-        return .success(
-            ValidatedDocumentLayerMutationCommand(
-                command: command,
-                layer: authorization
-            )
-        )
+        return .success(authorization)
     }
 
     func existingLayerIndex(

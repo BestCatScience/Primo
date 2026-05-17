@@ -35,15 +35,15 @@ struct DocumentSelectionProcessingAdapter: SelectionProcessingPort {
 }
 
 extension LayerStructureEditingRuntime {
-    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func revealLayerForEditing(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         revealLayerForEditing(command.existingLayerIndex)
     }
 
-    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func ensureLayerVisible(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         ensureLayerVisible(command.existingLayerIndex)
     }
 
-    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+    func applyLayerSurfaceMutation(_ command: LayerEditAuthorization, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
         applyLayerSurfaceMutation(command.editableLayerIndex, payload)
     }
 }
@@ -79,15 +79,15 @@ extension LayerSelectionEditingRuntime:
 struct DocumentLayerCommandMutationSubmitter: LayerMutationSubmitting, LayerVisibilityPort {
     let service: DocumentLayerCommandService
 
-    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func revealLayerForEditing(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         service.revealLayerForEditing(command.existingLayerIndex.rawValue)
     }
 
-    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func ensureLayerVisible(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         service.ensureLayerVisible(command.existingLayerIndex.rawValue)
     }
 
-    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+    func applyLayerSurfaceMutation(_ command: LayerEditAuthorization, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
         service.applyLayerSurfaceMutation(command.editableLayerIndex.rawValue, payload)
     }
 }
@@ -155,15 +155,15 @@ extension LayerWorkflowEnvironment {
 }
 
 extension DocumentLayerVisibilityAdapter {
-    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func revealLayerForEditing(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         runtime.revealLayerForEditing(command)
     }
 
-    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult {
+    func ensureLayerVisible(_ command: LayerEditAuthorization) -> DocumentMutationResult {
         runtime.ensureLayerVisible(command)
     }
 
-    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+    func applyLayerSurfaceMutation(_ command: LayerEditAuthorization, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult {
         runtime.applyLayerSurfaceMutation(command, payload)
     }
 }

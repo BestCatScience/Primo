@@ -85,7 +85,7 @@ extension DocumentFeature {
                 brush: context.brush,
                 previewBrush: context.previewBrush
             )
-            let layerCommand: ValidatedDocumentLayerMutationCommand
+            let layerCommand: LayerEditAuthorization
             switch DocumentWorkflowCommandValidator().editableLayerCommand(index: context.activeLayerIndex, in: state) {
             case let .success(command):
                 layerCommand = command

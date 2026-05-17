@@ -56,15 +56,15 @@ protocol LayerMutationWorkflowSubmitting: Sendable {
 }
 
 protocol LayerMutationSubmitting: Sendable {
-    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+    func revealLayerForEditing(_ command: LayerEditAuthorization) -> DocumentMutationResult
+    func ensureLayerVisible(_ command: LayerEditAuthorization) -> DocumentMutationResult
+    func applyLayerSurfaceMutation(_ command: LayerEditAuthorization, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
 }
 
 protocol LayerVisibilityPort: Sendable {
-    func revealLayerForEditing(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func ensureLayerVisible(_ command: ValidatedDocumentLayerMutationCommand) -> DocumentMutationResult
-    func applyLayerSurfaceMutation(_ command: ValidatedDocumentLayerMutationCommand, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+    func revealLayerForEditing(_ command: LayerEditAuthorization) -> DocumentMutationResult
+    func ensureLayerVisible(_ command: LayerEditAuthorization) -> DocumentMutationResult
+    func applyLayerSurfaceMutation(_ command: LayerEditAuthorization, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
 }
 
 protocol LayerContentWorkflowSubmitting: Sendable {
