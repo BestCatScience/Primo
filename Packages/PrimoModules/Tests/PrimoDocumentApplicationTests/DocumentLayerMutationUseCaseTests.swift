@@ -54,7 +54,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayRecorder(
-            addLayerResult: .failure(.bridgeMutationFailed("addLayer"))
+            addLayerResult: .failure(.bridgeMutationFailed(.init(operation: "addLayer")))
         )
 
         let result = useCase.execute(
@@ -63,7 +63,7 @@ struct DocumentLayerMutationUseCaseTests {
             gateway: gateway
         )
 
-        #expect(result == .failure(.bridgeMutationFailed("addLayer")))
+        #expect(result == .failure(.bridgeMutationFailed(.init(operation: "addLayer"))))
         #expect(gateway.addedLayerNames == ["Ink"])
     }
 
@@ -100,7 +100,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayStub(
-            duplicateLayerResult: .failure(.bridgeMutationFailed("duplicateLayer"))
+            duplicateLayerResult: .failure(.bridgeMutationFailed(.init(operation: "duplicateLayer")))
         )
 
         let result = useCase.execute(
@@ -109,7 +109,7 @@ struct DocumentLayerMutationUseCaseTests {
             gateway: gateway
         )
 
-        #expect(result == .failure(.bridgeMutationFailed("duplicateLayer")))
+        #expect(result == .failure(.bridgeMutationFailed(.init(operation: "duplicateLayer"))))
     }
 
     @Test
@@ -121,7 +121,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = StructureGatewayStub(
-            createFolderResult: .failure(.bridgeMutationFailed("createFolder"))
+            createFolderResult: .failure(.bridgeMutationFailed(.init(operation: "createFolder")))
         )
 
         let result = useCase.execute(
@@ -130,7 +130,7 @@ struct DocumentLayerMutationUseCaseTests {
             gateway: gateway
         )
 
-        #expect(result == .failure(.bridgeMutationFailed("createFolder")))
+        #expect(result == .failure(.bridgeMutationFailed(.init(operation: "createFolder"))))
     }
 
     @Test
@@ -180,7 +180,7 @@ struct DocumentLayerMutationUseCaseTests {
             isLayerLocked: { _ in false }
         )
         let gateway = AttributeGatewayStub(
-            setLayerVisibleResult: .failure(.bridgeMutationFailed("setLayerVisible"))
+            setLayerVisibleResult: .failure(.bridgeMutationFailed(.init(operation: "setLayerVisible")))
         )
 
         let result = useCase.execute(
@@ -189,7 +189,7 @@ struct DocumentLayerMutationUseCaseTests {
             gateway: gateway
         )
 
-        #expect(result == .failure(.bridgeMutationFailed("setLayerVisible")))
+        #expect(result == .failure(.bridgeMutationFailed(.init(operation: "setLayerVisible"))))
     }
 }
 

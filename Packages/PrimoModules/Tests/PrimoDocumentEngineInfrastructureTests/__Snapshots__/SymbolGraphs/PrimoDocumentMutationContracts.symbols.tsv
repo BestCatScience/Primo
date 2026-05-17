@@ -10,7 +10,7 @@ swift.enum.case	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO16invalidDirty
 swift.enum.case	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO18invalidPayloadSizeyACSS_S2itcACmF	DocumentGpuMutationFailure.invalidPayloadSize(operation:expected:actual:)	DocumentGpuMutationFailure.invalidPayloadSize(operation:expected:actual:)	case invalidPayloadSize(operation: String, expected: Int, actual: Int)
 swift.enum.case	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO21resourceHandleInvalidyA2CmF	DocumentGpuMutationFailure.resourceHandleInvalid	DocumentGpuMutationFailure.resourceHandleInvalid	case resourceHandleInvalid
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO011transactionF0yA2C_ACtcACmF	DocumentMutationCoreFailure.transactionFailure(primary:rollback:)	DocumentMutationCoreFailure.transactionFailure(primary:rollback:)	indirect case transactionFailure(primary: DocumentMutationCoreFailure, rollback: DocumentMutationCoreFailure)
-swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO06bridgeC6FailedyACSScACmF	DocumentMutationCoreFailure.bridgeMutationFailed(_:)	DocumentMutationCoreFailure.bridgeMutationFailed(_:)	case bridgeMutationFailed(String)
+swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO06bridgeC6FailedyAcA0b6BridgecF0VcACmF	DocumentMutationCoreFailure.bridgeMutationFailed(_:)	DocumentMutationCoreFailure.bridgeMutationFailed(_:)	case bridgeMutationFailed(DocumentBridgeMutationFailure)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO10emptyInputyA2CmF	DocumentMutationCoreFailure.emptyInput	DocumentMutationCoreFailure.emptyInput	case emptyInput
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO11alphaLockedyACSicACmF	DocumentMutationCoreFailure.alphaLocked(_:)	DocumentMutationCoreFailure.alphaLocked(_:)	case alphaLocked(Int)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO11layerLockedyACSicACmF	DocumentMutationCoreFailure.layerLocked(_:)	DocumentMutationCoreFailure.layerLocked(_:)	case layerLocked(Int)
@@ -31,7 +31,7 @@ swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO23unexpectedG
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO29invalidLayerProcessingRequestyACSScACmF	DocumentMutationCoreFailure.invalidLayerProcessingRequest(_:)	DocumentMutationCoreFailure.invalidLayerProcessingRequest(_:)	case invalidLayerProcessingRequest(String)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC11CoreFailureO3gpuyAcA0b3GpucF0OcACmF	DocumentMutationCoreFailure.gpu(_:)	DocumentMutationCoreFailure.gpu(_:)	case gpu(DocumentGpuMutationFailure)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO011transactionE0yA2C_ACtcACmF	DocumentMutationFailure.transactionFailure(primary:rollback:)	DocumentMutationFailure.transactionFailure(primary:rollback:)	indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
-swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO06bridgeC6FailedyACSScACmF	DocumentMutationFailure.bridgeMutationFailed(_:)	DocumentMutationFailure.bridgeMutationFailed(_:)	case bridgeMutationFailed(String)
+swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO06bridgeC6FailedyAcA0b6BridgecE0VcACmF	DocumentMutationFailure.bridgeMutationFailed(_:)	DocumentMutationFailure.bridgeMutationFailed(_:)	case bridgeMutationFailed(DocumentBridgeMutationFailure)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO10emptyInputyA2CmF	DocumentMutationFailure.emptyInput	DocumentMutationFailure.emptyInput	case emptyInput
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO11alphaLockedyACSicACmF	DocumentMutationFailure.alphaLocked(_:)	DocumentMutationFailure.alphaLocked(_:)	case alphaLocked(Int)
 swift.enum.case	s:30PrimoDocumentMutationContracts0bC7FailureO11layerLockedyACSicACmF	DocumentMutationFailure.layerLocked(_:)	DocumentMutationFailure.layerLocked(_:)	case layerLocked(Int)
@@ -69,6 +69,7 @@ swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO9tone
 swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO9transformyAcA0e9TransformfG0VcACmF	LayerProcessingRequest.transform(_:)	LayerProcessingRequest.transform(_:)	case transform(LayerTransformProcessingRequest)
 swift.init	s:30PrimoDocumentMutationContracts0B14HistoryGatewayV7canUndo0G4Redo4undo4redo21trimForMemoryPressureACs6ResultOySbAA0bC7FailureOGyYbc_AMyYbcAJyytALGyYbcANyYbcyyYbctcfc	DocumentHistoryGateway.init(canUndo:canRedo:undo:redo:trimForMemoryPressure:)	init(canUndo:canRedo:undo:redo:trimForMemoryPressure:)	init(canUndo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>, canRedo: @escaping @Sendable () -> Result<Bool, DocumentMutationFailure>, undo: @escaping @Sendable () -> DocumentMutationResult, redo: @escaping @Sendable () -> DocumentMutationResult, trimForMemoryPressure: @escaping @Sendable () -> Void = {})
 swift.init	s:30PrimoDocumentMutationContracts0B19LayerEffectsGatewayV05mergeE4DownACs6ResultOyytAA0bC7FailureOGSiYbc_tcfc	DocumentLayerEffectsGateway.init(mergeLayerDown:)	init(mergeLayerDown:)	init(mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult)
+swift.init	s:30PrimoDocumentMutationContracts0b6BridgeC7FailureV9operation6reasonACSS_SSSgtcfc	DocumentBridgeMutationFailure.init(operation:reason:)	init(operation:reason:)	init(operation: String, reason: String? = nil)
 swift.init	s:30PrimoDocumentMutationContracts0bC7FailureO04coreE0AcA0bc4CoreE0O_tcfc	DocumentMutationFailure.init(coreFailure:)	init(coreFailure:)	init(coreFailure: DocumentMutationCoreFailure)
 swift.init	s:30PrimoDocumentMutationContracts13LayerIndexSetVyACShySiGcfc	LayerIndexSet.init(_:)	init(_:)	init(_ rawValues: Set<Int>)
 swift.init	s:30PrimoDocumentMutationContracts13LayerIndexSetVyACxcSTRzSi7ElementRtzlufc	LayerIndexSet.init(_:)	init(_:)	init<S>(_ rawValues: S) where S : Sequence, S.Element == Int
@@ -124,6 +125,8 @@ swift.method	s:30PrimoDocumentMutationContracts23GradientMapStopSettingsV9withCo
 swift.property	s:30PrimoDocumentMutationContracts0B15CreatedFolderIDV8rawValueSivp	DocumentCreatedFolderID.rawValue	rawValue	let rawValue: Int
 swift.property	s:30PrimoDocumentMutationContracts0B17CreatedLayerIndexV8rawValueSivp	DocumentCreatedLayerIndex.rawValue	rawValue	let rawValue: Int
 swift.property	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO14displayMessageSSvp	DocumentGpuMutationFailure.displayMessage	displayMessage	var displayMessage: String { get }
+swift.property	s:30PrimoDocumentMutationContracts0b6BridgeC7FailureV6reasonSSSgvp	DocumentBridgeMutationFailure.reason	reason	let reason: String?
+swift.property	s:30PrimoDocumentMutationContracts0b6BridgeC7FailureV9operationSSvp	DocumentBridgeMutationFailure.operation	operation	let operation: String
 swift.property	s:30PrimoDocumentMutationContracts0bC7FailureO04coreE0AA0bc4CoreE0Ovp	DocumentMutationFailure.coreFailure	coreFailure	var coreFailure: DocumentMutationCoreFailure { get }
 swift.property	s:30PrimoDocumentMutationContracts0bC7FailureO14displayMessageSSSgvp	DocumentMutationFailure.displayMessage	displayMessage	var displayMessage: String? { get }
 swift.property	s:30PrimoDocumentMutationContracts13LayerIndexSetV5countSivp	LayerIndexSet.count	count	var count: Int { get }
@@ -192,6 +195,7 @@ swift.struct	s:30PrimoDocumentMutationContracts0B14HistoryGatewayV	DocumentHisto
 swift.struct	s:30PrimoDocumentMutationContracts0B15CreatedFolderIDV	DocumentCreatedFolderID	DocumentCreatedFolderID	struct DocumentCreatedFolderID
 swift.struct	s:30PrimoDocumentMutationContracts0B17CreatedLayerIndexV	DocumentCreatedLayerIndex	DocumentCreatedLayerIndex	struct DocumentCreatedLayerIndex
 swift.struct	s:30PrimoDocumentMutationContracts0B19LayerEffectsGatewayV	DocumentLayerEffectsGateway	DocumentLayerEffectsGateway	struct DocumentLayerEffectsGateway
+swift.struct	s:30PrimoDocumentMutationContracts0b6BridgeC7FailureV	DocumentBridgeMutationFailure	DocumentBridgeMutationFailure	struct DocumentBridgeMutationFailure
 swift.struct	s:30PrimoDocumentMutationContracts13LayerIndexSetV	LayerIndexSet	LayerIndexSet	struct LayerIndexSet
 swift.struct	s:30PrimoDocumentMutationContracts14ThresholdValueV	ThresholdValue	ThresholdValue	struct ThresholdValue
 swift.struct	s:30PrimoDocumentMutationContracts14TransformScaleV	TransformScale	TransformScale	struct TransformScale

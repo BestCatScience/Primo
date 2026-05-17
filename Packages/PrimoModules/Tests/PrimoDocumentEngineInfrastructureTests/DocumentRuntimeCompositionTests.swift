@@ -1065,6 +1065,7 @@ struct DocumentRuntimeCompositionTests {
             .emptyInput,
             .noUndoState,
             .incompatibleLayerType(4),
+            .bridgeMutationFailed(.init(operation: "bridgeOperation", reason: "unexpected result")),
             .rollbackFailed(operation: "rollback", underlying: .layerLocked(5)),
             .transactionFailure(primary: .invalidFolderID(6), rollback: .noRedoState)
         ]
@@ -1072,6 +1073,16 @@ struct DocumentRuntimeCompositionTests {
             #expect(DocumentMutationFailure(coreFailure: coreFailure).coreFailure == coreFailure)
             #expect(DocumentLayerMutationFailure(coreFailure: coreFailure).coreFailure == coreFailure)
         }
+        #expect(
+            DocumentMutationFailure
+                .bridgeMutationFailed(.init(operation: "bridgeOperation", reason: "unexpected result"))
+                .displayMessage == "bridgeOperation: bridge mutation failed (unexpected result)"
+        )
+        #expect(
+            DocumentMutationFailure
+                .bridgeMutationFailed(.init(operation: "bridgeOperation"))
+                .displayMessage == "bridgeOperation: bridge mutation failed"
+        )
 
         #expect(layerContractsBody.contains("public typealias DocumentLayerMutationFailure = DocumentMutationFailure"))
         #expect(!layerContractsBody.contains("public enum DocumentLayerMutationFailure"))

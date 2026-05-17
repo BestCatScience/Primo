@@ -21,7 +21,7 @@ struct DocumentMutationWorkflowServiceTests {
                 case .structure(.duplicateLayer):
                     return .success(.structure(LayerStructureMutationPlan(result: .createdLayer(DocumentCreatedLayerIndex(4)))))
                 default:
-                    return .failure(.bridgeMutationFailed("unexpected"))
+                    return .failure(.bridgeMutationFailed(.init(operation: "unexpected")))
                 }
             },
             documentLayerEffectsGateway: .unused
@@ -392,7 +392,7 @@ private func expectFailure(_ result: DocumentCreatedFolderMutationResult, _ expe
 
 private extension DocumentEditingGateway {
     static let failing = DocumentEditingGateway { _ in
-        .failure(.bridgeMutationFailed("unused"))
+        .failure(.bridgeMutationFailed(.init(operation: "unused")))
     }
 
     static func failing(with failure: DocumentMutationFailure) -> DocumentEditingGateway {
@@ -405,7 +405,7 @@ private extension DocumentEditingGateway {
     ) -> DocumentEditingGateway {
         DocumentEditingGateway { request in
             guard case let .content(command) = request else {
-                return .failure(.bridgeMutationFailed("unexpected"))
+                return .failure(.bridgeMutationFailed(.init(operation: "unexpected")))
             }
             recorder.record(command.eventDescription)
             return result(command)
@@ -418,7 +418,7 @@ private extension DocumentEditingGateway {
     ) -> DocumentEditingGateway {
         DocumentEditingGateway { request in
             guard case let .structure(command) = request else {
-                return .failure(.bridgeMutationFailed("unexpected"))
+                return .failure(.bridgeMutationFailed(.init(operation: "unexpected")))
             }
             recorder.record(command.eventDescription)
             return result(command)
@@ -470,14 +470,14 @@ private extension UncheckedLayerStructureCommand {
 
 private extension DocumentLayerEffectsGateway {
     static let unused = DocumentLayerEffectsGateway(
-        mergeLayerDown: { _ in .failure(.bridgeMutationFailed("unused")) }
+        mergeLayerDown: { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) }
     )
 }
 
 private extension TextLayerGateway {
     static let unused = TextLayerGateway(
         textLayerData: { _ in .success(nil) },
-        setTextLayer: { _, _ in .failure(.bridgeMutationFailed("unused")) },
+        setTextLayer: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
         clearTextLayerData: { _ in .success(()) }
     )
 }
@@ -486,27 +486,27 @@ private extension DocumentMutationGateway {
     static let unused = stub()
 
     static func stub(
-        replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed("unused")) },
-        replaceLayerMask: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed("unused")) },
-        clearLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed("unused")) },
-        clearLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed("unused")) },
-        applyLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed("unused")) },
-        applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed("unused")) }
+        replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+        replaceLayerMask: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+        clearLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+        clearLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+        applyLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+        applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) }
     ) -> DocumentMutationGateway {
         DocumentMutationGateway(
-            resizeCanvas: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            resizeCanvasExtent: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            addLayer: { _ in .failure(.bridgeMutationFailed("unused")) },
-            deleteLayer: { _ in .failure(.bridgeMutationFailed("unused")) },
-            setActiveLayer: { _ in .failure(.bridgeMutationFailed("unused")) },
-            setLayerName: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            setLayerVisibility: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            revealLayerForEditing: { _ in .failure(.bridgeMutationFailed("unused")) },
+            resizeCanvas: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            resizeCanvasExtent: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            addLayer: { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            deleteLayer: { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            setActiveLayer: { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            setLayerName: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            setLayerVisibility: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            revealLayerForEditing: { _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
             replaceLayerPixels: replaceLayerPixels,
-            replaceLayerPixelsInRect: { _, _, _ in .failure(.bridgeMutationFailed("unused")) },
-            applyLayerSurfaceMutation: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            applyLayerMutation: { _, _ in .failure(.bridgeMutationFailed("unused")) },
-            applyTextLayerMutation: { _, _, _ in .failure(.bridgeMutationFailed("unused")) },
+            replaceLayerPixelsInRect: { _, _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            applyLayerSurfaceMutation: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            applyLayerMutation: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
+            applyTextLayerMutation: { _, _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
             replaceLayerMask: replaceLayerMask,
             clearLayerMask: clearLayerMask,
             applyLayerMask: applyLayerMask,

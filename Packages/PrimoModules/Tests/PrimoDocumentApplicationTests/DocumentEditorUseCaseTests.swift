@@ -20,7 +20,7 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
         return .success(())
     }
 
-    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult { .failure(.bridgeMutationFailed("unused")) }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerCreatedMutationResult { .failure(.bridgeMutationFailed(.init(operation: "unused"))) }
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
     func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentFolderCreatedMutationResult { .success(DocumentCreatedFolderID(1)) }

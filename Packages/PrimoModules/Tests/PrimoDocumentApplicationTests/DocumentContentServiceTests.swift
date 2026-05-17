@@ -576,7 +576,7 @@ private func editingGateway(
             }
             return contentResult.map { .content }
         case .structure, .attribute:
-            return .failure(.bridgeMutationFailed("unexpected"))
+            return .failure(.bridgeMutationFailed(.init(operation: "unexpected")))
         }
     }
 }

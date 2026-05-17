@@ -144,11 +144,11 @@ struct DocumentCommandServiceTests {
     @Test
     func endBlurStrokePropagatesGatewayFailure() {
         let service = DocumentStrokeCommandService(
-            strokeGateway: strokeGateway(endBlurStroke: { .failure(.bridgeMutationFailed("endBlurStroke")) })
+            strokeGateway: strokeGateway(endBlurStroke: { .failure(.bridgeMutationFailed(.init(operation: "endBlurStroke"))) })
         )
 
         if case let .failure(failure) = service.endBlurStroke() {
-            #expect(failure == .bridgeMutationFailed("endBlurStroke"))
+            #expect(failure == .bridgeMutationFailed(.init(operation: "endBlurStroke")))
         } else {
             Issue.record("Expected endBlurStroke failure to propagate")
         }

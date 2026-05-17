@@ -162,10 +162,20 @@ public enum DocumentMutationCoreFailure: Error, Equatable, Sendable {
     case unexpectedGatewayResult(operation: String, expected: String, actual: String)
     case rawAPIUnavailable(operation: String)
     case inconsistentComposition(operation: String, reason: String)
-    case bridgeMutationFailed(String)
+    case bridgeMutationFailed(DocumentBridgeMutationFailure)
     case incompatibleLayerType(Int)
     indirect case rollbackFailed(operation: String, underlying: DocumentMutationCoreFailure)
     indirect case transactionFailure(primary: DocumentMutationCoreFailure, rollback: DocumentMutationCoreFailure)
+}
+
+public struct DocumentBridgeMutationFailure: Error, Equatable, Sendable {
+    public let operation: String
+    public let reason: String?
+
+    public init(operation: String, reason: String? = nil) {
+        self.operation = operation
+        self.reason = reason
+    }
 }
 
 public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
@@ -186,7 +196,7 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     case unexpectedGatewayResult(operation: String, expected: String, actual: String)
     case rawAPIUnavailable(operation: String)
     case inconsistentComposition(operation: String, reason: String)
-    case bridgeMutationFailed(String)
+    case bridgeMutationFailed(DocumentBridgeMutationFailure)
     case incompatibleLayerType(Int)
     indirect case rollbackFailed(operation: String, underlying: DocumentMutationFailure)
     indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
@@ -245,8 +255,8 @@ public extension DocumentMutationFailure {
             self = .rawAPIUnavailable(operation: operation)
         case let .inconsistentComposition(operation, reason):
             self = .inconsistentComposition(operation: operation, reason: reason)
-        case let .bridgeMutationFailed(message):
-            self = .bridgeMutationFailed(message)
+        case let .bridgeMutationFailed(failure):
+            self = .bridgeMutationFailed(failure)
         case let .incompatibleLayerType(index):
             self = .incompatibleLayerType(index)
         case let .rollbackFailed(operation, underlying):
@@ -314,8 +324,8 @@ public extension DocumentMutationFailure {
             return .rawAPIUnavailable(operation: operation)
         case let .inconsistentComposition(operation, reason):
             return .inconsistentComposition(operation: operation, reason: reason)
-        case let .bridgeMutationFailed(message):
-            return .bridgeMutationFailed(message)
+        case let .bridgeMutationFailed(failure):
+            return .bridgeMutationFailed(failure)
         case let .incompatibleLayerType(index):
             return .incompatibleLayerType(index)
         case let .rollbackFailed(operation, underlying):
@@ -335,8 +345,11 @@ public extension DocumentMutationFailure {
             return "\(operation): raw API unavailable"
         case let .inconsistentComposition(operation, reason):
             return "\(operation): inconsistent composition (\(reason))"
-        case let .bridgeMutationFailed(message):
-            return message
+        case let .bridgeMutationFailed(failure):
+            if let reason = failure.reason {
+                return "\(failure.operation): bridge mutation failed (\(reason))"
+            }
+            return "\(failure.operation): bridge mutation failed"
         case let .rollbackFailed(operation, underlying):
             if let message = underlying.displayMessage {
                 return "\(operation): rollback failed (\(message))"
