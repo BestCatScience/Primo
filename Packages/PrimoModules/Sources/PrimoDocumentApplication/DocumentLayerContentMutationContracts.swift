@@ -45,51 +45,48 @@ public struct LayerMaskData: Equatable, Sendable {
     }
 }
 
-public struct ValidatedLayerProcessingRequest: Equatable, Sendable {
-    public let rawValue: LayerProcessingRequest
-
-    package init?(_ rawValue: LayerProcessingRequest, canvasGeometry: PixelGeometry? = nil) {
-        guard Self.validationFailure(for: rawValue, canvasGeometry: canvasGeometry) == nil else { return nil }
-        self.rawValue = rawValue
-    }
-
-    package static func validationFailure(
-        for request: LayerProcessingRequest,
-        canvasGeometry: PixelGeometry? = nil
-    ) -> String? {
-        switch request {
-        case let .transform(request):
-            guard let boundedRequest = CanvasBoundedTransformRequest(
-                request,
-                canvasGeometry: canvasGeometry
-            ) else {
-                return "transform"
-            }
-            _ = boundedRequest
-            return nil
-        default:
-            return nil
-        }
-    }
-}
-
 public struct CanvasBoundedTransformRequest: Equatable, Sendable {
     public let translation: FiniteTranslation
     public let scale: TransformScale
     public let rotationDegrees: RotationDegrees
     public let selection: CanvasSelection?
 
-    package init?(
+    public init?(
+        translation: FiniteTranslation,
+        scale: TransformScale,
+        rotationDegrees: RotationDegrees,
+        selection: CanvasSelection?,
+        canvasGeometry: PixelGeometry?
+    ) {
+        guard Self.isValid(selection: selection, canvasGeometry: canvasGeometry) else {
+            return nil
+        }
+        self.translation = translation
+        self.scale = scale
+        self.rotationDegrees = rotationDegrees
+        self.selection = selection
+    }
+
+    public init?(
         _ request: LayerTransformProcessingRequest,
         canvasGeometry: PixelGeometry?
     ) {
-        guard Self.isValid(selection: request.selection, canvasGeometry: canvasGeometry) else {
-            return nil
-        }
-        self.translation = request.translation
-        self.scale = request.scale
-        self.rotationDegrees = request.rotationDegrees
-        self.selection = request.selection
+        self.init(
+            translation: request.translation,
+            scale: request.scale,
+            rotationDegrees: request.rotationDegrees,
+            selection: request.selection,
+            canvasGeometry: canvasGeometry
+        )
+    }
+
+    public var rawValue: LayerTransformProcessingRequest {
+        LayerTransformProcessingRequest(
+            translation: translation,
+            scale: scale,
+            rotationDegrees: rotationDegrees,
+            selection: selection
+        )
     }
 
     private static func isValid(selection: CanvasSelection?, canvasGeometry: PixelGeometry?) -> Bool {
@@ -103,6 +100,98 @@ public struct CanvasBoundedTransformRequest: Equatable, Sendable {
             width: canvasGeometry.width,
             height: canvasGeometry.height
         )
+    }
+}
+
+public enum ValidatedLayerProcessingRequest: Equatable, Sendable {
+    case gradientMap(GradientMapPreset)
+    case gradientMapSettings(GradientMapSettings)
+    case hueSaturationBrightness(HueSaturationBrightnessSettings)
+    case brightnessContrast(BrightnessContrastSettings)
+    case levels(LevelsAdjustmentSettings)
+    case toneCurve(ToneCurveSettings)
+    case colorBalance(ColorBalanceSettings)
+    case threshold(ThresholdSettings)
+    case posterize(PosterizeSettings)
+    case luminanceToAlpha
+    case transform(CanvasBoundedTransformRequest)
+
+    public var rawValue: LayerProcessingRequest {
+        switch self {
+        case let .gradientMap(preset):
+            return .gradientMap(preset)
+        case let .gradientMapSettings(settings):
+            return .gradientMapSettings(settings)
+        case let .hueSaturationBrightness(settings):
+            return .hueSaturationBrightness(settings)
+        case let .brightnessContrast(settings):
+            return .brightnessContrast(settings)
+        case let .levels(settings):
+            return .levels(settings)
+        case let .toneCurve(settings):
+            return .toneCurve(settings)
+        case let .colorBalance(settings):
+            return .colorBalance(settings)
+        case let .threshold(settings):
+            return .threshold(settings)
+        case let .posterize(settings):
+            return .posterize(settings)
+        case .luminanceToAlpha:
+            return .luminanceToAlpha
+        case let .transform(command):
+            return .transform(command.rawValue)
+        }
+    }
+
+    package init?(_ rawValue: LayerProcessingRequest, canvasGeometry: PixelGeometry? = nil) {
+        switch rawValue {
+        case let .gradientMap(preset):
+            self = .gradientMap(preset)
+        case let .gradientMapSettings(settings):
+            self = .gradientMapSettings(settings)
+        case let .hueSaturationBrightness(settings):
+            self = .hueSaturationBrightness(settings)
+        case let .brightnessContrast(settings):
+            self = .brightnessContrast(settings)
+        case let .levels(settings):
+            self = .levels(settings)
+        case let .toneCurve(settings):
+            self = .toneCurve(settings)
+        case let .colorBalance(settings):
+            self = .colorBalance(settings)
+        case let .threshold(settings):
+            self = .threshold(settings)
+        case let .posterize(settings):
+            self = .posterize(settings)
+        case .luminanceToAlpha:
+            self = .luminanceToAlpha
+        case let .transform(request):
+            guard let boundedRequest = CanvasBoundedTransformRequest(
+                request,
+                canvasGeometry: canvasGeometry
+            ) else {
+                return nil
+            }
+            self = .transform(boundedRequest)
+        }
+    }
+
+    package static func validationFailure(
+        for request: LayerProcessingRequest,
+        canvasGeometry: PixelGeometry? = nil
+    ) -> String? {
+        switch request {
+        case let .transform(request):
+            guard CanvasBoundedTransformRequest(
+                request,
+                canvasGeometry: canvasGeometry
+            ) != nil else {
+                return "transform"
+            }
+            return nil
+        default:
+            return nil
+        }
     }
 }
 

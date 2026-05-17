@@ -2188,9 +2188,16 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
             isDirectory: false
         )
-        let body = try String(contentsOf: mutationContracts, encoding: .utf8)
-        let processingRequest = try #require(Self.typeBody(named: "LayerProcessingRequest", in: body))
-        let transformRequest = try #require(Self.typeBody(named: "LayerTransformProcessingRequest", in: body))
+        let applicationContracts = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerContentMutationContracts.swift",
+            isDirectory: false
+        )
+        let mutationBody = try String(contentsOf: mutationContracts, encoding: .utf8)
+        let applicationBody = try String(contentsOf: applicationContracts, encoding: .utf8)
+        let processingRequest = try #require(Self.typeBody(named: "LayerProcessingRequest", in: mutationBody))
+        let transformRequest = try #require(Self.typeBody(named: "LayerTransformProcessingRequest", in: mutationBody))
+        let boundedTransformRequest = try #require(Self.typeBody(named: "CanvasBoundedTransformRequest", in: applicationBody))
+        let validatedProcessingRequest = try #require(Self.typeBody(named: "ValidatedLayerProcessingRequest", in: applicationBody))
 
         #expect(processingRequest.contains("case transform(LayerTransformProcessingRequest)"))
         #expect(!processingRequest.contains("case transform(translation: CGSize"))
@@ -2200,6 +2207,10 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!transformRequest.contains("public let translation: CGSize"))
         #expect(!transformRequest.contains("public let scale: CGFloat"))
         #expect(!transformRequest.contains("public let rotationDegrees: Double"))
+        #expect(boundedTransformRequest.contains("public init?("))
+        #expect(boundedTransformRequest.contains("public var rawValue: LayerTransformProcessingRequest"))
+        #expect(validatedProcessingRequest.contains("case transform(CanvasBoundedTransformRequest)"))
+        #expect(validatedProcessingRequest.contains("return .transform(command.rawValue)"))
     }
 
     @Test
