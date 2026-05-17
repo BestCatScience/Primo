@@ -48,6 +48,18 @@ struct ArchitectureSourceInspector {
         let parameters: [Parameter]
     }
 
+    struct FunctionCall: Equatable {
+        let expression: String
+        let base: String?
+        let name: String
+    }
+
+    struct MemberAccess: Equatable {
+        let expression: String
+        let base: String?
+        let name: String
+    }
+
     private let source: String
     private let tree: SourceFileSyntax
 
@@ -114,6 +126,24 @@ struct ArchitectureSourceInspector {
         let visitor = DependencyAttributeVisitor(viewMode: .sourceAccurate)
         visitor.walk(tree)
         return visitor.keys
+    }
+
+    var functionCalls: [FunctionCall] {
+        let visitor = FunctionCallVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.calls
+    }
+
+    var memberAccesses: [MemberAccess] {
+        let visitor = MemberAccessVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.accesses
+    }
+
+    var referencedIdentifiers: Set<String> {
+        let visitor = IdentifierReferenceVisitor(viewMode: .sourceAccurate)
+        visitor.walk(tree)
+        return visitor.identifiers
     }
 
     func declarationSource(named name: String) -> String? {
@@ -328,6 +358,69 @@ private final class DependencyAttributeVisitor: SyntaxVisitor {
             character.isLetter || character.isNumber || character == "_"
         }
         return key.isEmpty ? nil : String(key)
+    }
+}
+
+private final class FunctionCallVisitor: SyntaxVisitor {
+    var calls: [ArchitectureSourceInspector.FunctionCall] = []
+
+    override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
+        let expression = node.calledExpression.trimmedDescription
+        if let member = node.calledExpression.as(MemberAccessExprSyntax.self) {
+            calls.append(
+                ArchitectureSourceInspector.FunctionCall(
+                    expression: expression,
+                    base: member.base?.trimmedDescription,
+                    name: member.declName.baseName.text
+                )
+            )
+        } else if let reference = node.calledExpression.as(DeclReferenceExprSyntax.self) {
+            calls.append(
+                ArchitectureSourceInspector.FunctionCall(
+                    expression: expression,
+                    base: nil,
+                    name: reference.baseName.text
+                )
+            )
+        } else {
+            calls.append(
+                ArchitectureSourceInspector.FunctionCall(
+                    expression: expression,
+                    base: nil,
+                    name: expression
+                )
+            )
+        }
+        return .visitChildren
+    }
+}
+
+private final class MemberAccessVisitor: SyntaxVisitor {
+    var accesses: [ArchitectureSourceInspector.MemberAccess] = []
+
+    override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
+        accesses.append(
+            ArchitectureSourceInspector.MemberAccess(
+                expression: node.trimmedDescription,
+                base: node.base?.trimmedDescription,
+                name: node.declName.baseName.text
+            )
+        )
+        return .visitChildren
+    }
+}
+
+private final class IdentifierReferenceVisitor: SyntaxVisitor {
+    var identifiers: Set<String> = []
+
+    override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+        identifiers.insert(node.baseName.text)
+        return .skipChildren
+    }
+
+    override func visit(_ node: IdentifierTypeSyntax) -> SyntaxVisitorContinueKind {
+        identifiers.insert(node.name.text)
+        return .visitChildren
     }
 }
 

@@ -560,6 +560,29 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func liveRuntimeFactoryCallsStayBehindAppSupport() throws {
+        let repoRoot = try Self.repoRoot()
+        let roots = [
+            repoRoot.appendingPathComponent("App", isDirectory: true),
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources", isDirectory: true),
+        ]
+
+        for root in roots {
+            for source in try Self.swiftSources(under: root) {
+                let sourceText = try String(contentsOf: source, encoding: .utf8)
+                let liveRuntimeFactoryCalls = Self.functionCalls(in: sourceText)
+                    .filter(Self.isLiveRuntimeFactoryCall)
+                guard !liveRuntimeFactoryCalls.isEmpty else { continue }
+
+                #expect(
+                    source.path.contains("/PrimoDocumentAppSupport/"),
+                    "\(source.path) calls live runtime factories \(liveRuntimeFactoryCalls.map(\.expression)); route live wiring through AppSupport"
+                )
+            }
+        }
+    }
+
+    @Test
     func packageDoesNotPublishInfrastructureProducts() throws {
         let repoRoot = try Self.repoRoot()
         let package = try String(
@@ -611,6 +634,28 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Foundation",
             "PrimoDocumentApplication"
         ]))
+
+        let semanticSource = """
+        // DocumentApplicationRuntimeFactory.liveWorkflows()
+        let ignored = "DocumentRuntimeFactory.live()"
+        let workflows = DocumentApplicationRuntimeFactory.liveWorkflows()
+        let files = FileManager.default
+        """
+        #expect(
+            Self.functionCalls(in: semanticSource).contains {
+                $0.base == "DocumentApplicationRuntimeFactory" && $0.name == "liveWorkflows"
+            }
+        )
+        #expect(
+            !Self.functionCalls(in: semanticSource).contains {
+                $0.base == "DocumentRuntimeFactory" && $0.name == "live"
+            }
+        )
+        #expect(
+            ArchitectureSourceInspector(source: semanticSource).memberAccesses.contains {
+                $0.expression == "FileManager.default"
+            }
+        )
 
         let products = Self.infrastructureProductNames(
             in: """
@@ -3664,13 +3709,23 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Infrastructure/",
             "/RuntimeLive/",
         ]
+        let bannedMemberAccesses = Set(["FileManager.default", "URLSession.shared"])
 
         for root in roots {
             for source in try Self.swiftSources(under: root) {
                 let path = source.path
                 let isAllowed = allowedPathFragments.contains { path.contains($0) }
                 let body = try String(contentsOf: source, encoding: .utf8)
-                for token in bannedTokens where body.contains(token) {
+                let inspector = ArchitectureSourceInspector(source: body)
+                let semanticTokens = Set(
+                    inspector.memberAccesses
+                        .filter { bannedMemberAccesses.contains($0.expression) }
+                        .map(\.expression)
+                )
+                .union(inspector.importedModules.contains("Security") ? ["import Security"] : [])
+                .union(inspector.referencedIdentifiers.contains("MTLDevice") ? ["MTLDevice"] : [])
+
+                for token in bannedTokens where semanticTokens.contains(token) {
                     #expect(
                         isAllowed,
                         "\(path) contains side-effect API \(token); keep it in infrastructure/live targets"
@@ -3858,6 +3913,18 @@ struct GpuSideEffectIsolationArchitectureTests {
 
     private static func dependencyKeys(in source: String) -> Set<String> {
         ArchitectureSourceInspector(source: source).dependencyAttributeKeys
+    }
+
+    private static func functionCalls(in source: String) -> [ArchitectureSourceInspector.FunctionCall] {
+        ArchitectureSourceInspector(source: source).functionCalls
+    }
+
+    private static func isLiveRuntimeFactoryCall(_ call: ArchitectureSourceInspector.FunctionCall) -> Bool {
+        guard let base = call.base?.split(separator: ".").last.map(String.init),
+              base.hasSuffix("RuntimeFactory") else {
+            return false
+        }
+        return call.name == "live" || call.name.hasPrefix("live")
     }
 
     private static func swiftCodeWithCommentsAndStringsBlanked(in source: String) -> String {
