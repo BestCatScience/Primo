@@ -676,14 +676,9 @@ struct GpuSideEffectIsolationArchitectureTests {
 
     #if os(macOS)
         @Test
-        func publicRuntimeFacadeSymbolGraphsMatchSnapshots() throws {
+        func publicAPISymbolGraphsMatchSnapshots() throws {
             let repoRoot = try Self.repoRoot()
-            let moduleNames = [
-                "PrimoDocumentRuntime",
-                "PrimoDocumentMutationContracts",
-                "PrimoDocumentApplication",
-                "PrimoWorkspaceRuntime"
-            ]
+            let moduleNames = Self.publicAPISnapshotModuleNames
             let generatedSnapshots = try Self.generatedPublicSymbolSnapshots(
                 for: moduleNames,
                 repoRoot: repoRoot
@@ -1635,7 +1630,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         let actual = Set(Self.deprecatedPackageRawRuntimeOverloadRecords(in: facadeBody))
-        let expected: Set<String> = [
+        let baseline: Set<String> = [
             "CanvasMutationRuntime.package func createCanvas(_ width: Int, _ height: Int)",
             "CanvasMutationRuntime.package func resizeCanvas(_ width: Int, _ height: Int)",
             "CanvasMutationRuntime.package func resizeCanvasExtent(_ width: Int, _ height: Int)",
@@ -1646,11 +1641,20 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentPersistenceClient.package func newCanvas(_ width: Int, _ height: Int)",
             "DocumentPersistenceRuntime.package func newCanvas(_ width: Int, _ height: Int)"
         ]
+        let baselineCount = 9
         #expect(
-            actual == expected,
-            "Deprecated package raw runtime overload baseline changed. Remove entries intentionally; do not add new raw overloads. Actual: \(actual.sorted())"
+            baseline.count == baselineCount,
+            "Deprecated raw overload baseline count should be updated only with an intentional removal plan"
         )
-        for record in expected {
+        #expect(
+            actual.count <= baselineCount,
+            "Deprecated package raw runtime overload count increased from \(baselineCount) to \(actual.count). Actual: \(actual.sorted())"
+        )
+        #expect(
+            actual.subtracting(baseline).isEmpty,
+            "Deprecated package raw runtime overload baseline grew. New raw overloads are forbidden: \(actual.subtracting(baseline).sorted())"
+        )
+        for record in actual {
             #expect(
                 removalPlan.contains(record),
                 "Deprecated raw overload removal plan is missing baseline entry \(record)"
@@ -3914,6 +3918,38 @@ struct GpuSideEffectIsolationArchitectureTests {
     private static func dependencyKeys(in source: String) -> Set<String> {
         ArchitectureSourceInspector(source: source).dependencyAttributeKeys
     }
+
+    private static let publicAPISnapshotModuleNames = [
+        "PrimoAIImageApplication",
+        "PrimoAIImageDomain",
+        "PrimoAIImageRuntime",
+        "PrimoBrushDomain",
+        "PrimoBrushFileFormats",
+        "PrimoBrushRuntime",
+        "PrimoBrushRuntimeContracts",
+        "PrimoCanvasInputDomain",
+        "PrimoCanvasPresentationDomain",
+        "PrimoCanvasPresentationRuntime",
+        "PrimoCoreContracts",
+        "PrimoCoreTypes",
+        "PrimoDocumentApplication",
+        "PrimoDocumentAppSupport",
+        "PrimoDocumentContracts",
+        "PrimoDocumentDomain",
+        "PrimoDocumentGPUContracts",
+        "PrimoDocumentMutationContracts",
+        "PrimoDocumentPersistenceContracts",
+        "PrimoDocumentPresentationContracts",
+        "PrimoDocumentRenderingContracts",
+        "PrimoDocumentRuntime",
+        "PrimoDocumentStrokeApplication",
+        "PrimoLocalization",
+        "PrimoSystemClients",
+        "PrimoSystemContracts",
+        "PrimoWorkspaceApplication",
+        "PrimoWorkspaceDomain",
+        "PrimoWorkspaceRuntime"
+    ]
 
     private static func functionCalls(in source: String) -> [ArchitectureSourceInspector.FunctionCall] {
         ArchitectureSourceInspector(source: source).functionCalls

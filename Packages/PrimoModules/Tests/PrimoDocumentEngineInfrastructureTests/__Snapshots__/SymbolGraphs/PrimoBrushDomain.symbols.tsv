@@ -1,0 +1,49 @@
+swift.enum	s:16PrimoBrushDomain0B10SmudgeModeO	BrushSmudgeMode	BrushSmudgeMode	enum BrushSmudgeMode
+swift.enum	s:16PrimoBrushDomain0B11ScatterModeO	BrushScatterMode	BrushScatterMode	enum BrushScatterMode
+swift.enum	s:16PrimoBrushDomain0B11TextureModeO	BrushTextureMode	BrushTextureMode	enum BrushTextureMode
+swift.enum	s:16PrimoBrushDomain0B13DualBlendModeO	BrushDualBlendMode	BrushDualBlendMode	enum BrushDualBlendMode
+swift.enum	s:16PrimoBrushDomain0B15ColorMixingModeO	BrushColorMixingMode	BrushColorMixingMode	enum BrushColorMixingMode
+swift.enum	s:16PrimoBrushDomain0B7TipKindO	BrushTipKind	BrushTipKind	enum BrushTipKind
+swift.enum	s:16PrimoBrushDomain0B9AngleModeO	BrushAngleMode	BrushAngleMode	enum BrushAngleMode
+swift.enum.case	s:16PrimoBrushDomain0B10SmudgeModeO7dullingyA2CmF	BrushSmudgeMode.dulling	BrushSmudgeMode.dulling	case dulling
+swift.enum.case	s:16PrimoBrushDomain0B10SmudgeModeO8smearingyA2CmF	BrushSmudgeMode.smearing	BrushSmudgeMode.smearing	case smearing
+swift.enum.case	s:16PrimoBrushDomain0B11ScatterModeO11directionalyA2CmF	BrushScatterMode.directional	BrushScatterMode.directional	case directional
+swift.enum.case	s:16PrimoBrushDomain0B11ScatterModeO5sprayyA2CmF	BrushScatterMode.spray	BrushScatterMode.spray	case spray
+swift.enum.case	s:16PrimoBrushDomain0B11TextureModeO12strokeLockedyA2CmF	BrushTextureMode.strokeLocked	BrushTextureMode.strokeLocked	case strokeLocked
+swift.enum.case	s:16PrimoBrushDomain0B11TextureModeO3offyA2CmF	BrushTextureMode.off	BrushTextureMode.off	case off
+swift.enum.case	s:16PrimoBrushDomain0B11TextureModeO6movingyA2CmF	BrushTextureMode.moving	BrushTextureMode.moving	case moving
+swift.enum.case	s:16PrimoBrushDomain0B11TextureModeO7eachTipyA2CmF	BrushTextureMode.eachTip	BrushTextureMode.eachTip	case eachTip
+swift.enum.case	s:16PrimoBrushDomain0B13DualBlendModeO6darkeryA2CmF	BrushDualBlendMode.darker	BrushDualBlendMode.darker	case darker
+swift.enum.case	s:16PrimoBrushDomain0B13DualBlendModeO8multiplyyA2CmF	BrushDualBlendMode.multiply	BrushDualBlendMode.multiply	case multiply
+swift.enum.case	s:16PrimoBrushDomain0B13DualBlendModeO8subtractyA2CmF	BrushDualBlendMode.subtract	BrushDualBlendMode.subtract	case subtract
+swift.enum.case	s:16PrimoBrushDomain0B15ColorMixingModeO07runningD0yA2CmF	BrushColorMixingMode.runningColor	BrushColorMixingMode.runningColor	case runningColor
+swift.enum.case	s:16PrimoBrushDomain0B15ColorMixingModeO3offyA2CmF	BrushColorMixingMode.off	BrushColorMixingMode.off	case off
+swift.enum.case	s:16PrimoBrushDomain0B15ColorMixingModeO5blendyA2CmF	BrushColorMixingMode.blend	BrushColorMixingMode.blend	case blend
+swift.enum.case	s:16PrimoBrushDomain0B15ColorMixingModeO5smearyA2CmF	BrushColorMixingMode.smear	BrushColorMixingMode.smear	case smear
+swift.enum.case	s:16PrimoBrushDomain0B7TipKindO3inkyA2CmF	BrushTipKind.ink	BrushTipKind.ink	case ink
+swift.enum.case	s:16PrimoBrushDomain0B7TipKindO3oilyA2CmF	BrushTipKind.oil	BrushTipKind.oil	case oil
+swift.enum.case	s:16PrimoBrushDomain0B7TipKindO6pencilyA2CmF	BrushTipKind.pencil	BrushTipKind.pencil	case pencil
+swift.enum.case	s:16PrimoBrushDomain0B7TipKindO8airbrushyA2CmF	BrushTipKind.airbrush	BrushTipKind.airbrush	case airbrush
+swift.enum.case	s:16PrimoBrushDomain0B9AngleModeO10stylusTiltyA2CmF	BrushAngleMode.stylusTilt	BrushAngleMode.stylusTilt	case stylusTilt
+swift.enum.case	s:16PrimoBrushDomain0B9AngleModeO15strokeDirectionyA2CmF	BrushAngleMode.strokeDirection	BrushAngleMode.strokeDirection	case strokeDirection
+swift.enum.case	s:16PrimoBrushDomain0B9AngleModeO5fixedyA2CmF	BrushAngleMode.fixed	BrushAngleMode.fixed	case fixed
+swift.init	s:16PrimoBrushDomain0B10SmudgeModeO8rawValueACSgSS_tcfc	BrushSmudgeMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B11ScatterModeO8rawValueACSgSS_tcfc	BrushScatterMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B11TextureModeO8rawValueACSgSS_tcfc	BrushTextureMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B13DualBlendModeO8rawValueACSgSS_tcfc	BrushDualBlendMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B15ColorMixingModeO8rawValueACSgSS_tcfc	BrushColorMixingMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B7TipKindO8rawValueACSgSS_tcfc	BrushTipKind.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B9AngleModeO8rawValueACSgSS_tcfc	BrushAngleMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:16PrimoBrushDomain0B9TipRasterV5width6height9alphaDataACSi_Si10Foundation0I0Vtcfc	BrushTipRaster.init(width:height:alphaData:)	init(width:height:alphaData:)	init(width: Int, height: Int, alphaData: Data)
+swift.property	s:16PrimoBrushDomain0B10SmudgeModeO2idSSvp	BrushSmudgeMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B11ScatterModeO2idSSvp	BrushScatterMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B11TextureModeO2idSSvp	BrushTextureMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B13DualBlendModeO2idSSvp	BrushDualBlendMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B15ColorMixingModeO2idSSvp	BrushColorMixingMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B7TipKindO2idSSvp	BrushTipKind.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B9AngleModeO2idSSvp	BrushAngleMode.id	id	var id: String { get }
+swift.property	s:16PrimoBrushDomain0B9TipRasterV5widthSivp	BrushTipRaster.width	width	let width: Int
+swift.property	s:16PrimoBrushDomain0B9TipRasterV6heightSivp	BrushTipRaster.height	height	let height: Int
+swift.property	s:16PrimoBrushDomain0B9TipRasterV9alphaData10Foundation0G0Vvp	BrushTipRaster.alphaData	alphaData	let alphaData: Data
+swift.struct	s:16PrimoBrushDomain0B9TipRasterV	BrushTipRaster	BrushTipRaster	struct BrushTipRaster
+swift.type.method	s:16PrimoBrushDomain0B15ColorMixingModeO8inferred7wetness16colorMixStrength17smudgeBlurEnabled0L5Bleed0L6Radius9paintLoadACSd_SdSbS3dtFZ	BrushColorMixingMode.inferred(wetness:colorMixStrength:smudgeBlurEnabled:smudgeBleed:smudgeRadius:paintLoad:)	inferred(wetness:colorMixStrength:smudgeBlurEnabled:smudgeBleed:smudgeRadius:paintLoad:)	static func inferred(wetness: Double, colorMixStrength: Double, smudgeBlurEnabled: Bool, smudgeBleed: Double, smudgeRadius: Double, paintLoad: Double) -> BrushColorMixingMode

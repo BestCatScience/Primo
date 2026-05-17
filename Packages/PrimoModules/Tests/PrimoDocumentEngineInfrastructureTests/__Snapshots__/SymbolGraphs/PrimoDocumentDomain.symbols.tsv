@@ -1,0 +1,332 @@
+swift.enum	s:19PrimoDocumentDomain0B14WorkspaceErrorO	DocumentWorkspaceError	DocumentWorkspaceError	enum DocumentWorkspaceError
+swift.enum	s:19PrimoDocumentDomain13ShapeToolModeO	ShapeToolMode	ShapeToolMode	enum ShapeToolMode
+swift.enum	s:19PrimoDocumentDomain13WorkspacePaneO	WorkspacePane	WorkspacePane	enum WorkspacePane
+swift.enum	s:19PrimoDocumentDomain14LayerBlendModeO	LayerBlendMode	LayerBlendMode	enum LayerBlendMode
+swift.enum	s:19PrimoDocumentDomain16CanvasSizePolicyO	CanvasSizePolicy	CanvasSizePolicy	enum CanvasSizePolicy
+swift.enum	s:19PrimoDocumentDomain17SelectionToolModeO	SelectionToolMode	SelectionToolMode	enum SelectionToolMode
+swift.enum	s:19PrimoDocumentDomain18SaveHistoryTriggerO	SaveHistoryTrigger	SaveHistoryTrigger	enum SaveHistoryTrigger
+swift.enum	s:19PrimoDocumentDomain20SelectionCombineModeO	SelectionCombineMode	SelectionCombineMode	enum SelectionCombineMode
+swift.enum	s:19PrimoDocumentDomain25ColorRangeSelectionSourceO	ColorRangeSelectionSource	ColorRangeSelectionSource	enum ColorRangeSelectionSource
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO15invalidFolderIDyACSicACmF	DocumentWorkspaceError.invalidFolderID(_:)	DocumentWorkspaceError.invalidFolderID(_:)	case invalidFolderID(Int)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO17invalidIdentifieryACSScACmF	DocumentWorkspaceError.invalidIdentifier(_:)	DocumentWorkspaceError.invalidIdentifier(_:)	case invalidIdentifier(String)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO17invalidLayerIndexyACSicACmF	DocumentWorkspaceError.invalidLayerIndex(_:)	DocumentWorkspaceError.invalidLayerIndex(_:)	case invalidLayerIndex(Int)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO23invalidProjectDirectoryyACSS_10Foundation3URLVtcACmF	DocumentWorkspaceError.invalidProjectDirectory(_:_:)	DocumentWorkspaceError.invalidProjectDirectory(_:_:)	case invalidProjectDirectory(String, URL)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO23missingProjectDirectoryyACSS_10Foundation3URLVtcACmF	DocumentWorkspaceError.missingProjectDirectory(_:_:)	DocumentWorkspaceError.missingProjectDirectory(_:_:)	case missingProjectDirectory(String, URL)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO24destinationAlreadyExistsyAC10Foundation3URLVcACmF	DocumentWorkspaceError.destinationAlreadyExists(_:)	DocumentWorkspaceError.destinationAlreadyExists(_:)	case destinationAlreadyExists(URL)
+swift.enum.case	s:19PrimoDocumentDomain0B14WorkspaceErrorO25invalidRelativeFolderPathyACSScACmF	DocumentWorkspaceError.invalidRelativeFolderPath(_:)	DocumentWorkspaceError.invalidRelativeFolderPath(_:)	case invalidRelativeFolderPath(String)
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO4lineyA2CmF	ShapeToolMode.line	ShapeToolMode.line	case line
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO7ellipseyA2CmF	ShapeToolMode.ellipse	ShapeToolMode.ellipse	case ellipse
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO7hexagonyA2CmF	ShapeToolMode.hexagon	ShapeToolMode.hexagon	case hexagon
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO8pentagonyA2CmF	ShapeToolMode.pentagon	ShapeToolMode.pentagon	case pentagon
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO8triangleyA2CmF	ShapeToolMode.triangle	ShapeToolMode.triangle	case triangle
+swift.enum.case	s:19PrimoDocumentDomain13ShapeToolModeO9rectangleyA2CmF	ShapeToolMode.rectangle	ShapeToolMode.rectangle	case rectangle
+swift.enum.case	s:19PrimoDocumentDomain13WorkspacePaneO7primaryyA2CmF	WorkspacePane.primary	WorkspacePane.primary	case primary
+swift.enum.case	s:19PrimoDocumentDomain13WorkspacePaneO9secondaryyA2CmF	WorkspacePane.secondary	WorkspacePane.secondary	case secondary
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10colorDodgeyA2CmF	LayerBlendMode.colorDodge	LayerBlendMode.colorDodge	case colorDodge
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10differenceyA2CmF	LayerBlendMode.difference	LayerBlendMode.difference	case difference
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10linearBurnyA2CmF	LayerBlendMode.linearBurn	LayerBlendMode.linearBurn	case linearBurn
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10luminosityyA2CmF	LayerBlendMode.luminosity	LayerBlendMode.luminosity	case luminosity
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10saturationyA2CmF	LayerBlendMode.saturation	LayerBlendMode.saturation	case saturation
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO10vividLightyA2CmF	LayerBlendMode.vividLight	LayerBlendMode.vividLight	case vividLight
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO11darkerColoryA2CmF	LayerBlendMode.darkerColor	LayerBlendMode.darkerColor	case darkerColor
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO11linearLightyA2CmF	LayerBlendMode.linearLight	LayerBlendMode.linearLight	case linearLight
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO12lighterColoryA2CmF	LayerBlendMode.lighterColor	LayerBlendMode.lighterColor	case lighterColor
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO3addyA2CmF	LayerBlendMode.add	LayerBlendMode.add	case add
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO3hueyA2CmF	LayerBlendMode.hue	LayerBlendMode.hue	case hue
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO5coloryA2CmF	LayerBlendMode.color	LayerBlendMode.color	case color
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO6darkenyA2CmF	LayerBlendMode.darken	LayerBlendMode.darken	case darken
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO6divideyA2CmF	LayerBlendMode.divide	LayerBlendMode.divide	case divide
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO6normalyA2CmF	LayerBlendMode.normal	LayerBlendMode.normal	case normal
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO6screenyA2CmF	LayerBlendMode.screen	LayerBlendMode.screen	case screen
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO7addGlowyA2CmF	LayerBlendMode.addGlow	LayerBlendMode.addGlow	case addGlow
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO7hardMixyA2CmF	LayerBlendMode.hardMix	LayerBlendMode.hardMix	case hardMix
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO7lightenyA2CmF	LayerBlendMode.lighten	LayerBlendMode.lighten	case lighten
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO7overlayyA2CmF	LayerBlendMode.overlay	LayerBlendMode.overlay	case overlay
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO8multiplyyA2CmF	LayerBlendMode.multiply	LayerBlendMode.multiply	case multiply
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO8pinLightyA2CmF	LayerBlendMode.pinLight	LayerBlendMode.pinLight	case pinLight
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO8subtractyA2CmF	LayerBlendMode.subtract	LayerBlendMode.subtract	case subtract
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO9colorBurnyA2CmF	LayerBlendMode.colorBurn	LayerBlendMode.colorBurn	case colorBurn
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO9exclusionyA2CmF	LayerBlendMode.exclusion	LayerBlendMode.exclusion	case exclusion
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO9glowDodgeyA2CmF	LayerBlendMode.glowDodge	LayerBlendMode.glowDodge	case glowDodge
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO9hardLightyA2CmF	LayerBlendMode.hardLight	LayerBlendMode.hardLight	case hardLight
+swift.enum.case	s:19PrimoDocumentDomain14LayerBlendModeO9softLightyA2CmF	LayerBlendMode.softLight	LayerBlendMode.softLight	case softLight
+swift.enum.case	s:19PrimoDocumentDomain17SelectionToolModeO4autoyA2CmF	SelectionToolMode.auto	SelectionToolMode.auto	case auto
+swift.enum.case	s:19PrimoDocumentDomain17SelectionToolModeO5lassoyA2CmF	SelectionToolMode.lasso	SelectionToolMode.lasso	case lasso
+swift.enum.case	s:19PrimoDocumentDomain17SelectionToolModeO9rectangleyA2CmF	SelectionToolMode.rectangle	SelectionToolMode.rectangle	case rectangle
+swift.enum.case	s:19PrimoDocumentDomain18SaveHistoryTriggerO04autoD0yA2CmF	SaveHistoryTrigger.autoSave	SaveHistoryTrigger.autoSave	case autoSave
+swift.enum.case	s:19PrimoDocumentDomain18SaveHistoryTriggerO05closeD0yA2CmF	SaveHistoryTrigger.closeSave	SaveHistoryTrigger.closeSave	case closeSave
+swift.enum.case	s:19PrimoDocumentDomain18SaveHistoryTriggerO06manualD0yA2CmF	SaveHistoryTrigger.manualSave	SaveHistoryTrigger.manualSave	case manualSave
+swift.enum.case	s:19PrimoDocumentDomain20SelectionCombineModeO3addyA2CmF	SelectionCombineMode.add	SelectionCombineMode.add	case add
+swift.enum.case	s:19PrimoDocumentDomain20SelectionCombineModeO7replaceyA2CmF	SelectionCombineMode.replace	SelectionCombineMode.replace	case replace
+swift.enum.case	s:19PrimoDocumentDomain20SelectionCombineModeO8subtractyA2CmF	SelectionCombineMode.subtract	SelectionCombineMode.subtract	case subtract
+swift.enum.case	s:19PrimoDocumentDomain25ColorRangeSelectionSourceO11activeLayeryA2CmF	ColorRangeSelectionSource.activeLayer	ColorRangeSelectionSource.activeLayer	case activeLayer
+swift.enum.case	s:19PrimoDocumentDomain25ColorRangeSelectionSourceO6canvasyA2CmF	ColorRangeSelectionSource.canvas	ColorRangeSelectionSource.canvas	case canvas
+swift.func.op	s:19PrimoDocumentDomain0B10LayerIndexV1loiySbAC_ACtFZ	DocumentLayerIndex.<(_:_:)	<(_:_:)	static func < (lhs: DocumentLayerIndex, rhs: DocumentLayerIndex) -> Bool
+swift.func.op	s:19PrimoDocumentDomain0B8FolderIDV1loiySbAC_ACtFZ	DocumentFolderID.<(_:_:)	<(_:_:)	static func < (lhs: DocumentFolderID, rhs: DocumentFolderID) -> Bool
+swift.func.op	s:19PrimoDocumentDomain0B8RevisionV1loiySbAC_ACtFZ	DocumentRevision.<(_:_:)	<(_:_:)	static func < (lhs: DocumentRevision, rhs: DocumentRevision) -> Bool
+swift.init	s:19PrimoDocumentDomain04OpenB3TabV2id5title15backingStoreURL013sourceProjectJ010canvasSize7isDirty4pane14previewSurface0R9ImageDataAC10Foundation4UUIDV_SSAA0bL4PathVAQSgSo6CGSizeVSbAA13WorkspacePaneOAA0b9CompositeS0VSgAM0U0VSgtcfc	OpenDocumentTab.init(id:title:backingStoreURL:sourceProjectURL:canvasSize:isDirty:pane:previewSurface:previewImageData:)	init(id:title:backingStoreURL:sourceProjectURL:canvasSize:isDirty:pane:previewSurface:previewImageData:)	init(id: UUID, title: String, backingStoreURL: DocumentProjectPath, sourceProjectURL: DocumentProjectPath?, canvasSize: CGSize, isDirty: Bool, pane: WorkspacePane, previewSurface: DocumentCompositeSurface? = nil, previewImageData: Data?)
+swift.init	s:19PrimoDocumentDomain0B10LayerIndexV10validatingACSi_tKcfc	DocumentLayerIndex.init(validating:)	init(validating:)	init(validating rawValue: Int) throws
+swift.init	s:19PrimoDocumentDomain0B10LayerIndexV4fromACs7Decoder_p_tKcfc	DocumentLayerIndex.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain0B11ProjectPathV4fromACs7Decoder_p_tKcfc	DocumentProjectPath.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain0B11ProjectPathVyAC10Foundation3URLVcfc	DocumentProjectPath.init(_:)	init(_:)	init(_ fileURL: URL)
+swift.init	s:19PrimoDocumentDomain0B16CompositeSurfaceV15validatingWidth6height9pixelDataACSgSi_Si10Foundation0J0Vtcfc	DocumentCompositeSurface.init(validatingWidth:height:pixelData:)	init(validatingWidth:height:pixelData:)	init?(validatingWidth width: Int, height: Int, pixelData: Data)
+swift.init	s:19PrimoDocumentDomain0B8FolderIDV10validatingACSi_tKcfc	DocumentFolderID.init(validating:)	init(validating:)	init(validating rawValue: Int) throws
+swift.init	s:19PrimoDocumentDomain0B8FolderIDV4fromACs7Decoder_p_tKcfc	DocumentFolderID.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain0B8RevisionV4fromACs7Decoder_p_tKcfc	DocumentRevision.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain0B8RevisionVyACSicfc	DocumentRevision.init(_:)	init(_:)	init(_ rawValue: Int)
+swift.init	s:19PrimoDocumentDomain11CanvasColorV3red5green4blue5alphaACSgSd_S3dtcfc	CanvasColor.init(red:green:blue:alpha:)	init(red:green:blue:alpha:)	init?(red: Double, green: Double, blue: Double, alpha: Double)
+swift.init	s:19PrimoDocumentDomain11CanvasColorV3red5green4blue5alphaAcA12UnitIntervalV_A3Itcfc	CanvasColor.init(red:green:blue:alpha:)	init(red:green:blue:alpha:)	init(red: UnitInterval, green: UnitInterval, blue: UnitInterval, alpha: UnitInterval)
+swift.init	s:19PrimoDocumentDomain11MaskSurfaceV5width6height4dataACSgSi_Si10Foundation4DataVtcfc	MaskSurface.init(width:height:data:)	init(width:height:data:)	init?(width: Int, height: Int, data: Data)
+swift.init	s:19PrimoDocumentDomain11MaskSurfaceV8geometry4dataACSgAA13PixelGeometryV_10Foundation4DataVtcfc	MaskSurface.init(geometry:data:)	init(geometry:data:)	init?(geometry: PixelGeometry, data: Data)
+swift.init	s:19PrimoDocumentDomain11RgbaSurfaceV5width6height4dataACSgSi_Si10Foundation4DataVtcfc	RgbaSurface.init(width:height:data:)	init(width:height:data:)	init?(width: Int, height: Int, data: Data)
+swift.init	s:19PrimoDocumentDomain11RgbaSurfaceV8geometry4dataACSgAA13PixelGeometryV_10Foundation4DataVtcfc	RgbaSurface.init(geometry:data:)	init(geometry:data:)	init?(geometry: PixelGeometry, data: Data)
+swift.init	s:19PrimoDocumentDomain11TextContentV4fromACs7Decoder_p_tKcfc	TextContent.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain11TextContentVyACSgSScfc	TextContent.init(_:)	init(_:)	init?(_ rawValue: String)
+swift.init	s:19PrimoDocumentDomain12FiniteDoubleVyACSgSdcfc	FiniteDouble.init(_:)	init(_:)	init?(_ rawValue: Double)
+swift.init	s:19PrimoDocumentDomain12UnitIntervalVyACSgSdcfc	UnitInterval.init(_:)	init(_:)	init?(_ rawValue: Double)
+swift.init	s:19PrimoDocumentDomain13PixelGeometryV5width6height9maxPixelsACSgSi_S2itcfc	PixelGeometry.init(width:height:maxPixels:)	init(width:height:maxPixels:)	init?(width: Int, height: Int, maxPixels: Int = CanvasSizePolicy.maxPixelCount)
+swift.init	s:19PrimoDocumentDomain13ShapeToolModeO8rawValueACSgSS_tcfc	ShapeToolMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain13TextLayerDataV010validatingD09positionX0H1Y18fontPostScriptName0i7DisplayL00I4Size5scale15rotationDegrees3red5green4blue5alphaACSgSS_S2dS2SS7dtcfc	TextLayerData.init(validatingText:positionX:positionY:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:red:green:blue:alpha:)	init(validatingText:positionX:positionY:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:red:green:blue:alpha:)	init?(validatingText text: String, positionX: Double, positionY: Double, fontPostScriptName: String, fontDisplayName: String, fontSize: Double, scale: Double = 1.0, rotationDegrees: Double = 0, red: Double, green: Double, blue: Double, alpha: Double)
+swift.init	s:19PrimoDocumentDomain13TextLayerDataV4fromACs7Decoder_p_tKcfc	TextLayerData.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain13TextLayerDataV4text9positionX0H1Y18fontPostScriptName0i7DisplayL00I4Size5scale15rotationDegrees5colorAcA0D7ContentV_AA12FiniteDoubleVAPS2SAA08PositivetU0VArpA11CanvasColorVtcfc	TextLayerData.init(text:positionX:positionY:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:color:)	init(text:positionX:positionY:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:color:)	init(text: TextContent, positionX: FiniteDouble, positionY: FiniteDouble, fontPostScriptName: String, fontDisplayName: String, fontSize: PositiveFiniteDouble, scale: PositiveFiniteDouble = PositiveFiniteDouble(1.0)!, rotationDegrees: FiniteDouble = FiniteDouble(0)!, color: CanvasColor)
+swift.init	s:19PrimoDocumentDomain13WorkspacePaneO8rawValueACSgSS_tcfc	WorkspacePane.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain14LayerBlendModeO8rawValueACSgSS_tcfc	LayerBlendMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain14TextFontOptionV14postScriptName07displayI014sourceFilenameACSS_S2SSgtcfc	TextFontOption.init(postScriptName:displayName:sourceFilename:)	init(postScriptName:displayName:sourceFilename:)	init(postScriptName: String, displayName: String, sourceFilename: String?)
+swift.init	s:19PrimoDocumentDomain14TextFontOptionV4fromACs7Decoder_p_tKcfc	TextFontOption.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain14TextLayerDraftV06targetE5Index4text8position18fontPostScriptName0k7DisplayN00K4Size5scale15rotationDegreesACSgSiSg_SSSo7CGPointVSgSSSgAQS3dtcfc	TextLayerDraft.init(targetLayerIndex:text:position:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:)	init(targetLayerIndex:text:position:fontPostScriptName:fontDisplayName:fontSize:scale:rotationDegrees:)	init?(targetLayerIndex: Int?, text: String, position: CGPoint?, fontPostScriptName: String?, fontDisplayName: String?, fontSize: Double, scale: Double, rotationDegrees: Double)
+swift.init	s:19PrimoDocumentDomain15ValidCanvasSizeVyACSgSi_Sitcfc	ValidCanvasSize.init(_:_:)	init(_:_:)	init?(_ width: Int, _ height: Int)
+swift.init	s:19PrimoDocumentDomain15WorkspaceItemIDV10validatingACSS_tKcfc	WorkspaceItemID.init(validating:)	init(validating:)	init(validating rawValue: String) throws
+swift.init	s:19PrimoDocumentDomain15WorkspaceItemIDV4fromACs7Decoder_p_tKcfc	WorkspaceItemID.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain16CanvasPaperStyleV13validatingRed5green4blue5alpha13isTransparentACSgSf_S3fSbtcfc	CanvasPaperStyle.init(validatingRed:green:blue:alpha:isTransparent:)	init(validatingRed:green:blue:alpha:isTransparent:)	init?(validatingRed red: Float, green: Float, blue: Float, alpha: Float, isTransparent: Bool)
+swift.init	s:19PrimoDocumentDomain16CanvasPaperStyleV5color13isTransparentAcA0D5ColorV_Sbtcfc	CanvasPaperStyle.init(color:isTransparent:)	init(color:isTransparent:)	init(color: CanvasColor, isTransparent: Bool)
+swift.init	s:19PrimoDocumentDomain16SaveHistoryEntryV2id5title10projectURL9createdAt7trigger14previewSurface0N9ImageDataAcA15WorkspaceItemIDV_SSAA0B11ProjectPathV10Foundation4DateVAA0dE7TriggerOAA0b9CompositeO0VSgAO0Q0VSgtcfc	SaveHistoryEntry.init(id:title:projectURL:createdAt:trigger:previewSurface:previewImageData:)	init(id:title:projectURL:createdAt:trigger:previewSurface:previewImageData:)	init(id: WorkspaceItemID, title: String, projectURL: DocumentProjectPath, createdAt: Date, trigger: SaveHistoryTrigger, previewSurface: DocumentCompositeSurface? = nil, previewImageData: Data?)
+swift.init	s:19PrimoDocumentDomain17NonEmptyLayerNameV4fromACs7Decoder_p_tKcfc	NonEmptyLayerName.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain17NonEmptyLayerNameVyACSgSScfc	NonEmptyLayerName.init(_:)	init(_:)	init?(_ rawValue: String)
+swift.init	s:19PrimoDocumentDomain17SelectionToolModeO8rawValueACSgSS_tcfc	SelectionToolMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain18SaveHistoryTriggerO8rawValueACSgSS_tcfc	SaveHistoryTrigger.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain19SavedProjectSummaryV3url4name18relativeFolderPath10modifiedAt10canvasSize10layerCount14previewSurface0R9ImageDataAcA0beK0V_SSAA08RelativeejK0VSg10Foundation4DateVSo6CGSizeVSiAA0b9CompositeS0VSgAQ0U0VSgtcfc	SavedProjectSummary.init(url:name:relativeFolderPath:modifiedAt:canvasSize:layerCount:previewSurface:previewImageData:)	init(url:name:relativeFolderPath:modifiedAt:canvasSize:layerCount:previewSurface:previewImageData:)	init(url: DocumentProjectPath, name: String, relativeFolderPath: RelativeProjectFolderPath?, modifiedAt: Date, canvasSize: CGSize, layerCount: Int, previewSurface: DocumentCompositeSurface? = nil, previewImageData: Data?)
+swift.init	s:19PrimoDocumentDomain20AutosaveRecoveryItemV2id5title16sourceProjectURL08autosavejK09updatedAt14previewSurface0O9ImageDataAcA09WorkspaceF2IDV_SSAA0bJ4PathVSgAN10Foundation4DateVAA0b9CompositeP0VSgAP0R0VSgtcfc	AutosaveRecoveryItem.init(id:title:sourceProjectURL:autosaveProjectURL:updatedAt:previewSurface:previewImageData:)	init(id:title:sourceProjectURL:autosaveProjectURL:updatedAt:previewSurface:previewImageData:)	init(id: WorkspaceItemID, title: String, sourceProjectURL: DocumentProjectPath?, autosaveProjectURL: DocumentProjectPath, updatedAt: Date, previewSurface: DocumentCompositeSurface? = nil, previewImageData: Data?)
+swift.init	s:19PrimoDocumentDomain20PositiveFiniteDoubleVyACSgSdcfc	PositiveFiniteDouble.init(_:)	init(_:)	init?(_ rawValue: Double)
+swift.init	s:19PrimoDocumentDomain20SelectionCombineModeO8rawValueACSgSS_tcfc	SelectionCombineMode.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain22ProjectPackageLocationV4fromACs7Decoder_p_tKcfc	ProjectPackageLocation.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain22ProjectPackageLocationVyAC10Foundation3URLVcfc	ProjectPackageLocation.init(_:)	init(_:)	init(_ fileURL: URL)
+swift.init	s:19PrimoDocumentDomain22ProjectPackageLocationVyAcA0bD4PathVcfc	ProjectPackageLocation.init(_:)	init(_:)	init(_ projectPath: DocumentProjectPath)
+swift.init	s:19PrimoDocumentDomain23WritableProjectLocationV4fromACs7Decoder_p_tKcfc	WritableProjectLocation.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain23WritableProjectLocationVyAC10Foundation3URLVcfc	WritableProjectLocation.init(_:)	init(_:)	init(_ fileURL: URL)
+swift.init	s:19PrimoDocumentDomain23WritableProjectLocationVyAcA0bE4PathVcfc	WritableProjectLocation.init(_:)	init(_:)	init(_ projectPath: DocumentProjectPath)
+swift.init	s:19PrimoDocumentDomain25ColorRangeSelectionSourceO8rawValueACSgSS_tcfc	ColorRangeSelectionSource.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.init	s:19PrimoDocumentDomain25RelativeProjectFolderPathV10validatingACSSSg_tKcfc	RelativeProjectFolderPath.init(validating:)	init(validating:)	init(validating rawValue: String?) throws
+swift.init	s:19PrimoDocumentDomain25RelativeProjectFolderPathV20validatingComponentsACSaySSG_tKcfc	RelativeProjectFolderPath.init(validatingComponents:)	init(validatingComponents:)	init(validatingComponents components: [String]) throws
+swift.init	s:19PrimoDocumentDomain25RelativeProjectFolderPathV4fromACs7Decoder_p_tKcfc	RelativeProjectFolderPath.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV6source3red5green4blue9tolerance12minimumAlpha9expansionAcA0deF6SourceO_s5UInt8VA2NS2dSitcfc	ColorRangeSelectionRequest.init(source:red:green:blue:tolerance:minimumAlpha:expansion:)	init(source:red:green:blue:tolerance:minimumAlpha:expansion:)	init(source: ColorRangeSelectionSource, red: UInt8, green: UInt8, blue: UInt8, tolerance: Double, minimumAlpha: Double, expansion: Int)
+swift.init	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseV4fromACs7Decoder_p_tKcfc	SecurityScopedResourceLease.init(from:)	init(from:)	init(from decoder: any Decoder) throws
+swift.init	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseVyAC10Foundation3URLVcfc	SecurityScopedResourceLease.init(_:)	init(_:)	init(_ fileURL: URL)
+swift.method	s:19PrimoDocumentDomain0B10LayerIndexV6encode2toys7Encoder_p_tKF	DocumentLayerIndex.encode(to:)	encode(to:)	func encode(to encoder: any Encoder) throws
+swift.method	s:19PrimoDocumentDomain0B8FolderIDV6encode2toys7Encoder_p_tKF	DocumentFolderID.encode(to:)	encode(to:)	func encode(to encoder: any Encoder) throws
+swift.method	s:19PrimoDocumentDomain0B8RevisionV8advancedACyF	DocumentRevision.advanced()	advanced()	func advanced() -> DocumentRevision
+swift.method	s:19PrimoDocumentDomain13TextLayerDataV11transformed11translation11scaleFactor20rotationDeltaDegreesACSgSo6CGSizeV_AA20PositiveFiniteDoubleVAA0pQ0VtF	TextLayerData.transformed(translation:scaleFactor:rotationDeltaDegrees:)	transformed(translation:scaleFactor:rotationDeltaDegrees:)	func transformed(translation: CGSize, scaleFactor: PositiveFiniteDouble, rotationDeltaDegrees: FiniteDouble) -> TextLayerData?
+swift.method	s:19PrimoDocumentDomain13TextLayerDataV6encode2toys7Encoder_p_tKF	TextLayerData.encode(to:)	encode(to:)	func encode(to encoder: any Encoder) throws
+swift.method	s:19PrimoDocumentDomain25RelativeProjectFolderPathV6encode2toys7Encoder_p_tKF	RelativeProjectFolderPath.encode(to:)	encode(to:)	func encode(to encoder: any Encoder) throws
+swift.method	s:19PrimoDocumentDomain25RelativeProjectFolderPathV9appending2to10Foundation3URLVAH_tF	RelativeProjectFolderPath.appending(to:)	appending(to:)	func appending(to rootDirectory: URL) -> URL
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV10canvasSizeSo6CGSizeVvp	OpenDocumentTab.canvasSize	canvasSize	var canvasSize: CGSize
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV14previewSurfaceAA0b9CompositeG0VSgvp	OpenDocumentTab.previewSurface	previewSurface	var previewSurface: DocumentCompositeSurface?
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV15backingStoreURLAA0B11ProjectPathVvp	OpenDocumentTab.backingStoreURL	backingStoreURL	var backingStoreURL: DocumentProjectPath
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV16previewImageData10Foundation0H0VSgvp	OpenDocumentTab.previewImageData	previewImageData	var previewImageData: Data?
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV16sourceProjectURLAA0bG4PathVSgvp	OpenDocumentTab.sourceProjectURL	sourceProjectURL	var sourceProjectURL: DocumentProjectPath?
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV2id10Foundation4UUIDVvp	OpenDocumentTab.id	id	let id: UUID
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV4paneAA13WorkspacePaneOvp	OpenDocumentTab.pane	pane	var pane: WorkspacePane
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV5titleSSvp	OpenDocumentTab.title	title	var title: String
+swift.property	s:19PrimoDocumentDomain04OpenB3TabV7isDirtySbvp	OpenDocumentTab.isDirty	isDirty	var isDirty: Bool
+swift.property	s:19PrimoDocumentDomain0B10LayerIndexV2idSivp	DocumentLayerIndex.id	id	var id: Int { get }
+swift.property	s:19PrimoDocumentDomain0B10LayerIndexV8rawValueSivp	DocumentLayerIndex.rawValue	rawValue	let rawValue: Int
+swift.property	s:19PrimoDocumentDomain0B11ProjectPathV11displayNameSSvp	DocumentProjectPath.displayName	displayName	var displayName: String { get }
+swift.property	s:19PrimoDocumentDomain0B11ProjectPathV2id10Foundation3URLVvp	DocumentProjectPath.id	id	var id: URL { get }
+swift.property	s:19PrimoDocumentDomain0B11ProjectPathV4pathSSvp	DocumentProjectPath.path	path	var path: String { get }
+swift.property	s:19PrimoDocumentDomain0B11ProjectPathV7fileURL10Foundation0G0Vvp	DocumentProjectPath.fileURL	fileURL	let fileURL: URL
+swift.property	s:19PrimoDocumentDomain0B14WorkspaceErrorO16errorDescriptionSSSgvp	DocumentWorkspaceError.errorDescription	errorDescription	var errorDescription: String? { get }
+swift.property	s:19PrimoDocumentDomain0B16CompositeSurfaceV13pixelGeometryAA05PixelG0VSgvp	DocumentCompositeSurface.pixelGeometry	pixelGeometry	var pixelGeometry: PixelGeometry? { get }
+swift.property	s:19PrimoDocumentDomain0B16CompositeSurfaceV5widthSivp	DocumentCompositeSurface.width	width	let width: Int
+swift.property	s:19PrimoDocumentDomain0B16CompositeSurfaceV6heightSivp	DocumentCompositeSurface.height	height	let height: Int
+swift.property	s:19PrimoDocumentDomain0B16CompositeSurfaceV9pixelData10Foundation0G0Vvp	DocumentCompositeSurface.pixelData	pixelData	let pixelData: Data
+swift.property	s:19PrimoDocumentDomain0B8FolderIDV2idSivp	DocumentFolderID.id	id	var id: Int { get }
+swift.property	s:19PrimoDocumentDomain0B8FolderIDV8rawValueSivp	DocumentFolderID.rawValue	rawValue	let rawValue: Int
+swift.property	s:19PrimoDocumentDomain0B8RevisionV8rawValueSivp	DocumentRevision.rawValue	rawValue	let rawValue: Int
+swift.property	s:19PrimoDocumentDomain11CanvasColorV3redAA12UnitIntervalVvp	CanvasColor.red	red	let red: UnitInterval
+swift.property	s:19PrimoDocumentDomain11CanvasColorV4blueAA12UnitIntervalVvp	CanvasColor.blue	blue	let blue: UnitInterval
+swift.property	s:19PrimoDocumentDomain11CanvasColorV5alphaAA12UnitIntervalVvp	CanvasColor.alpha	alpha	let alpha: UnitInterval
+swift.property	s:19PrimoDocumentDomain11CanvasColorV5greenAA12UnitIntervalVvp	CanvasColor.green	green	let green: UnitInterval
+swift.property	s:19PrimoDocumentDomain11MaskSurfaceV4data10Foundation4DataVvp	MaskSurface.data	data	let data: Data
+swift.property	s:19PrimoDocumentDomain11MaskSurfaceV5widthSivp	MaskSurface.width	width	var width: Int { get }
+swift.property	s:19PrimoDocumentDomain11MaskSurfaceV6heightSivp	MaskSurface.height	height	var height: Int { get }
+swift.property	s:19PrimoDocumentDomain11MaskSurfaceV8geometryAA13PixelGeometryVvp	MaskSurface.geometry	geometry	let geometry: PixelGeometry
+swift.property	s:19PrimoDocumentDomain11RgbaSurfaceV4data10Foundation4DataVvp	RgbaSurface.data	data	let data: Data
+swift.property	s:19PrimoDocumentDomain11RgbaSurfaceV5widthSivp	RgbaSurface.width	width	var width: Int { get }
+swift.property	s:19PrimoDocumentDomain11RgbaSurfaceV6heightSivp	RgbaSurface.height	height	var height: Int { get }
+swift.property	s:19PrimoDocumentDomain11RgbaSurfaceV8geometryAA13PixelGeometryVvp	RgbaSurface.geometry	geometry	let geometry: PixelGeometry
+swift.property	s:19PrimoDocumentDomain11TextContentV8rawValueSSvp	TextContent.rawValue	rawValue	let rawValue: String
+swift.property	s:19PrimoDocumentDomain12FiniteDoubleV8rawValueSdvp	FiniteDouble.rawValue	rawValue	let rawValue: Double
+swift.property	s:19PrimoDocumentDomain12UnitIntervalV8rawValueSdvp	UnitInterval.rawValue	rawValue	let rawValue: Double
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV10pixelCountSivp	PixelGeometry.pixelCount	pixelCount	let pixelCount: Int
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV13maskByteCountSivp	PixelGeometry.maskByteCount	maskByteCount	let maskByteCount: Int
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV13rgbaByteCountSivp	PixelGeometry.rgbaByteCount	rgbaByteCount	let rgbaByteCount: Int
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV15fitsMetalUInt32Sbvp	PixelGeometry.fitsMetalUInt32	fitsMetalUInt32	var fitsMetalUInt32: Bool { get }
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV5widthSivp	PixelGeometry.width	width	let width: Int
+swift.property	s:19PrimoDocumentDomain13PixelGeometryV6heightSivp	PixelGeometry.height	height	let height: Int
+swift.property	s:19PrimoDocumentDomain13ShapeToolModeO2idSSvp	ShapeToolMode.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV10scaleValueAA20PositiveFiniteDoubleVvp	TextLayerData.scaleValue	scaleValue	let scaleValue: PositiveFiniteDouble
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV11textContentAA0dH0Vvp	TextLayerData.textContent	textContent	let textContent: TextContent
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV13fontSizeValueAA20PositiveFiniteDoubleVvp	TextLayerData.fontSizeValue	fontSizeValue	let fontSizeValue: PositiveFiniteDouble
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV14positionXValueAA12FiniteDoubleVvp	TextLayerData.positionXValue	positionXValue	let positionXValue: FiniteDouble
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV14positionYValueAA12FiniteDoubleVvp	TextLayerData.positionYValue	positionYValue	let positionYValue: FiniteDouble
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV14validatedColorAA06CanvasH0VSgvp	TextLayerData.validatedColor	validatedColor	var validatedColor: CanvasColor? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV14validatedScaleAA20PositiveFiniteDoubleVSgvp	TextLayerData.validatedScale	validatedScale	var validatedScale: PositiveFiniteDouble? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV15fontDisplayNameSSvp	TextLayerData.fontDisplayName	fontDisplayName	let fontDisplayName: String
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV15rotationDegreesSdvp	TextLayerData.rotationDegrees	rotationDegrees	var rotationDegrees: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV17validatedFontSizeAA20PositiveFiniteDoubleVSgvp	TextLayerData.validatedFontSize	validatedFontSize	var validatedFontSize: PositiveFiniteDouble? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV18fontPostScriptNameSSvp	TextLayerData.fontPostScriptName	fontPostScriptName	let fontPostScriptName: String
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV18validatedPositionXAA12FiniteDoubleVSgvp	TextLayerData.validatedPositionX	validatedPositionX	var validatedPositionX: FiniteDouble? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV18validatedPositionYAA12FiniteDoubleVSgvp	TextLayerData.validatedPositionY	validatedPositionY	var validatedPositionY: FiniteDouble? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV20rotationDegreesValueAA12FiniteDoubleVvp	TextLayerData.rotationDegreesValue	rotationDegreesValue	let rotationDegreesValue: FiniteDouble
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV24validatedRotationDegreesAA12FiniteDoubleVSgvp	TextLayerData.validatedRotationDegrees	validatedRotationDegrees	var validatedRotationDegrees: FiniteDouble? { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV3redSdvp	TextLayerData.red	red	var red: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV4blueSdvp	TextLayerData.blue	blue	var blue: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV4textSSvp	TextLayerData.text	text	var text: String { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV5alphaSdvp	TextLayerData.alpha	alpha	var alpha: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV5colorAA11CanvasColorVvp	TextLayerData.color	color	let color: CanvasColor
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV5greenSdvp	TextLayerData.green	green	var green: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV5scaleSdvp	TextLayerData.scale	scale	var scale: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV8fontSizeSdvp	TextLayerData.fontSize	fontSize	var fontSize: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV8positionSo7CGPointVvp	TextLayerData.position	position	var position: CGPoint { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV9positionXSdvp	TextLayerData.positionX	positionX	var positionX: Double { get }
+swift.property	s:19PrimoDocumentDomain13TextLayerDataV9positionYSdvp	TextLayerData.positionY	positionY	var positionY: Double { get }
+swift.property	s:19PrimoDocumentDomain14LayerBlendModeO2idSSvp	LayerBlendMode.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain14TextFontOptionV11displayNameSSvp	TextFontOption.displayName	displayName	let displayName: String
+swift.property	s:19PrimoDocumentDomain14TextFontOptionV14postScriptNameSSvp	TextFontOption.postScriptName	postScriptName	let postScriptName: String
+swift.property	s:19PrimoDocumentDomain14TextFontOptionV14sourceFilenameSSSgvp	TextFontOption.sourceFilename	sourceFilename	let sourceFilename: String?
+swift.property	s:19PrimoDocumentDomain14TextFontOptionV2idSSvp	TextFontOption.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV06targetE5IndexSiSgvp	TextLayerDraft.targetLayerIndex	targetLayerIndex	var targetLayerIndex: Int?
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV10scaleValueAA20PositiveFiniteDoubleVvp	TextLayerDraft.scaleValue	scaleValue	var scaleValue: PositiveFiniteDouble
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV11textContentAA0dH0Vvp	TextLayerDraft.textContent	textContent	var textContent: TextContent
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV13fontSizeValueAA20PositiveFiniteDoubleVvp	TextLayerDraft.fontSizeValue	fontSizeValue	var fontSizeValue: PositiveFiniteDouble
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV15fontDisplayNameSSSgvp	TextLayerDraft.fontDisplayName	fontDisplayName	var fontDisplayName: String?
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV15rotationDegreesSdvp	TextLayerDraft.rotationDegrees	rotationDegrees	var rotationDegrees: Double { get }
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV18fontPostScriptNameSSSgvp	TextLayerDraft.fontPostScriptName	fontPostScriptName	var fontPostScriptName: String?
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV20rotationDegreesValueAA12FiniteDoubleVvp	TextLayerDraft.rotationDegreesValue	rotationDegreesValue	var rotationDegreesValue: FiniteDouble
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV4textSSvp	TextLayerDraft.text	text	var text: String { get }
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV5scaleSdvp	TextLayerDraft.scale	scale	var scale: Double { get }
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV8fontSizeSdvp	TextLayerDraft.fontSize	fontSize	var fontSize: Double { get }
+swift.property	s:19PrimoDocumentDomain14TextLayerDraftV8positionSo7CGPointVSgvp	TextLayerDraft.position	position	var position: CGPoint?
+swift.property	s:19PrimoDocumentDomain15ValidCanvasSizeV5widthSivp	ValidCanvasSize.width	width	let width: Int
+swift.property	s:19PrimoDocumentDomain15ValidCanvasSizeV6heightSivp	ValidCanvasSize.height	height	let height: Int
+swift.property	s:19PrimoDocumentDomain15WorkspaceItemIDV2idSSvp	WorkspaceItemID.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain15WorkspaceItemIDV8rawValueSSvp	WorkspaceItemID.rawValue	rawValue	let rawValue: String
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV13isTransparentSbvp	CanvasPaperStyle.isTransparent	isTransparent	let isTransparent: Bool
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV14validatedColorAA0dH0VSgvp	CanvasPaperStyle.validatedColor	validatedColor	var validatedColor: CanvasColor? { get }
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV3redSfvp	CanvasPaperStyle.red	red	var red: Float { get }
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV4blueSfvp	CanvasPaperStyle.blue	blue	var blue: Float { get }
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV5alphaSfvp	CanvasPaperStyle.alpha	alpha	var alpha: Float { get }
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV5colorAA0D5ColorVvp	CanvasPaperStyle.color	color	let color: CanvasColor
+swift.property	s:19PrimoDocumentDomain16CanvasPaperStyleV5greenSfvp	CanvasPaperStyle.green	green	var green: Float { get }
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV10projectURLAA0B11ProjectPathVvp	SaveHistoryEntry.projectURL	projectURL	let projectURL: DocumentProjectPath
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV14previewSurfaceAA0b9CompositeH0VSgvp	SaveHistoryEntry.previewSurface	previewSurface	let previewSurface: DocumentCompositeSurface?
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV16previewImageData10Foundation0I0VSgvp	SaveHistoryEntry.previewImageData	previewImageData	let previewImageData: Data?
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV2idAA15WorkspaceItemIDVvp	SaveHistoryEntry.id	id	let id: WorkspaceItemID
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV5titleSSvp	SaveHistoryEntry.title	title	let title: String
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV7triggerAA0dE7TriggerOvp	SaveHistoryEntry.trigger	trigger	let trigger: SaveHistoryTrigger
+swift.property	s:19PrimoDocumentDomain16SaveHistoryEntryV9createdAt10Foundation4DateVvp	SaveHistoryEntry.createdAt	createdAt	let createdAt: Date
+swift.property	s:19PrimoDocumentDomain17NonEmptyLayerNameV8rawValueSSvp	NonEmptyLayerName.rawValue	rawValue	let rawValue: String
+swift.property	s:19PrimoDocumentDomain17SelectionToolModeO2idSSvp	SelectionToolMode.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV10canvasSizeSo6CGSizeVvp	SavedProjectSummary.canvasSize	canvasSize	let canvasSize: CGSize
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV10layerCountSivp	SavedProjectSummary.layerCount	layerCount	let layerCount: Int
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV10modifiedAt10Foundation4DateVvp	SavedProjectSummary.modifiedAt	modifiedAt	let modifiedAt: Date
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV14previewSurfaceAA0b9CompositeH0VSgvp	SavedProjectSummary.previewSurface	previewSurface	let previewSurface: DocumentCompositeSurface?
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV16previewImageData10Foundation0I0VSgvp	SavedProjectSummary.previewImageData	previewImageData	let previewImageData: Data?
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV18relativeFolderPathAA08RelativeehI0VSgvp	SavedProjectSummary.relativeFolderPath	relativeFolderPath	let relativeFolderPath: RelativeProjectFolderPath?
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV2idAA0bE4PathVvp	SavedProjectSummary.id	id	var id: DocumentProjectPath { get }
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV3urlAA0bE4PathVvp	SavedProjectSummary.url	url	let url: DocumentProjectPath
+swift.property	s:19PrimoDocumentDomain19SavedProjectSummaryV4nameSSvp	SavedProjectSummary.name	name	let name: String
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV14previewSurfaceAA0b9CompositeH0VSgvp	AutosaveRecoveryItem.previewSurface	previewSurface	let previewSurface: DocumentCompositeSurface?
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV16previewImageData10Foundation0I0VSgvp	AutosaveRecoveryItem.previewImageData	previewImageData	let previewImageData: Data?
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV16sourceProjectURLAA0bH4PathVSgvp	AutosaveRecoveryItem.sourceProjectURL	sourceProjectURL	let sourceProjectURL: DocumentProjectPath?
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV18autosaveProjectURLAA0bH4PathVvp	AutosaveRecoveryItem.autosaveProjectURL	autosaveProjectURL	let autosaveProjectURL: DocumentProjectPath
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV2idAA09WorkspaceF2IDVvp	AutosaveRecoveryItem.id	id	let id: WorkspaceItemID
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV5titleSSvp	AutosaveRecoveryItem.title	title	let title: String
+swift.property	s:19PrimoDocumentDomain20AutosaveRecoveryItemV9updatedAt10Foundation4DateVvp	AutosaveRecoveryItem.updatedAt	updatedAt	let updatedAt: Date
+swift.property	s:19PrimoDocumentDomain20PositiveFiniteDoubleV8rawValueSdvp	PositiveFiniteDouble.rawValue	rawValue	let rawValue: Double
+swift.property	s:19PrimoDocumentDomain20SelectionCombineModeO2idSSvp	SelectionCombineMode.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain22ProjectPackageLocationV11displayNameSSvp	ProjectPackageLocation.displayName	displayName	var displayName: String { get }
+swift.property	s:19PrimoDocumentDomain22ProjectPackageLocationV11projectPathAA0bdH0Vvp	ProjectPackageLocation.projectPath	projectPath	var projectPath: DocumentProjectPath { get }
+swift.property	s:19PrimoDocumentDomain22ProjectPackageLocationV2id10Foundation3URLVvp	ProjectPackageLocation.id	id	var id: URL { get }
+swift.property	s:19PrimoDocumentDomain22ProjectPackageLocationV4pathSSvp	ProjectPackageLocation.path	path	var path: String { get }
+swift.property	s:19PrimoDocumentDomain22ProjectPackageLocationV7fileURL10Foundation0H0Vvp	ProjectPackageLocation.fileURL	fileURL	let fileURL: URL
+swift.property	s:19PrimoDocumentDomain23WritableProjectLocationV11displayNameSSvp	WritableProjectLocation.displayName	displayName	var displayName: String { get }
+swift.property	s:19PrimoDocumentDomain23WritableProjectLocationV11projectPathAA0beH0Vvp	WritableProjectLocation.projectPath	projectPath	var projectPath: DocumentProjectPath { get }
+swift.property	s:19PrimoDocumentDomain23WritableProjectLocationV2id10Foundation3URLVvp	WritableProjectLocation.id	id	var id: URL { get }
+swift.property	s:19PrimoDocumentDomain23WritableProjectLocationV4pathSSvp	WritableProjectLocation.path	path	var path: String { get }
+swift.property	s:19PrimoDocumentDomain23WritableProjectLocationV7fileURL10Foundation0H0Vvp	WritableProjectLocation.fileURL	fileURL	let fileURL: URL
+swift.property	s:19PrimoDocumentDomain25ColorRangeSelectionSourceO2idSSvp	ColorRangeSelectionSource.id	id	var id: String { get }
+swift.property	s:19PrimoDocumentDomain25RelativeProjectFolderPathV10componentsSaySSGvp	RelativeProjectFolderPath.components	components	let components: [String]
+swift.property	s:19PrimoDocumentDomain25RelativeProjectFolderPathV8rawValueSSvp	RelativeProjectFolderPath.rawValue	rawValue	var rawValue: String { get }
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV12minimumAlphaSdvp	ColorRangeSelectionRequest.minimumAlpha	minimumAlpha	let minimumAlpha: Double
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV3reds5UInt8Vvp	ColorRangeSelectionRequest.red	red	let red: UInt8
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV4blues5UInt8Vvp	ColorRangeSelectionRequest.blue	blue	let blue: UInt8
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV5greens5UInt8Vvp	ColorRangeSelectionRequest.green	green	let green: UInt8
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV6sourceAA0deF6SourceOvp	ColorRangeSelectionRequest.source	source	let source: ColorRangeSelectionSource
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV9expansionSivp	ColorRangeSelectionRequest.expansion	expansion	let expansion: Int
+swift.property	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV9toleranceSdvp	ColorRangeSelectionRequest.tolerance	tolerance	let tolerance: Double
+swift.property	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseV2id10Foundation3URLVvp	SecurityScopedResourceLease.id	id	var id: URL { get }
+swift.property	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseV4pathSSvp	SecurityScopedResourceLease.path	path	var path: String { get }
+swift.property	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseV7fileURL10Foundation0I0Vvp	SecurityScopedResourceLease.fileURL	fileURL	let fileURL: URL
+swift.struct	s:19PrimoDocumentDomain04OpenB3TabV	OpenDocumentTab	OpenDocumentTab	struct OpenDocumentTab
+swift.struct	s:19PrimoDocumentDomain0B10LayerIndexV	DocumentLayerIndex	DocumentLayerIndex	struct DocumentLayerIndex
+swift.struct	s:19PrimoDocumentDomain0B11ProjectPathV	DocumentProjectPath	DocumentProjectPath	struct DocumentProjectPath
+swift.struct	s:19PrimoDocumentDomain0B16CompositeSurfaceV	DocumentCompositeSurface	DocumentCompositeSurface	struct DocumentCompositeSurface
+swift.struct	s:19PrimoDocumentDomain0B8FolderIDV	DocumentFolderID	DocumentFolderID	struct DocumentFolderID
+swift.struct	s:19PrimoDocumentDomain0B8RevisionV	DocumentRevision	DocumentRevision	struct DocumentRevision
+swift.struct	s:19PrimoDocumentDomain11CanvasColorV	CanvasColor	CanvasColor	struct CanvasColor
+swift.struct	s:19PrimoDocumentDomain11MaskSurfaceV	MaskSurface	MaskSurface	struct MaskSurface
+swift.struct	s:19PrimoDocumentDomain11RgbaSurfaceV	RgbaSurface	RgbaSurface	struct RgbaSurface
+swift.struct	s:19PrimoDocumentDomain11TextContentV	TextContent	TextContent	struct TextContent
+swift.struct	s:19PrimoDocumentDomain12FiniteDoubleV	FiniteDouble	FiniteDouble	struct FiniteDouble
+swift.struct	s:19PrimoDocumentDomain12UnitIntervalV	UnitInterval	UnitInterval	struct UnitInterval
+swift.struct	s:19PrimoDocumentDomain13PixelGeometryV	PixelGeometry	PixelGeometry	struct PixelGeometry
+swift.struct	s:19PrimoDocumentDomain13TextLayerDataV	TextLayerData	TextLayerData	struct TextLayerData
+swift.struct	s:19PrimoDocumentDomain14TextFontOptionV	TextFontOption	TextFontOption	struct TextFontOption
+swift.struct	s:19PrimoDocumentDomain14TextLayerDraftV	TextLayerDraft	TextLayerDraft	struct TextLayerDraft
+swift.struct	s:19PrimoDocumentDomain15ValidCanvasSizeV	ValidCanvasSize	ValidCanvasSize	struct ValidCanvasSize
+swift.struct	s:19PrimoDocumentDomain15WorkspaceItemIDV	WorkspaceItemID	WorkspaceItemID	struct WorkspaceItemID
+swift.struct	s:19PrimoDocumentDomain16CanvasPaperStyleV	CanvasPaperStyle	CanvasPaperStyle	struct CanvasPaperStyle
+swift.struct	s:19PrimoDocumentDomain16SaveHistoryEntryV	SaveHistoryEntry	SaveHistoryEntry	struct SaveHistoryEntry
+swift.struct	s:19PrimoDocumentDomain17NonEmptyLayerNameV	NonEmptyLayerName	NonEmptyLayerName	struct NonEmptyLayerName
+swift.struct	s:19PrimoDocumentDomain19SavedProjectSummaryV	SavedProjectSummary	SavedProjectSummary	struct SavedProjectSummary
+swift.struct	s:19PrimoDocumentDomain20AutosaveRecoveryItemV	AutosaveRecoveryItem	AutosaveRecoveryItem	struct AutosaveRecoveryItem
+swift.struct	s:19PrimoDocumentDomain20PositiveFiniteDoubleV	PositiveFiniteDouble	PositiveFiniteDouble	struct PositiveFiniteDouble
+swift.struct	s:19PrimoDocumentDomain22ProjectPackageLocationV	ProjectPackageLocation	ProjectPackageLocation	struct ProjectPackageLocation
+swift.struct	s:19PrimoDocumentDomain23WritableProjectLocationV	WritableProjectLocation	WritableProjectLocation	struct WritableProjectLocation
+swift.struct	s:19PrimoDocumentDomain25RelativeProjectFolderPathV	RelativeProjectFolderPath	RelativeProjectFolderPath	struct RelativeProjectFolderPath
+swift.struct	s:19PrimoDocumentDomain26ColorRangeSelectionRequestV	ColorRangeSelectionRequest	ColorRangeSelectionRequest	struct ColorRangeSelectionRequest
+swift.struct	s:19PrimoDocumentDomain27SecurityScopedResourceLeaseV	SecurityScopedResourceLease	SecurityScopedResourceLease	struct SecurityScopedResourceLease
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO016maxLayerCountForD0ySiAA13PixelGeometryVFZ	CanvasSizePolicy.maxLayerCountForCanvas(_:)	maxLayerCountForCanvas(_:)	static func maxLayerCountForCanvas(_ geometry: PixelGeometry) -> Int
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO018layerPixelBytesFitB6Budget19canvasRGBAByteCount0gN0SbSi_SitFZ	CanvasSizePolicy.layerPixelBytesFitDocumentBudget(canvasRGBAByteCount:layerCount:)	layerPixelBytesFitDocumentBudget(canvasRGBAByteCount:layerCount:)	static func layerPixelBytesFitDocumentBudget(canvasRGBAByteCount: Int, layerCount: Int) -> Bool
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO10fitsUInt32ySbSiFZ	CanvasSizePolicy.fitsUInt32(_:)	fitsUInt32(_:)	static func fitsUInt32(_ value: Int) -> Bool
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO13maxLayerCount014canvasRGBAByteI0S2i_tFZ	CanvasSizePolicy.maxLayerCount(canvasRGBAByteCount:)	maxLayerCount(canvasRGBAByteCount:)	static func maxLayerCount(canvasRGBAByteCount: Int) -> Int
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO14safePixelCount5width6height9maxPixelsSiSgSi_S2itFZ	CanvasSizePolicy.safePixelCount(width:height:maxPixels:)	safePixelCount(width:height:maxPixels:)	static func safePixelCount(width: Int, height: Int, maxPixels: Int = maxPixelCount) -> Int?
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO17safeMaskByteCount5width6heightSiSgSi_SitFZ	CanvasSizePolicy.safeMaskByteCount(width:height:)	safeMaskByteCount(width:height:)	static func safeMaskByteCount(width: Int, height: Int) -> Int?
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO17safeRGBAByteCount5width6heightSiSgSi_SitFZ	CanvasSizePolicy.safeRGBAByteCount(width:height:)	safeRGBAByteCount(width:height:)	static func safeRGBAByteCount(width: Int, height: Int) -> Int?
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO18fitsPositiveUInt32ySbSiFZ	CanvasSizePolicy.fitsPositiveUInt32(_:)	fitsPositiveUInt32(_:)	static func fitsPositiveUInt32(_ value: Int) -> Bool
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO21safeRectMaskByteCount5width6heightSiSgSi_SitFZ	CanvasSizePolicy.safeRectMaskByteCount(width:height:)	safeRectMaskByteCount(width:height:)	static func safeRectMaskByteCount(width: Int, height: Int) -> Int?
+swift.type.method	s:19PrimoDocumentDomain16CanvasSizePolicyO21safeRectRGBAByteCount5width6heightSiSgSi_SitFZ	CanvasSizePolicy.safeRectRGBAByteCount(width:height:)	safeRectRGBAByteCount(width:height:)	static func safeRectRGBAByteCount(width: Int, height: Int) -> Int?
+swift.type.property	s:19PrimoDocumentDomain0B8RevisionV7initialACvpZ	DocumentRevision.initial	initial	static let initial: DocumentRevision
+swift.type.property	s:19PrimoDocumentDomain11TextContentV9maxLengthSivpZ	TextContent.maxLength	maxLength	static let maxLength: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasPaperStyleV7defaultACvpZ	CanvasPaperStyle.default	default	static let `default`: CanvasPaperStyle
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO03maxB15LayerPixelBytesSivpZ	CanvasSizePolicy.maxDocumentLayerPixelBytes	maxDocumentLayerPixelBytes	static let maxDocumentLayerPixelBytes: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO03maxD9DimensionSivpZ	CanvasSizePolicy.maxCanvasDimension	maxCanvasDimension	static let maxCanvasDimension: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO13maxLayerCountSivpZ	CanvasSizePolicy.maxLayerCount	maxLayerCount	static let maxLayerCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO13maxPixelCountSivpZ	CanvasSizePolicy.maxPixelCount	maxPixelCount	static let maxPixelCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO14maxFolderCountSivpZ	CanvasSizePolicy.maxFolderCount	maxFolderCount	static let maxFolderCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO17maxVideoDimensionSivpZ	CanvasSizePolicy.maxVideoDimension	maxVideoDimension	static let maxVideoDimension: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO18maxLassoPointCountSivpZ	CanvasSizePolicy.maxLassoPointCount	maxLassoPointCount	static let maxLassoPointCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO18maxLayerNameLengthSivpZ	CanvasSizePolicy.maxLayerNameLength	maxLayerNameLength	static let maxLayerNameLength: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO20maxStrokeSampleCountSivpZ	CanvasSizePolicy.maxStrokeSampleCount	maxStrokeSampleCount	static let maxStrokeSampleCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO26maxTimelapseOperationCountSivpZ	CanvasSizePolicy.maxTimelapseOperationCount	maxTimelapseOperationCount	static let maxTimelapseOperationCount: Int
+swift.type.property	s:19PrimoDocumentDomain16CanvasSizePolicyO30maxInterpolatedSamplesPerEventSivpZ	CanvasSizePolicy.maxInterpolatedSamplesPerEvent	maxInterpolatedSamplesPerEvent	static let maxInterpolatedSamplesPerEvent: Int

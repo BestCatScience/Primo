@@ -1,0 +1,7 @@
+swift.enum	s:17PrimoLocalization11AppLanguageO	AppLanguage	AppLanguage	enum AppLanguage
+swift.enum.case	s:17PrimoLocalization11AppLanguageO7englishyA2CmF	AppLanguage.english	AppLanguage.english	case english
+swift.enum.case	s:17PrimoLocalization11AppLanguageO8japaneseyA2CmF	AppLanguage.japanese	AppLanguage.japanese	case japanese
+swift.init	s:17PrimoLocalization11AppLanguageO8rawValueACSgSS_tcfc	AppLanguage.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
+swift.property	s:17PrimoLocalization11AppLanguageO2idSSvp	AppLanguage.id	id	var id: String { get }
+swift.property	s:17PrimoLocalization11AppLanguageO5titleSSvp	AppLanguage.title	title	var title: String { get }
+swift.type.property	s:17PrimoLocalization11AppLanguageO10storageKeySSvpZ	AppLanguage.storageKey	storageKey	static let storageKey: String

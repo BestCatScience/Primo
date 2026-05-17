@@ -1,0 +1,11 @@
+swift.associatedtype	s:18PrimoCoreContracts17OperationContractP6ResultQa	OperationContract.Result	Result	associatedtype Result : OperationResult
+swift.associatedtype	s:18PrimoCoreContracts17OperationContractP7FailureQa	OperationContract.Failure	Failure	associatedtype Failure : OperationFailure
+swift.associatedtype	s:18PrimoCoreContracts17OperationContractP7RequestQa	OperationContract.Request	Request	associatedtype Request : OperationRequest
+swift.protocol	s:18PrimoCoreContracts11DomainIssueP	DomainIssue	DomainIssue	protocol DomainIssue : Error
+swift.protocol	s:18PrimoCoreContracts13DomainCommandP	DomainCommand	DomainCommand	protocol DomainCommand : Sendable
+swift.protocol	s:18PrimoCoreContracts13DomainOutcomeP	DomainOutcome	DomainOutcome	protocol DomainOutcome : Sendable
+swift.protocol	s:18PrimoCoreContracts13FailureReasonP	FailureReason	FailureReason	protocol FailureReason : Error
+swift.protocol	s:18PrimoCoreContracts15OperationResultP	OperationResult	OperationResult	protocol OperationResult : Sendable
+swift.protocol	s:18PrimoCoreContracts16OperationFailureP	OperationFailure	OperationFailure	protocol OperationFailure : Error
+swift.protocol	s:18PrimoCoreContracts16OperationRequestP	OperationRequest	OperationRequest	protocol OperationRequest : Sendable
+swift.protocol	s:18PrimoCoreContracts17OperationContractP	OperationContract	OperationContract	protocol OperationContract

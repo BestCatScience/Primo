@@ -22,7 +22,39 @@ swift package \
   --minimum-access-level public \
   --skip-synthesized-members || dump_status=$?
 
-for module in PrimoDocumentRuntime PrimoDocumentMutationContracts PrimoDocumentApplication PrimoWorkspaceRuntime; do
+snapshot_modules=(
+  PrimoAIImageApplication
+  PrimoAIImageDomain
+  PrimoAIImageRuntime
+  PrimoBrushDomain
+  PrimoBrushFileFormats
+  PrimoBrushRuntime
+  PrimoBrushRuntimeContracts
+  PrimoCanvasInputDomain
+  PrimoCanvasPresentationDomain
+  PrimoCanvasPresentationRuntime
+  PrimoCoreContracts
+  PrimoCoreTypes
+  PrimoDocumentApplication
+  PrimoDocumentAppSupport
+  PrimoDocumentContracts
+  PrimoDocumentDomain
+  PrimoDocumentGPUContracts
+  PrimoDocumentMutationContracts
+  PrimoDocumentPersistenceContracts
+  PrimoDocumentPresentationContracts
+  PrimoDocumentRenderingContracts
+  PrimoDocumentRuntime
+  PrimoDocumentStrokeApplication
+  PrimoLocalization
+  PrimoSystemClients
+  PrimoSystemContracts
+  PrimoWorkspaceApplication
+  PrimoWorkspaceDomain
+  PrimoWorkspaceRuntime
+)
+
+for module in "${snapshot_modules[@]}"; do
   symbol_graph="$(
     find "$SCRATCH_DIR" \
       -name "$module.symbols.json" \
