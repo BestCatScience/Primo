@@ -264,7 +264,7 @@ public enum TimelapseExportService {
         progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
         var progressGate = ProgressPreviewGate()
-        let replayService = DocumentTimelapseReplayService(
+        let replayService = DocumentTimelapseReplayServiceFactory.live(
             canvasSize: capture.canvasSize,
             fileClient: fileClient,
             gpuServices: gpuServices

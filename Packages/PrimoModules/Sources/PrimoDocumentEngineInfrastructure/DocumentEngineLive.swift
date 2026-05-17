@@ -362,9 +362,9 @@ package final class DocumentTimelapseReplayService: @unchecked Sendable {
 
     init(
         canvasSize: CGSize,
-        fileClient: PrimoCoreTypes.FileClient = .live,
-        dateClient: PrimoCoreTypes.DateClient = .live,
-        uuidClient: PrimoCoreTypes.UUIDClient = .live,
+        fileClient: PrimoCoreTypes.FileClient,
+        dateClient: PrimoCoreTypes.DateClient,
+        uuidClient: PrimoCoreTypes.UUIDClient,
         gpuServices: DocumentRuntimeGpuServices
     ) {
         self.stateExecutor = LockedDocumentRuntimeExecutor(
@@ -402,6 +402,39 @@ package final class DocumentTimelapseReplayService: @unchecked Sendable {
         case .failure:
             return nil
         }
+    }
+}
+
+enum DocumentTimelapseReplayServiceFactory {
+    static func live(
+        canvasSize: CGSize,
+        fileClient: PrimoCoreTypes.FileClient = .live,
+        dateClient: PrimoCoreTypes.DateClient = .live,
+        uuidClient: PrimoCoreTypes.UUIDClient = .live
+    ) -> DocumentTimelapseReplayService {
+        live(
+            canvasSize: canvasSize,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient,
+            gpuServices: DocumentRuntimeGpuServicesFactory.live()
+        )
+    }
+
+    static func live(
+        canvasSize: CGSize,
+        fileClient: PrimoCoreTypes.FileClient = .live,
+        dateClient: PrimoCoreTypes.DateClient = .live,
+        uuidClient: PrimoCoreTypes.UUIDClient = .live,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentTimelapseReplayService {
+        DocumentTimelapseReplayService(
+            canvasSize: canvasSize,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient,
+            gpuServices: gpuServices
+        )
     }
 }
 

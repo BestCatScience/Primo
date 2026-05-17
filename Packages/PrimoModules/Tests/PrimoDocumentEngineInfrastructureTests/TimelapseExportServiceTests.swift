@@ -22,7 +22,7 @@ struct TimelapseExportServiceTests {
             pixelData: Data(repeating: 0x7f, count: 16)
         )
         let gpuServices = RecordingTimelapseGpuServices(surface: surface)
-        let replayService = DocumentTimelapseReplayService(
+        let replayService = DocumentTimelapseReplayServiceFactory.live(
             canvasSize: CGSize(width: 2, height: 2),
             gpuServices: gpuServices.services()
         )
@@ -50,14 +50,26 @@ struct TimelapseExportServiceTests {
         )
         let engineLive = try String(contentsOf: engineLiveURL, encoding: .utf8)
         let exportService = try String(contentsOf: exportServiceURL, encoding: .utf8)
+        let replayServiceDeclaration = engineLive
+            .components(separatedBy: "package final class DocumentTimelapseReplayService")
+            .dropFirst()
+            .joined(separator: "package final class DocumentTimelapseReplayService")
+            .components(separatedBy: "enum DocumentTimelapseReplayServiceFactory")
+            .first ?? engineLive
 
         #expect(engineLive.contains("package final class DocumentTimelapseReplayService"))
+        #expect(engineLive.contains("enum DocumentTimelapseReplayServiceFactory"))
+        #expect(engineLive.contains("static func live(\n        canvasSize: CGSize,"))
         #expect(engineLive.contains("init(\n        canvasSize: CGSize,"))
         #expect(engineLive.contains("gpuServices: DocumentRuntimeGpuServices"))
+        #expect(!replayServiceDeclaration.contains("fileClient: PrimoCoreTypes.FileClient = .live"))
+        #expect(!replayServiceDeclaration.contains("dateClient: PrimoCoreTypes.DateClient = .live"))
+        #expect(!replayServiceDeclaration.contains("uuidClient: PrimoCoreTypes.UUIDClient = .live"))
         #expect(!engineLive.contains("public convenience init(\n        canvasSize: CGSize,"))
         #expect(engineLive.contains("gpuServices: gpuServices"))
         #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServicesFactory.live()"))
         #expect(exportService.contains("gpuServices: DocumentRuntimeGpuServices"))
+        #expect(exportService.contains("DocumentTimelapseReplayServiceFactory.live("))
         #expect(exportService.contains("gpuServices: gpuServices"))
     }
 
