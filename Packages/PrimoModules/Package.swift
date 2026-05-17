@@ -473,7 +473,6 @@ let package = Package(
                 "PrimoDocumentApplication",
                 "PrimoDocumentContracts",
                 "PrimoDocumentRuntime",
-                "PrimoDocumentRuntimeLive",
                 "PrimoWorkspaceApplication",
                 "PrimoWorkspaceInfrastructure",
             ],

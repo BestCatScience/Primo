@@ -4,7 +4,6 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentRuntime
-import PrimoDocumentRuntimeLive
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 
@@ -51,31 +50,4 @@ public enum WorkspaceRuntimeFactory {
         )
     }
 
-    public static func liveDocumentWorkspaceClient(
-        fileClient: FileClient,
-        dateClient: DateClient,
-        uuidClient: UUIDClient
-    ) -> DocumentWorkspaceClient {
-        DocumentWorkspaceClient.live(
-            fileClient: fileClient,
-            dateClient: dateClient,
-            uuidClient: uuidClient,
-            previewGateway: DocumentWorkspacePreviewGateway(
-                loadProjectPreview: { packageURL in
-                    let preview = try DocumentProjectPreviewLoader.loadPreview(
-                        from: packageURL.fileURL,
-                        fileClient: fileClient,
-                        dateClient: dateClient,
-                        uuidClient: uuidClient
-                    )
-                    return DocumentWorkspacePreview(
-                        canvasSize: preview.canvasSize,
-                        layerCount: preview.layerCount,
-                        previewSurface: preview.previewSurface,
-                        previewImageData: nil
-                    )
-                }
-            )
-        )
-    }
 }

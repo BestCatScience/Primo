@@ -547,6 +547,10 @@ struct GpuSideEffectIsolationArchitectureTests {
             graph["PrimoDocumentAppSupport"]?.contains("PrimoDocumentRuntimeLive") == true,
             "SwiftPM app support target should own live runtime implementation wiring"
         )
+        #expect(
+            graph["PrimoWorkspaceRuntime"]?.contains("PrimoDocumentRuntimeLive") != true,
+            "SwiftPM app-facing workspace runtime target should not depend on document live runtime implementation"
+        )
         for product in runtimeWiringProducts {
             #expect(
                 graph["PrimoDocumentAppSupport"]?.contains(product) == true,
@@ -1043,12 +1047,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             (
                 target: "PrimoWorkspaceRuntime",
                 sourcePath: "Packages/PrimoModules/Sources/PrimoWorkspaceRuntime/WorkspaceRuntimeFacade.swift",
-                expectedDependencies: Set(["PrimoWorkspaceApplication", "PrimoWorkspaceInfrastructure", "PrimoDocumentRuntime", "PrimoDocumentRuntimeLive"]),
-                allowedImplementationImports: Set(["PrimoWorkspaceInfrastructure", "PrimoDocumentRuntimeLive"]),
+                expectedDependencies: Set(["PrimoWorkspaceApplication", "PrimoWorkspaceInfrastructure", "PrimoDocumentRuntime"]),
+                allowedImplementationImports: Set(["PrimoWorkspaceInfrastructure"]),
                 liveTokens: [
                     "DocumentWorkspaceClient.infrastructureLive(",
                     "DocumentImportClient.infrastructureLive(",
-                    "DocumentProjectPreviewLoader.loadPreview(",
                     "WorkspaceApplicationServices("
                 ]
             ),
