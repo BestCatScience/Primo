@@ -110,8 +110,14 @@ public struct DocumentMutationWorkflowService: Sendable {
 
     public func assignLayer(_ index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentMutationResult {
         requireCurrent(index).flatMap { index in
-            requireCurrent(folderID).flatMap { folderID in
-                execute(.structure(.assignLayerToFolder(index: index.rawValue, folderID: folderID?.rawValue)))
+            requireCurrent(folderID).flatMap { folderOutcome in
+                let rawFolderID: Int? = switch folderOutcome {
+                case let .folder(folderID):
+                    folderID.rawValue
+                case .noFolder:
+                    nil
+                }
+                return execute(.structure(.assignLayerToFolder(index: index.rawValue, folderID: rawFolderID)))
             }
         }
     }
@@ -272,9 +278,14 @@ public struct DocumentMutationWorkflowService: Sendable {
         }
     }
 
-    private func requireCurrent(_ folderID: ExistingFolderID?) -> Result<ExistingFolderID?, DocumentMutationFailure> {
-        guard let folderID else { return .success(nil) }
-        return requireCurrent(folderID).map(Optional.some)
+    private enum CurrentFolderOutcome {
+        case folder(ExistingFolderID)
+        case noFolder
+    }
+
+    private func requireCurrent(_ folderID: ExistingFolderID?) -> Result<CurrentFolderOutcome, DocumentMutationFailure> {
+        guard let folderID else { return .success(.noFolder) }
+        return requireCurrent(folderID).map(CurrentFolderOutcome.folder)
     }
 
     private func requireCurrent(_ anchorLayerIndex: LayerAnchorIndex) -> Result<LayerAnchorIndex, DocumentMutationFailure> {

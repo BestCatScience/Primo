@@ -2,6 +2,7 @@ swift.enum	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO	DocumentGpuMutatio
 swift.enum	s:30PrimoDocumentMutationContracts0bC11CoreFailureO	DocumentMutationCoreFailure	DocumentMutationCoreFailure	enum DocumentMutationCoreFailure
 swift.enum	s:30PrimoDocumentMutationContracts0bC7FailureO	DocumentMutationFailure	DocumentMutationFailure	enum DocumentMutationFailure
 swift.enum	s:30PrimoDocumentMutationContracts17GradientMapPresetO	GradientMapPreset	GradientMapPreset	enum GradientMapPreset
+swift.enum	s:30PrimoDocumentMutationContracts20TextLayerDataOutcomeO	TextLayerDataOutcome	TextLayerDataOutcome	enum TextLayerDataOutcome
 swift.enum	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO	LayerProcessingRequest	LayerProcessingRequest	enum LayerProcessingRequest
 swift.enum.case	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO12kernelFailedyACSS_tcACmF	DocumentGpuMutationFailure.kernelFailed(operation:)	DocumentGpuMutationFailure.kernelFailed(operation:)	case kernelFailed(operation: String)
 swift.enum.case	s:30PrimoDocumentMutationContracts0b3GpuC7FailureO13staleSnapshotyACSS_tcACmF	DocumentGpuMutationFailure.staleSnapshot(operation:)	DocumentGpuMutationFailure.staleSnapshot(operation:)	case staleSnapshot(operation: String)
@@ -56,6 +57,8 @@ swift.enum.case	s:30PrimoDocumentMutationContracts17GradientMapPresetO5sepiayA2C
 swift.enum.case	s:30PrimoDocumentMutationContracts17GradientMapPresetO5toxicyA2CmF	GradientMapPreset.toxic	GradientMapPreset.toxic	case toxic
 swift.enum.case	s:30PrimoDocumentMutationContracts17GradientMapPresetO6sunsetyA2CmF	GradientMapPreset.sunset	GradientMapPreset.sunset	case sunset
 swift.enum.case	s:30PrimoDocumentMutationContracts17GradientMapPresetO8graphiteyA2CmF	GradientMapPreset.graphite	GradientMapPreset.graphite	case graphite
+swift.enum.case	s:30PrimoDocumentMutationContracts20TextLayerDataOutcomeO02noeF0yA2CmF	TextLayerDataOutcome.noTextLayer	TextLayerDataOutcome.noTextLayer	case noTextLayer
+swift.enum.case	s:30PrimoDocumentMutationContracts20TextLayerDataOutcomeO04textF0yAC0aB6Domain0efG0VcACmF	TextLayerDataOutcome.textLayer(_:)	TextLayerDataOutcome.textLayer(_:)	case textLayer(TextLayerData)
 swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO11gradientMapyAcA08GradientI6PresetOcACmF	LayerProcessingRequest.gradientMap(_:)	LayerProcessingRequest.gradientMap(_:)	case gradientMap(GradientMapPreset)
 swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO12colorBalanceyAcA05ColorI8SettingsVcACmF	LayerProcessingRequest.colorBalance(_:)	LayerProcessingRequest.colorBalance(_:)	case colorBalance(ColorBalanceSettings)
 swift.enum.case	s:30PrimoDocumentMutationContracts22LayerProcessingRequestO16luminanceToAlphayA2CmF	LayerProcessingRequest.luminanceToAlpha	LayerProcessingRequest.luminanceToAlpha	case luminanceToAlpha
@@ -84,7 +87,7 @@ swift.init	s:30PrimoDocumentMutationContracts15PosterizeLevelsVyACSgSicfc	Poster
 swift.init	s:30PrimoDocumentMutationContracts15RotationDegreesVyACSgSdcfc	RotationDegrees.init(_:)	init(_:)	init?(_ rawValue: Double)
 swift.init	s:30PrimoDocumentMutationContracts16AdjustmentOffsetV8clampingACSd_tcfc	AdjustmentOffset.init(clamping:)	init(clamping:)	init(clamping rawValue: Double)
 swift.init	s:30PrimoDocumentMutationContracts16AdjustmentOffsetVyACSgSdcfc	AdjustmentOffset.init(_:)	init(_:)	init?(_ rawValue: Double)
-swift.init	s:30PrimoDocumentMutationContracts16TextLayerGatewayV04textF4Data03seteF005clearefI0ACs6ResultOy0aB6Domain0efI0VSgAA0bC7FailureOGSiYbc_AHyytANGSi_AKtYbcAPSiYbctcfc	TextLayerGateway.init(textLayerData:setTextLayer:clearTextLayerData:)	init(textLayerData:setTextLayer:clearTextLayerData:)	init(textLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>, setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult, clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult)
+swift.init	s:30PrimoDocumentMutationContracts16TextLayerGatewayV04textF4Data03seteF005clearefI0ACs6ResultOyAA0efI7OutcomeOAA0bC7FailureOGSiYbc_AHyytALGSi_0aB6Domain0efI0VtYbcANSiYbctcfc	TextLayerGateway.init(textLayerData:setTextLayer:clearTextLayerData:)	init(textLayerData:setTextLayer:clearTextLayerData:)	init(textLayerData: @escaping @Sendable (Int) -> Result<TextLayerDataOutcome, DocumentMutationFailure>, setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult, clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult)
 swift.init	s:30PrimoDocumentMutationContracts17FiniteTranslationVyACSgSo6CGSizeVcfc	FiniteTranslation.init(_:)	init(_:)	init?(_ rawValue: CGSize)
 swift.init	s:30PrimoDocumentMutationContracts17GradientMapPresetO8rawValueACSgSS_tcfc	GradientMapPreset.init(rawValue:)	init(rawValue:)	init?(rawValue: String)
 swift.init	s:30PrimoDocumentMutationContracts17PosterizeSettingsV6levelsACSd_tcfc	PosterizeSettings.init(levels:)	init(levels:)	init(levels: Double = 6)

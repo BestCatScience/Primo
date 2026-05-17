@@ -1036,12 +1036,12 @@ public struct DocumentHistoryGateway: Sendable {
 }
 
 public struct TextLayerGateway: Sendable {
-    package let textLayerData: @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>
+    package let textLayerData: @Sendable (Int) -> Result<TextLayerDataOutcome, DocumentMutationFailure>
     package let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
     package let clearTextLayerData: @Sendable (Int) -> DocumentMutationResult
 
     public init(
-        textLayerData: @escaping @Sendable (Int) -> Result<TextLayerData?, DocumentMutationFailure>,
+        textLayerData: @escaping @Sendable (Int) -> Result<TextLayerDataOutcome, DocumentMutationFailure>,
         setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
         clearTextLayerData: @escaping @Sendable (Int) -> DocumentMutationResult
     ) {
@@ -1050,6 +1050,11 @@ public struct TextLayerGateway: Sendable {
         self.clearTextLayerData = clearTextLayerData
     }
 
+}
+
+public enum TextLayerDataOutcome: Equatable, Sendable {
+    case textLayer(TextLayerData)
+    case noTextLayer
 }
 
 public struct DocumentLayerEffectsGateway: Sendable {

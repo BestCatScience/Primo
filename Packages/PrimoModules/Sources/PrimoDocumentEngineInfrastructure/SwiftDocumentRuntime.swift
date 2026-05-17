@@ -53,6 +53,11 @@ struct RuntimeStrokeCommitPlan: Sendable {
     let gpuServices: DocumentRuntimeGpuServices
 }
 
+enum RuntimeStrokeCommitPlanOutcome: Sendable {
+    case commit(RuntimeStrokeCommitPlan)
+    case noCurrentStroke
+}
+
 struct RuntimeBlurPlan: Sendable {
     let sessionID: UUID?
     let layerIndex: Int
@@ -265,8 +270,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         switch makeResizeCanvasPlan(width: width, height: height) {
         case let .failure(failure):
             return .failure(failure)
-        case let .success(plan):
-            guard let plan else { return .success(()) }
+        case .success(.noResizeNeeded):
+            return .success(())
+        case let .success(.resize(plan)):
             guard let layers = plan.resizedLayers() else {
                 return .failure(.rawAPIUnavailable(operation: "resizeCanvas"))
             }
@@ -278,8 +284,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         switch makeResizeCanvasExtentPlan(width: width, height: height) {
         case let .failure(failure):
             return .failure(failure)
-        case let .success(plan):
-            guard let plan else { return .success(()) }
+        case .success(.noResizeNeeded):
+            return .success(())
+        case let .success(.resize(plan)):
             guard let layers = plan.resizedLayers() else {
                 return .failure(.rawAPIUnavailable(operation: "resizeCanvasExtent"))
             }
@@ -287,11 +294,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
     }
 
-    func makeResizeCanvasPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+    func makeResizeCanvasPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlanOutcome, DocumentMutationFailure> {
         makeResizeCanvasPlan(width: width, height: height, mode: .scale)
     }
 
-    func makeResizeCanvasExtentPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+    func makeResizeCanvasExtentPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlanOutcome, DocumentMutationFailure> {
         makeResizeCanvasPlan(width: width, height: height, mode: .extent)
     }
 
@@ -299,7 +306,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         width: Int,
         height: Int,
         mode: RuntimeResizeCanvasPlan.Mode
-    ) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+    ) -> Result<RuntimeResizeCanvasPlanOutcome, DocumentMutationFailure> {
         CanvasResizeCoordinator.makeResizeCanvasPlan(
             width: width,
             height: height,
@@ -983,14 +990,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
-    func currentStrokeCommitPlan() -> Result<RuntimeStrokeCommitPlan?, DocumentMutationFailure> {
-        guard let currentStroke = strokeCoordinator.currentStrokePlanInput() else { return .success(nil) }
+    func currentStrokeCommitPlan() -> Result<RuntimeStrokeCommitPlanOutcome, DocumentMutationFailure> {
+        guard let currentStroke = strokeCoordinator.currentStrokePlanInput() else { return .success(.noCurrentStroke) }
         return makeStrokeCommitPlan(
             samples: currentStroke.samples,
             brush: currentStroke.brush,
             layerIndex: currentStroke.layerIndex,
             sessionID: currentStroke.id
-        ).map(Optional.some)
+        ).map(RuntimeStrokeCommitPlanOutcome.commit)
     }
 
     func clearCurrentStroke(sessionID: UUID? = nil) {
@@ -1329,9 +1336,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         switch currentStrokeCommitPlan() {
         case let .failure(failure):
             return .failure(failure)
-        case .success(nil):
+        case .success(.noCurrentStroke):
             return .success(())
-        case let .success(plan?):
+        case let .success(.commit(plan)):
             guard let result = strokeCommitResult(for: plan) else {
                 return .failure(.rawAPIUnavailable(operation: "applyCommittedStroke"))
             }

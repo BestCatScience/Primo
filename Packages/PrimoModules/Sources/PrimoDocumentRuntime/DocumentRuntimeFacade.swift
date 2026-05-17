@@ -160,12 +160,12 @@ public struct DocumentPresentationReader: Sendable {
 }
 
 public struct DocumentTextLayerService: Sendable {
-    private let textLayerDataHandler: @Sendable (ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure>
+    private let textLayerDataHandler: @Sendable (ExistingLayerIndex) -> Result<TextLayerDataOutcome, DocumentMutationFailure>
     private let setTextLayerHandler: @Sendable (EditableLayerIndex, TextLayerData) -> DocumentMutationResult
     private let clearTextLayerDataHandler: @Sendable (EditableLayerIndex) -> DocumentMutationResult
 
     public init(
-        textLayerData: @escaping @Sendable (ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure>,
+        textLayerData: @escaping @Sendable (ExistingLayerIndex) -> Result<TextLayerDataOutcome, DocumentMutationFailure>,
         setTextLayer: @escaping @Sendable (EditableLayerIndex, TextLayerData) -> DocumentMutationResult,
         clearTextLayerData: @escaping @Sendable (EditableLayerIndex) -> DocumentMutationResult
     ) {
@@ -198,7 +198,7 @@ public struct DocumentTextLayerService: Sendable {
         )
     }
 
-    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> {
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerDataOutcome, DocumentMutationFailure> {
         textLayerDataHandler(index)
     }
 
@@ -920,7 +920,7 @@ public struct TextLayerEditingRuntime: Sendable {
     }
 
     public func setTextLayer(_ index: EditableLayerIndex, textLayer: TextLayerData) -> DocumentMutationResult { mutationWorkflow.setTextLayer(index, textLayer: textLayer) }
-    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { textLayerService.textLayerData(index) }
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerDataOutcome, DocumentMutationFailure> { textLayerService.textLayerData(index) }
     public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { textLayerService.clearTextLayerData(index) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { contentService.applyTextLayer(textLayer, to: target) }
     public func applyTextLayerMutation(_ index: EditableLayerIndex, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult { layerCommands.applyTextLayerMutation(index.rawValue, textLayer, payload) }
@@ -1126,7 +1126,7 @@ public struct LayerEditingRuntime: Sendable {
     public func applyPixels(_ pixelData: LayerPixelData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { content.applyPixels(pixelData, to: target) }
     public func applyTextLayer(_ textLayer: TextLayerData, to target: LayerContentMutationTarget) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> { text.applyTextLayer(textLayer, to: target) }
     public func replaceLayerPixelsInRect(_ index: EditableLayerIndex, _ rect: LayerPixelRect, _ pixelData: LayerPixelData) -> DocumentMutationResult { content.replaceLayerPixelsInRect(index, rect, pixelData) }
-    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> { text.textLayerData(index) }
+    public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerDataOutcome, DocumentMutationFailure> { text.textLayerData(index) }
     public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult { text.clearTextLayerData(index) }
     public func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditing.execute(command, state: context) }
     public func executeCanvasEditing(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome { canvasEditing.executeCanvasEditing(command, state: context) }

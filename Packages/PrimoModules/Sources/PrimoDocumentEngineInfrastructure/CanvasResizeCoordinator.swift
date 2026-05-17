@@ -146,6 +146,11 @@ struct RuntimeResizeCanvasPlan: Sendable {
     }
 }
 
+enum RuntimeResizeCanvasPlanOutcome: Sendable {
+    case resize(RuntimeResizeCanvasPlan)
+    case noResizeNeeded
+}
+
 enum CanvasResizeCoordinator {
     static func makeResizeCanvasPlan(
         width: Int,
@@ -155,25 +160,27 @@ enum CanvasResizeCoordinator {
         beforeSnapshot: () -> SwiftDocumentStoreSnapshot,
         documentGeneration: UUID,
         gpuServices: DocumentRuntimeGpuServices
-    ) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+    ) -> Result<RuntimeResizeCanvasPlanOutcome, DocumentMutationFailure> {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
         let sourceSize = PaintDocumentCanvasSize(width: snapshot.canvasWidth, height: snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        guard sourceSize != targetSize else { return .success(nil) }
+        guard sourceSize != targetSize else { return .success(.noResizeNeeded) }
         let before = beforeSnapshot()
         return .success(
-            RuntimeResizeCanvasPlan(
-                mode: mode,
-                documentGeneration: documentGeneration,
-                before: before,
-                sourceWidth: sourceSize.width,
-                sourceHeight: sourceSize.height,
-                targetWidth: targetSize.width,
-                targetHeight: targetSize.height,
-                layers: before.layers,
-                gpuServices: gpuServices
+            .resize(
+                RuntimeResizeCanvasPlan(
+                    mode: mode,
+                    documentGeneration: documentGeneration,
+                    before: before,
+                    sourceWidth: sourceSize.width,
+                    sourceHeight: sourceSize.height,
+                    targetWidth: targetSize.width,
+                    targetHeight: targetSize.height,
+                    layers: before.layers,
+                    gpuServices: gpuServices
+                )
             )
         )
     }

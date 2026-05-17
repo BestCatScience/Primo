@@ -476,7 +476,7 @@ private extension DocumentLayerEffectsGateway {
 
 private extension TextLayerGateway {
     static let unused = TextLayerGateway(
-        textLayerData: { _ in .success(nil) },
+        textLayerData: { _ in .success(.noTextLayer) },
         setTextLayer: { _, _ in .failure(.bridgeMutationFailed(.init(operation: "unused"))) },
         clearTextLayerData: { _ in .success(()) }
     )

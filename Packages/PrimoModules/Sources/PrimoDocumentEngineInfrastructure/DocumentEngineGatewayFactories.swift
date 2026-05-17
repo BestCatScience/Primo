@@ -73,6 +73,9 @@ enum DocumentEngineDirtyUpdateQueueFactory {
             consumeDirtyUpdate: {
                 runtimeExecutor.performValue(operation: "consumeDirtyUpdate") {
                     $0.consumeDirtyUpdate()
+                }.map { update in
+                    guard let update else { return .noUpdate }
+                    return .update(update)
                 }
             }
         )
@@ -182,8 +185,9 @@ enum DocumentEngineMutationGatewayFactory {
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
-        case let .success(plan):
-            guard let plan else { return .success(()) }
+        case .success(.noResizeNeeded):
+            return .success(())
+        case let .success(.resize(plan)):
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvas")))
             }
@@ -204,8 +208,9 @@ enum DocumentEngineMutationGatewayFactory {
         switch planResult {
         case let .failure(failure):
             return .failure(failure)
-        case let .success(plan):
-            guard let plan else { return .success(()) }
+        case .success(.noResizeNeeded):
+            return .success(())
+        case let .success(.resize(plan)):
             guard let layers = plan.resizedLayers() else {
                 return .failure(.gpu(.kernelFailed(operation: "resizeCanvasExtent")))
             }
@@ -384,9 +389,9 @@ enum DocumentEngineStrokeGatewayFactory {
         case let .failure(failure):
             logger.error("Current stroke commit plan failed: \(String(describing: failure), privacy: .public)")
             return .failure(failure)
-        case .success(nil):
+        case .success(.noCurrentStroke):
             return .success(())
-        case let .success(plan?):
+        case let .success(.commit(plan)):
             guard let result = plan.gpuServices.commitStrokeMutation(
                 basePixelData: plan.pixelData,
                 baseBufferHandle: plan.baseBufferHandle,
@@ -622,6 +627,9 @@ enum DocumentEngineTextLayerGatewayFactory {
             textLayerData: { index in
                 runtimeExecutor.performValue(operation: "textLayerData") {
                     $0.textLayerData(index: index)
+                }.map { textLayer in
+                    guard let textLayer else { return .noTextLayer }
+                    return .textLayer(textLayer)
                 }
             },
             setTextLayer: { index, textLayer in

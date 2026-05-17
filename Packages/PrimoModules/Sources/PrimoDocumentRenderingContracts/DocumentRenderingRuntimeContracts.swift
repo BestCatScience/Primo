@@ -40,13 +40,18 @@ public struct DocumentRenderGateway: Sendable {
 }
 
 public struct DocumentDirtyUpdateQueue: Sendable {
-    package let consumeDirtyUpdate: @Sendable () -> Result<IncrementalLayerUpdate?, DocumentMutationFailure>
+    package let consumeDirtyUpdate: @Sendable () -> Result<DocumentDirtyUpdateOutcome, DocumentMutationFailure>
 
     public init(
-        consumeDirtyUpdate: @escaping @Sendable () -> Result<IncrementalLayerUpdate?, DocumentMutationFailure>
+        consumeDirtyUpdate: @escaping @Sendable () -> Result<DocumentDirtyUpdateOutcome, DocumentMutationFailure>
     ) {
         self.consumeDirtyUpdate = consumeDirtyUpdate
     }
+}
+
+public enum DocumentDirtyUpdateOutcome: Equatable, Sendable {
+    case update(IncrementalLayerUpdate)
+    case noUpdate
 }
 
 public enum DocumentSelectionCombineMode: Sendable {

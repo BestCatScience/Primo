@@ -485,6 +485,31 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func fallibleOptionalResultsUseOutcomeEnums() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceFiles = [
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentRenderingContracts/DocumentRenderingRuntimeContracts.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/CanvasResizeCoordinator.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
+        ]
+        let optionalResultPattern = try Regex(#"Result<[^>\n]+\?,\s*[^>\n]+>"#)
+
+        for sourceFile in sourceFiles {
+            let body = try String(contentsOf: repoRoot.appendingPathComponent(sourceFile), encoding: .utf8)
+            #expect(body.firstMatch(of: optionalResultPattern) == nil, "\(sourceFile) should use outcome enums instead of Result<T?, Failure>")
+        }
+    }
+
+    @Test
     func lockedRuntimeExecutorGuardsAgainstReentrantAccess() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
