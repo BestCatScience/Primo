@@ -224,6 +224,48 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
+    func layerMutationSequencesRejectStaleLayerIndexesProperty() throws {
+        for seed in UInt64(0)..<64 {
+            let runtime = SwiftDocumentRuntime(
+                width: 4,
+                height: 4,
+                gpuServices: DocumentRuntimeGpuServicesFactory.live()
+            )
+            for layerNumber in 1..<4 {
+                _ = try runtime.addLayer(name: "Layer \(layerNumber)").get()
+            }
+
+            let capturedPresentation = runtime.lightweightPresentation()
+            let capturedContext = mutationContext(from: capturedPresentation)
+            let targetIndex = Int(seed % UInt64(capturedPresentation.layerRows.count))
+            var layerCount = capturedPresentation.layerRows.count
+            try applyLayerMutationSequence(seed: seed, runtime: runtime, layerCount: &layerCount)
+            let currentPresentation = runtime.lightweightPresentation()
+
+            #expect(currentPresentation.revision != capturedPresentation.revision)
+            let result = DocumentEditorUseCase().execute(
+                .attribute(.setLayerName(index: targetIndex, name: "Stale \(seed)")),
+                in: capturedContext,
+                gateway: RuntimeDocumentEditorGateway(
+                    runtime: runtime,
+                    currentPresentation: currentPresentation
+                )
+            )
+
+            switch result {
+            case .success:
+                Issue.record("Expected stale layer failure for seed \(seed)")
+            case let .failure(failure):
+                #expect(failure == .staleLayerIndex(
+                    index: targetIndex,
+                    validationRevision: capturedPresentation.revision,
+                    currentRevision: currentPresentation.revision
+                ))
+            }
+        }
+    }
+
+    @Test
     func replaceLayerPixelsRejectsEmptyInput() {
         let runtime = DocumentEngineFactory.live()
         expectFailure(runtime.mutationGateway.replaceLayerPixels(0, Data()), .emptyInput)
@@ -661,6 +703,56 @@ struct PaintDocumentMutationContractTests {
             }
             return nil
         }.first
+    }
+
+    private func mutationContext(from presentation: PaintDocumentPresentation) -> DocumentLayerMutationContext {
+        DocumentLayerMutationContext(
+            revision: presentation.revision,
+            layerIndexes: presentation.layerRows.map(\.index),
+            folderIDs: Set(
+                presentation.layerSidebarRows.compactMap { row in
+                    guard case let .folder(folder) = row else { return nil }
+                    return folder.id
+                }
+            ),
+            canvasGeometry: presentation.geometry,
+            isLayerLocked: { index in
+                presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
+            }
+        )
+    }
+
+    private func applyLayerMutationSequence(
+        seed: UInt64,
+        runtime: SwiftDocumentRuntime,
+        layerCount: inout Int
+    ) throws {
+        var state = seed &+ 1
+        for step in 0..<5 {
+            state = nextMutationSeed(state)
+            switch Int(state % 4) {
+            case 0:
+                _ = try runtime.addLayer(name: "Generated \(seed)-\(step)").get()
+                layerCount += 1
+            case 1:
+                let index = Int((state >> 8) % UInt64(layerCount))
+                _ = try runtime.duplicateLayer(index: index, name: "Duplicate \(seed)-\(step)").get()
+                layerCount += 1
+            case 2 where layerCount > 1:
+                let index = Int((state >> 16) % UInt64(layerCount))
+                try runtime.deleteLayer(index: index).get()
+                layerCount -= 1
+            default:
+                guard layerCount > 1 else { continue }
+                let source = Int((state >> 24) % UInt64(layerCount))
+                let destination = Int((state >> 32) % UInt64(layerCount))
+                try runtime.moveLayer(from: source, to: destination).get()
+            }
+        }
+    }
+
+    private func nextMutationSeed(_ state: UInt64) -> UInt64 {
+        state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
     }
 
     private func temporaryProjectURL() -> URL {

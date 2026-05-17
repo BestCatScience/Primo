@@ -217,6 +217,30 @@ struct PaintDocumentPersistenceServiceTests {
     }
 
     @Test
+    func validateProjectPackageRejectsFuzzedInvalidManifestData() throws {
+        let invalidPayloads: [Data] = [
+            Data(),
+            Data([0x00, 0xff, 0x7f, 0x80]),
+            Data("{".utf8),
+            Data("[]".utf8),
+            Data("null".utf8),
+            Data(#"{"version":1,"canvasWidth":"wide","canvasHeight":1,"layers":[]}"#.utf8),
+            Data(#"{"version":1,"canvasWidth":1,"canvasHeight":1,"activeLayerIndex":0,"layers":"nope"}"#.utf8),
+        ] + deterministicInvalidManifestPayloads(seed: 0xA71E1, count: 24)
+
+        for (index, payload) in invalidPayloads.enumerated() {
+            let projectURL = try makeProjectPackage()
+            defer { try? FileManager.default.removeItem(at: projectURL) }
+            let manifestURL = projectURL.appendingPathComponent("manifest.json", isDirectory: false)
+            try payload.write(to: manifestURL)
+
+            #expect(throws: Error.self, "payload \(index) should be rejected") {
+                try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+            }
+        }
+    }
+
+    @Test
     func validateProjectPackageRejectsInvalidManifestLayerReferencesAndAttributes() throws {
         let invalidPackages = try [
             makeProjectPackage(activeLayerIndex: .unchecked(1)),
@@ -408,5 +432,20 @@ struct PaintDocumentPersistenceServiceTests {
         let manifestData = try JSONEncoder().encode(document)
         try manifestData.write(to: projectURL.appendingPathComponent("manifest.json", isDirectory: false))
         return projectURL
+    }
+
+    private func deterministicInvalidManifestPayloads(seed: UInt64, count: Int) -> [Data] {
+        var state = seed
+        return (0..<count).map { sample in
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            let length = Int((state >> 57) % 48) + sample % 5
+            var bytes: [UInt8] = []
+            bytes.reserveCapacity(length)
+            for offset in 0..<length {
+                state = state &* 2_862_933_555_777_941_757 &+ 3_037_000_493
+                bytes.append(UInt8(truncatingIfNeeded: state >> UInt64((offset % 8) * 8)))
+            }
+            return Data(bytes)
+        }
     }
 }
