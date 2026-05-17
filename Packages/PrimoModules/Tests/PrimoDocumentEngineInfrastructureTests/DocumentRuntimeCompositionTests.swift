@@ -3,8 +3,10 @@ import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentRuntime
 import PrimoDocumentRuntimeLive
+import PrimoDocumentStrokeApplication
 @testable import PrimoDocumentPresentationContracts
 @testable import PrimoDocumentRenderingContracts
 @testable import PrimoDocumentRenderingInfrastructure
@@ -12,51 +14,85 @@ import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
 private extension DocumentEngineRuntimeComposition {
-    func withTestHistoryGateway(
-        _ historyGateway: DocumentHistoryGateway
+    func withOverrides(
+        queryGateway: DocumentQueryGateway? = nil,
+        renderGateway: DocumentRenderGateway? = nil,
+        dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
+        mutationGateway: DocumentMutationGateway? = nil,
+        strokeGateway: StrokeInputGateway? = nil,
+        historyGateway: DocumentHistoryGateway? = nil,
+        persistenceGateway: DocumentPersistenceGateway? = nil,
+        exportGateway: DocumentExportGateway? = nil,
+        textLayerGateway: TextLayerGateway? = nil,
+        layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
+        editingGateway: DocumentEditingGateway? = nil,
+        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
+        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
+        layerTransformOperations: DocumentLayerTransformOperations? = nil,
+        renderingOperations: DocumentRenderingOperations? = nil,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
     ) -> DocumentEngineRuntimeComposition {
         DocumentEngineRuntimeComposition(
-            queryGateway: queryGateway,
-            renderGateway: renderGateway,
-            dirtyUpdateQueue: dirtyUpdateQueue,
-            mutationGateway: mutationGateway,
-            strokeGateway: strokeGateway,
-            historyGateway: historyGateway,
-            persistenceGateway: persistenceGateway,
-            exportGateway: exportGateway,
-            textLayerGateway: textLayerGateway,
-            layerEffectsGateway: layerEffectsGateway,
-            editingGateway: editingGateway,
-            strokeSessionUseCase: strokeSessionUseCase,
-            canvasPreviewOperations: canvasPreviewOperations,
-            selectionMaskOperations: selectionMaskOperations,
-            layerTransformOperations: layerTransformOperations,
-            renderingOperations: renderingOperations,
-            surfaceHandleReleaser: surfaceHandleReleaser
+            queryGateway: queryGateway ?? self.queryGateway,
+            renderGateway: renderGateway ?? self.renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue ?? self.dirtyUpdateQueue,
+            mutationGateway: mutationGateway ?? self.mutationGateway,
+            strokeGateway: strokeGateway ?? self.strokeGateway,
+            historyGateway: historyGateway ?? self.historyGateway,
+            persistenceGateway: persistenceGateway ?? self.persistenceGateway,
+            exportGateway: exportGateway ?? self.exportGateway,
+            textLayerGateway: textLayerGateway ?? self.textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
+            editingGateway: editingGateway ?? self.editingGateway,
+            strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
+            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
+            renderingOperations: renderingOperations ?? self.renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
         )
     }
+}
 
-    func withTestSurfaceHandleReleaser(
-        _ surfaceHandleReleaser: DocumentSurfaceHandleReleaser
-    ) -> DocumentEngineRuntimeComposition {
-        DocumentEngineRuntimeComposition(
-            queryGateway: queryGateway,
-            renderGateway: renderGateway,
-            dirtyUpdateQueue: dirtyUpdateQueue,
-            mutationGateway: mutationGateway,
-            strokeGateway: strokeGateway,
-            historyGateway: historyGateway,
-            persistenceGateway: persistenceGateway,
-            exportGateway: exportGateway,
-            textLayerGateway: textLayerGateway,
-            layerEffectsGateway: layerEffectsGateway,
-            editingGateway: editingGateway,
-            strokeSessionUseCase: strokeSessionUseCase,
-            canvasPreviewOperations: canvasPreviewOperations,
-            selectionMaskOperations: selectionMaskOperations,
-            layerTransformOperations: layerTransformOperations,
-            renderingOperations: renderingOperations,
-            surfaceHandleReleaser: surfaceHandleReleaser
+private extension PrimoDocumentRuntime.DocumentRuntimeComposition {
+    func withOverrides(
+        queryGateway: DocumentQueryGateway? = nil,
+        renderGateway: DocumentRenderGateway? = nil,
+        dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
+        mutationGateway: DocumentMutationGateway? = nil,
+        strokeGateway: StrokeInputGateway? = nil,
+        historyGateway: DocumentHistoryGateway? = nil,
+        persistenceGateway: DocumentPersistenceGateway? = nil,
+        exportGateway: DocumentExportGateway? = nil,
+        textLayerGateway: TextLayerGateway? = nil,
+        layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
+        editingGateway: DocumentEditingGateway? = nil,
+        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
+        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
+        layerTransformOperations: DocumentLayerTransformOperations? = nil,
+        renderingOperations: DocumentRenderingOperations? = nil,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
+    ) -> PrimoDocumentRuntime.DocumentRuntimeComposition {
+        PrimoDocumentRuntime.DocumentRuntimeComposition(
+            queryGateway: queryGateway ?? self.queryGateway,
+            renderGateway: renderGateway ?? self.renderGateway,
+            dirtyUpdateQueue: dirtyUpdateQueue ?? self.dirtyUpdateQueue,
+            mutationGateway: mutationGateway ?? self.mutationGateway,
+            strokeGateway: strokeGateway ?? self.strokeGateway,
+            historyGateway: historyGateway ?? self.historyGateway,
+            persistenceGateway: persistenceGateway ?? self.persistenceGateway,
+            exportGateway: exportGateway ?? self.exportGateway,
+            textLayerGateway: textLayerGateway ?? self.textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
+            editingGateway: editingGateway ?? self.editingGateway,
+            strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
+            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
+            renderingOperations: renderingOperations ?? self.renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
         )
     }
 }
@@ -194,8 +230,8 @@ struct DocumentRuntimeCompositionTests {
         let runtime = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
             gpuOperations: DocumentGpuOperationGatewayFactory.live()
         )
-        let overridden = runtime.withTestHistoryGateway(
-            DocumentHistoryGateway(
+        let overridden = runtime.withOverrides(
+            historyGateway: DocumentHistoryGateway(
                 canUndo: { .success(false) },
                 canRedo: { .success(false) },
                 undo: { .failure(.noUndoState) },
@@ -227,8 +263,12 @@ struct DocumentRuntimeCompositionTests {
         let runtimeCompositionURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift"
         )
+        let testURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Tests/PrimoDocumentEngineInfrastructureTests/DocumentRuntimeCompositionTests.swift"
+        )
         let body = try String(contentsOf: compositionURL, encoding: .utf8)
         let runtimeBody = try String(contentsOf: runtimeCompositionURL, encoding: .utf8)
+        let testBody = try String(contentsOf: testURL, encoding: .utf8)
 
         #expect(body.contains("package struct DocumentEngineRuntimeComposition"))
         #expect(body.contains("package let queryGateway: DocumentQueryGateway"))
@@ -238,6 +278,7 @@ struct DocumentRuntimeCompositionTests {
         #expect(body.contains("package let strokeGateway: StrokeInputGateway"))
         #expect(!body.contains("func withOverrides("))
         #expect(!runtimeBody.contains("func withOverrides("))
+        #expect(testBody.contains("func withOverrides("))
         #expect(!body.contains("public let queryGateway: DocumentQueryGateway"))
         #expect(!body.contains("public var queryGateway: DocumentQueryGateway"))
     }
@@ -291,14 +332,20 @@ struct DocumentRuntimeCompositionTests {
         let factoryURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
+        let gatewayFactoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
+        )
         let compositionURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineRuntimeComposition.swift"
         )
         let factoryBody = try String(contentsOf: factoryURL, encoding: .utf8)
+        let gatewayFactoryBody = try String(contentsOf: gatewayFactoryURL, encoding: .utf8)
         let compositionBody = try String(contentsOf: compositionURL, encoding: .utf8)
 
-        #expect(factoryBody.contains("runtimeExecutor.performResult(operation: \"executeDocumentEditorRequest\")"))
-        #expect(factoryBody.contains("let gateway = RuntimeDocumentEditorGateway("))
+        #expect(gatewayFactoryBody.contains("runtimeExecutor.performResult(operation: \"executeDocumentEditorRequest\")"))
+        #expect(gatewayFactoryBody.contains("let gateway = RuntimeDocumentEditorGateway("))
+        #expect(factoryBody.contains("DocumentEngineEditingGatewayFactory.live(runtimeExecutor: runtimeExecutor)"))
+        #expect(factoryBody.contains("DocumentEngineLayerEffectsFactory.live(runtimeExecutor: runtimeExecutor)"))
         #expect(factoryBody.contains("return runtime.clearLayer(index: index.rawValue)"))
         #expect(factoryBody.contains("return runtime.replaceLayerMask(index: index.rawValue, data: mask.bytes)"))
         #expect(factoryBody.contains("return runtime.deleteLayer(index: index.rawValue)"))
@@ -314,7 +361,7 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let factoryURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
         )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
 
@@ -338,18 +385,37 @@ struct DocumentRuntimeCompositionTests {
         let factoryURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
+        let gatewayFactoryURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
+        )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
+        let gatewayFactoryBody = try String(contentsOf: gatewayFactoryURL, encoding: .utf8)
 
-        #expect(body.contains("let queryGateway = makeQueryGateway(runtimeExecutor: runtimeExecutor)"))
-        #expect(body.contains("let mutationGateway = makeMutationGateway(runtimeExecutor: runtimeExecutor)"))
-        #expect(body.contains("let strokeGateway = makeStrokeGateway(runtimeExecutor: runtimeExecutor)"))
-        #expect(body.contains("let persistenceGateway = makePersistenceGateway("))
-        #expect(body.contains("let exportGateway = makeExportGateway("))
-        #expect(body.contains("private static func makeQueryGateway("))
-        #expect(body.contains("private static func makeMutationGateway("))
-        #expect(body.contains("private static func makeStrokeGateway("))
-        #expect(body.contains("private static func makePersistenceGateway("))
-        #expect(body.contains("private static func makeExportGateway("))
+        #expect(body.contains("let queryGateway = DocumentEngineQueryGatewayFactory.live(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let mutationGateway = DocumentEngineMutationGatewayFactory.live(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let strokeGateway = DocumentEngineStrokeGatewayFactory.live(runtimeExecutor: runtimeExecutor)"))
+        #expect(body.contains("let persistenceGateway = DocumentEnginePersistenceGatewayFactory.live("))
+        #expect(body.contains("let exportGateway = DocumentEngineExportGatewayFactory.live("))
+        for factoryName in [
+            "DocumentEngineQueryGatewayFactory",
+            "DocumentEngineRenderGatewayFactory",
+            "DocumentEngineDirtyUpdateQueueFactory",
+            "DocumentEngineMutationGatewayFactory",
+            "DocumentEngineStrokeGatewayFactory",
+            "DocumentEngineHistoryGatewayFactory",
+            "DocumentEnginePersistenceGatewayFactory",
+            "DocumentEngineExportGatewayFactory",
+            "DocumentEngineTextLayerGatewayFactory",
+            "DocumentEngineEditingGatewayFactory",
+            "DocumentEngineLayerEffectsFactory"
+        ] {
+            #expect(gatewayFactoryBody.contains("enum \(factoryName)"), "Missing focused gateway factory \(factoryName)")
+        }
+        #expect(!body.contains("private static func makeQueryGateway("))
+        #expect(!body.contains("private static func makeMutationGateway("))
+        #expect(!body.contains("private static func makeStrokeGateway("))
+        #expect(!body.contains("private static func makePersistenceGateway("))
+        #expect(!body.contains("private static func makeExportGateway("))
     }
 
     @Test
@@ -379,9 +445,41 @@ struct DocumentRuntimeCompositionTests {
             #expect(facadeBody.contains("package struct \(services): Sendable"))
             #expect(assemblyBody.contains("package extension \(services)"))
         }
+        for services in [
+            "DocumentCanvasMutationServices",
+            "DocumentLayerStructureMutationServices",
+            "DocumentLayerContentMutationServices",
+            "DocumentTextLayerMutationServices",
+            "DocumentSelectionMutationServices",
+            "DocumentCanvasEditingMutationServices",
+            "DocumentStrokeMutationServices",
+            "DocumentPreviewLeaseMutationServices"
+        ] {
+            #expect(facadeBody.contains("package struct \(services): Sendable"))
+            #expect(assemblyBody.contains("package extension \(services)"))
+        }
+        for serviceSlot in [
+            "package let canvas: DocumentCanvasMutationServices",
+            "package let layerStructure: DocumentLayerStructureMutationServices",
+            "package let layerContent: DocumentLayerContentMutationServices",
+            "package let textLayer: DocumentTextLayerMutationServices",
+            "package let selection: DocumentSelectionMutationServices",
+            "package let canvasEditing: DocumentCanvasEditingMutationServices",
+            "package let stroke: DocumentStrokeMutationServices",
+            "package let previewLease: DocumentPreviewLeaseMutationServices"
+        ] {
+            #expect(facadeBody.contains(serviceSlot), "DocumentMutationServices should expose \(serviceSlot)")
+        }
         #expect(assemblyBody.contains("let presentationServices = DocumentPresentationServices(composition: composition)"))
         #expect(assemblyBody.contains("let previewServices = DocumentPreviewServices(composition: composition)"))
         #expect(assemblyBody.contains("let mutationServices = DocumentMutationServices("))
+        #expect(assemblyBody.contains("canvas: DocumentCanvasMutationServices(composition: composition)"))
+        #expect(assemblyBody.contains("textLayer: DocumentTextLayerMutationServices("))
+        #expect(assemblyBody.contains("stroke: DocumentStrokeMutationServices(composition: composition)"))
+        #expect(assemblyBody.contains("CanvasMutationRuntime(services: mutationServices.canvas)"))
+        #expect(assemblyBody.contains("CanvasStrokeRuntime(services: mutationServices.stroke)"))
+        #expect(!facadeBody.contains("package var canvasCommands: DocumentCanvasCommandService"))
+        #expect(!facadeBody.contains("package init(services: DocumentMutationServices)"))
         #expect(assemblyBody.contains("let persistenceServices = DocumentPersistenceServices(composition: composition)"))
         #expect(!assemblyBody.contains("DocumentRuntimeServices(composition: composition)"))
     }
@@ -885,16 +983,18 @@ struct DocumentRuntimeCompositionTests {
     @Test
     func runtimeFacadesReleasePreviewLeasesThroughSharedSurfaceBoundary() {
         let releasedHandles = LockedValues<MetalBufferHandle?>()
-        let composition = PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
-            gpuOperations: DocumentGpuOperationGatewayFactory.live()
-        )
-            .withTestSurfaceHandleReleaser(
-                DocumentSurfaceHandleReleaser { handle in
-                    releasedHandles.append(handle)
-                }
+        let composition = PrimoDocumentRuntime.DocumentRuntimeComposition(
+            PrimoDocumentEngineInfrastructure.DocumentEngineRuntimeCompositionFactory.live(
+                gpuOperations: DocumentGpuOperationGatewayFactory.live()
             )
+        )
+        .withOverrides(
+            surfaceHandleReleaser: DocumentSurfaceHandleReleaser { handle in
+                releasedHandles.append(handle)
+            }
+        )
         let runtime = PrimoDocumentRuntime.DocumentApplicationRuntime(
-            composition: PrimoDocumentRuntime.DocumentRuntimeComposition(composition)
+            composition: composition
         )
         let strokeHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let layerHandle = MetalBufferHandle.unsafeUnchecked(width: 3, height: 3, bytesPerRow: 12)
@@ -914,7 +1014,7 @@ struct DocumentRuntimeCompositionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let factoryURL = repoRoot.appendingPathComponent(
-            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
         )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
         let gpuOperations = [
@@ -928,14 +1028,14 @@ struct DocumentRuntimeCompositionTests {
             #expect(body.contains(operation), "DocumentEngineLive should keep \(operation) visible outside runtime executor bodies")
         }
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeLayerProcessingPlan\")"))
-        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyLayerProcessingPlan\""))
+        #expect(body.contains("return DocumentEngineGpuPayloadApplier.apply(\n                operation: \"applyLayerProcessingPlan\""))
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeFillPlan\")"))
-        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyFillPlan\""))
+        #expect(body.contains("return DocumentEngineGpuPayloadApplier.apply(\n                operation: \"applyFillPlan\""))
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeStrokeCommitPlan\")"))
-        #expect(body.contains("return performGpuPayloadApply(\n                operation: \"applyStrokeCommitPlan\""))
+        #expect(body.contains("return DocumentEngineGpuPayloadApplier.apply(\n                operation: \"applyStrokeCommitPlan\""))
         #expect(body.contains("let reservationResult = runtimeExecutor.performResult(operation: \"reserveBlurSession\")"))
         #expect(body.contains("let planResult = runtimeExecutor.performResult(operation: \"makeBlurPlan\")"))
-        #expect(body.contains("let mutationResult = performGpuPayloadApply(\n                operation: \"applyBlurPlan\""))
+        #expect(body.contains("let mutationResult = DocumentEngineGpuPayloadApplier.apply(\n                operation: \"applyBlurPlan\""))
         #expect(body.contains("rollbackBlurSessionReservation(reservation, runtimeExecutor: runtimeExecutor)"))
         #expect(body.contains("let payloadLease = GpuMutationPayloadLease(handle: handle, services: gpuServices)"))
         #expect(body.contains("payloadLease.withTransferredOwnership"))

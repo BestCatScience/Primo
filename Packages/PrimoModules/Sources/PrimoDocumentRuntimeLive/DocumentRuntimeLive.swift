@@ -48,15 +48,15 @@ package extension DocumentRuntime {
             case let .canvas(command):
                 switch command {
                 case let .createSized(size):
-                    return mutationOutcome(mutationServices.canvasCommands.createCanvas(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvas.canvasCommands.createCanvas(size.width, size.height).map { .completed })
                 case let .resizeSized(size):
-                    return mutationOutcome(mutationServices.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvas.canvasCommands.resizeCanvas(size.width, size.height).map { .completed })
                 case let .resizeExtentSized(size):
-                    return mutationOutcome(mutationServices.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
+                    return mutationOutcome(mutationServices.canvas.canvasCommands.resizeCanvasExtent(size.width, size.height).map { .completed })
                 case let .initializeImported(request, layerName):
-                    return mutationOutcome(mutationServices.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
+                    return mutationOutcome(mutationServices.canvas.canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
                 case .compositeSurface:
-                    return mutationServices.canvasCommands.compositeSurface()
+                    return mutationServices.canvas.canvasCommands.compositeSurface()
                         .map(DocumentCommandOutcome.compositeSurface)
                         .getOrFailureOutcome()
                 case let .setPaperStyle(style):

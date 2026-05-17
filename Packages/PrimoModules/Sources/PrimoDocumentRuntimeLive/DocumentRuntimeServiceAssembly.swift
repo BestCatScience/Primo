@@ -22,19 +22,6 @@ package extension DocumentMutationServices {
         composition: PrimoDocumentRuntime.DocumentRuntimeComposition,
         previewServices: DocumentPreviewServices
     ) {
-        let canvasCommands = DocumentCanvasCommandService(
-            queryGateway: composition.queryGateway,
-            renderGateway: composition.renderGateway,
-            mutationGateway: composition.mutationGateway,
-            persistenceGateway: composition.persistenceGateway
-        )
-        let layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
-        let strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
-        let canvasStrokeInteractionService = CanvasStrokeInteractionService(
-            sessionUseCase: composition.strokeSessionUseCase,
-            releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
-        )
-        let historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
         let mutationWorkflow = DocumentMutationWorkflowService(
             documentQueryGateway: composition.queryGateway,
             documentEditingGateway: composition.editingGateway,
@@ -46,27 +33,128 @@ package extension DocumentMutationServices {
             documentEditingGateway: composition.editingGateway,
             documentMutationGateway: composition.mutationGateway
         )
-        let canvasEditingWorkflow = CanvasEditingWorkflowService(
-            documentContentService: contentService,
-            layerTransformProcessor: previewServices.layerTransformProcessor
-        )
-        let selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
-        let textLayerService = DocumentTextLayerService(
-            textLayerGateway: composition.textLayerGateway,
-            documentQueryGateway: composition.queryGateway,
-            documentEditingGateway: composition.editingGateway
-        )
         self.init(
-            canvasCommands: canvasCommands,
-            layerCommands: layerCommands,
-            strokeCommands: strokeCommands,
-            canvasStrokeInteractionService: canvasStrokeInteractionService,
-            historyCommands: historyCommands,
+            canvas: DocumentCanvasMutationServices(composition: composition),
+            layerStructure: DocumentLayerStructureMutationServices(
+                composition: composition,
+                mutationWorkflow: mutationWorkflow
+            ),
+            layerContent: DocumentLayerContentMutationServices(
+                composition: composition,
+                contentService: contentService
+            ),
+            textLayer: DocumentTextLayerMutationServices(
+                composition: composition,
+                mutationWorkflow: mutationWorkflow,
+                contentService: contentService
+            ),
+            selection: DocumentSelectionMutationServices(composition: composition),
+            canvasEditing: DocumentCanvasEditingMutationServices(
+                contentService: contentService,
+                previewServices: previewServices
+            ),
+            stroke: DocumentStrokeMutationServices(composition: composition),
+            previewLease: DocumentPreviewLeaseMutationServices(composition: composition)
+        )
+    }
+}
+
+package extension DocumentCanvasMutationServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        self.init(
+            canvasCommands: DocumentCanvasCommandService(
+                queryGateway: composition.queryGateway,
+                renderGateway: composition.renderGateway,
+                mutationGateway: composition.mutationGateway,
+                persistenceGateway: composition.persistenceGateway
+            ),
+            historyCommands: DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+        )
+    }
+}
+
+package extension DocumentLayerStructureMutationServices {
+    init(
+        composition: PrimoDocumentRuntime.DocumentRuntimeComposition,
+        mutationWorkflow: DocumentMutationWorkflowService
+    ) {
+        self.init(
+            layerCommands: DocumentLayerCommandService(mutationGateway: composition.mutationGateway),
+            mutationWorkflow: mutationWorkflow
+        )
+    }
+}
+
+package extension DocumentLayerContentMutationServices {
+    init(
+        composition: PrimoDocumentRuntime.DocumentRuntimeComposition,
+        contentService: DocumentContentService
+    ) {
+        self.init(
+            layerCommands: DocumentLayerCommandService(mutationGateway: composition.mutationGateway),
+            contentService: contentService
+        )
+    }
+}
+
+package extension DocumentTextLayerMutationServices {
+    init(
+        composition: PrimoDocumentRuntime.DocumentRuntimeComposition,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService
+    ) {
+        self.init(
+            layerCommands: DocumentLayerCommandService(mutationGateway: composition.mutationGateway),
             mutationWorkflow: mutationWorkflow,
             contentService: contentService,
-            canvasEditingWorkflow: canvasEditingWorkflow,
-            selectionWorkflow: selectionWorkflow,
-            textLayerService: textLayerService
+            textLayerService: DocumentTextLayerService(
+                textLayerGateway: composition.textLayerGateway,
+                documentQueryGateway: composition.queryGateway,
+                documentEditingGateway: composition.editingGateway
+            )
+        )
+    }
+}
+
+package extension DocumentSelectionMutationServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        self.init(selectionWorkflow: SelectionWorkflowService(operations: composition.selectionMaskOperations))
+    }
+}
+
+package extension DocumentCanvasEditingMutationServices {
+    init(
+        contentService: DocumentContentService,
+        previewServices: DocumentPreviewServices
+    ) {
+        self.init(
+            canvasEditingWorkflow: CanvasEditingWorkflowService(
+                documentContentService: contentService,
+                layerTransformProcessor: previewServices.layerTransformProcessor
+            )
+        )
+    }
+}
+
+package extension DocumentStrokeMutationServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        self.init(
+            strokeCommands: DocumentStrokeCommandService(strokeGateway: composition.strokeGateway),
+            canvasStrokeInteractionService: CanvasStrokeInteractionService(
+                sessionUseCase: composition.strokeSessionUseCase,
+                releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
+            )
+        )
+    }
+}
+
+package extension DocumentPreviewLeaseMutationServices {
+    init(composition: PrimoDocumentRuntime.DocumentRuntimeComposition) {
+        self.init(
+            canvasStrokeInteractionService: CanvasStrokeInteractionService(
+                sessionUseCase: composition.strokeSessionUseCase,
+                releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
+            )
         )
     }
 }
@@ -127,8 +215,8 @@ package extension DocumentApplicationRuntime {
         let persistenceServices = DocumentPersistenceServices(composition: composition)
         self.init(
             presentation: DocumentPresentationRuntime(services: presentationServices),
-            canvasMutation: CanvasMutationRuntime(services: mutationServices),
-            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: mutationServices)),
+            canvasMutation: CanvasMutationRuntime(services: mutationServices.canvas),
+            strokeEditing: StrokeEditingRuntime(strokeRuntime: CanvasStrokeRuntime(services: mutationServices.stroke)),
             layerEditing: LayerEditingRuntime(
                 mutationServices: mutationServices,
                 previewServices: previewServices

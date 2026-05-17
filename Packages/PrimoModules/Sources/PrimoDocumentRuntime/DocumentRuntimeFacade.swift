@@ -474,16 +474,34 @@ package struct DocumentPresentationServices: Sendable {
 }
 
 package struct DocumentMutationServices: Sendable {
-    package let canvasCommands: DocumentCanvasCommandService
-    package let layerCommands: DocumentLayerCommandService
-    package let strokeCommands: DocumentStrokeCommandService
-    package let canvasStrokeInteractionService: CanvasStrokeInteractionService
-    package let historyCommands: DocumentHistoryCommandService
-    package let mutationWorkflow: DocumentMutationWorkflowService
-    package let contentService: DocumentContentService
-    package let canvasEditingWorkflow: CanvasEditingWorkflowService
-    package let selectionWorkflow: SelectionWorkflowService
-    package let textLayerService: DocumentTextLayerService
+    package let canvas: DocumentCanvasMutationServices
+    package let layerStructure: DocumentLayerStructureMutationServices
+    package let layerContent: DocumentLayerContentMutationServices
+    package let textLayer: DocumentTextLayerMutationServices
+    package let selection: DocumentSelectionMutationServices
+    package let canvasEditing: DocumentCanvasEditingMutationServices
+    package let stroke: DocumentStrokeMutationServices
+    package let previewLease: DocumentPreviewLeaseMutationServices
+
+    package init(
+        canvas: DocumentCanvasMutationServices,
+        layerStructure: DocumentLayerStructureMutationServices,
+        layerContent: DocumentLayerContentMutationServices,
+        textLayer: DocumentTextLayerMutationServices,
+        selection: DocumentSelectionMutationServices,
+        canvasEditing: DocumentCanvasEditingMutationServices,
+        stroke: DocumentStrokeMutationServices,
+        previewLease: DocumentPreviewLeaseMutationServices
+    ) {
+        self.canvas = canvas
+        self.layerStructure = layerStructure
+        self.layerContent = layerContent
+        self.textLayer = textLayer
+        self.selection = selection
+        self.canvasEditing = canvasEditing
+        self.stroke = stroke
+        self.previewLease = previewLease
+    }
 
     package init(
         canvasCommands: DocumentCanvasCommandService,
@@ -497,16 +515,127 @@ package struct DocumentMutationServices: Sendable {
         selectionWorkflow: SelectionWorkflowService,
         textLayerService: DocumentTextLayerService
     ) {
+        self.init(
+            canvas: DocumentCanvasMutationServices(canvasCommands: canvasCommands, historyCommands: historyCommands),
+            layerStructure: DocumentLayerStructureMutationServices(
+                layerCommands: layerCommands,
+                mutationWorkflow: mutationWorkflow
+            ),
+            layerContent: DocumentLayerContentMutationServices(
+                layerCommands: layerCommands,
+                contentService: contentService
+            ),
+            textLayer: DocumentTextLayerMutationServices(
+                layerCommands: layerCommands,
+                mutationWorkflow: mutationWorkflow,
+                contentService: contentService,
+                textLayerService: textLayerService
+            ),
+            selection: DocumentSelectionMutationServices(selectionWorkflow: selectionWorkflow),
+            canvasEditing: DocumentCanvasEditingMutationServices(canvasEditingWorkflow: canvasEditingWorkflow),
+            stroke: DocumentStrokeMutationServices(
+                strokeCommands: strokeCommands,
+                canvasStrokeInteractionService: canvasStrokeInteractionService
+            ),
+            previewLease: DocumentPreviewLeaseMutationServices(
+                canvasStrokeInteractionService: canvasStrokeInteractionService
+            )
+        )
+    }
+}
+
+package struct DocumentCanvasMutationServices: Sendable {
+    package let canvasCommands: DocumentCanvasCommandService
+    package let historyCommands: DocumentHistoryCommandService
+
+    package init(
+        canvasCommands: DocumentCanvasCommandService,
+        historyCommands: DocumentHistoryCommandService
+    ) {
         self.canvasCommands = canvasCommands
-        self.layerCommands = layerCommands
-        self.strokeCommands = strokeCommands
-        self.canvasStrokeInteractionService = canvasStrokeInteractionService
         self.historyCommands = historyCommands
+    }
+}
+
+package struct DocumentLayerStructureMutationServices: Sendable {
+    package let layerCommands: DocumentLayerCommandService
+    package let mutationWorkflow: DocumentMutationWorkflowService
+
+    package init(
+        layerCommands: DocumentLayerCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService
+    ) {
+        self.layerCommands = layerCommands
+        self.mutationWorkflow = mutationWorkflow
+    }
+}
+
+package struct DocumentLayerContentMutationServices: Sendable {
+    package let layerCommands: DocumentLayerCommandService
+    package let contentService: DocumentContentService
+
+    package init(
+        layerCommands: DocumentLayerCommandService,
+        contentService: DocumentContentService
+    ) {
+        self.layerCommands = layerCommands
+        self.contentService = contentService
+    }
+}
+
+package struct DocumentTextLayerMutationServices: Sendable {
+    package let layerCommands: DocumentLayerCommandService
+    package let mutationWorkflow: DocumentMutationWorkflowService
+    package let contentService: DocumentContentService
+    package let textLayerService: DocumentTextLayerService
+
+    package init(
+        layerCommands: DocumentLayerCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        textLayerService: DocumentTextLayerService
+    ) {
+        self.layerCommands = layerCommands
         self.mutationWorkflow = mutationWorkflow
         self.contentService = contentService
-        self.canvasEditingWorkflow = canvasEditingWorkflow
-        self.selectionWorkflow = selectionWorkflow
         self.textLayerService = textLayerService
+    }
+}
+
+package struct DocumentSelectionMutationServices: Sendable {
+    package let selectionWorkflow: SelectionWorkflowService
+
+    package init(selectionWorkflow: SelectionWorkflowService) {
+        self.selectionWorkflow = selectionWorkflow
+    }
+}
+
+package struct DocumentCanvasEditingMutationServices: Sendable {
+    package let canvasEditingWorkflow: CanvasEditingWorkflowService
+
+    package init(canvasEditingWorkflow: CanvasEditingWorkflowService) {
+        self.canvasEditingWorkflow = canvasEditingWorkflow
+    }
+}
+
+package struct DocumentStrokeMutationServices: Sendable {
+    package let strokeCommands: DocumentStrokeCommandService
+    package let canvasStrokeInteractionService: CanvasStrokeInteractionService
+
+    package init(
+        strokeCommands: DocumentStrokeCommandService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService
+    ) {
+        self.strokeCommands = strokeCommands
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+    }
+}
+
+package struct DocumentPreviewLeaseMutationServices: Sendable {
+    package let canvasStrokeInteractionService: CanvasStrokeInteractionService
+
+    package init(canvasStrokeInteractionService: CanvasStrokeInteractionService) {
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 }
 
@@ -640,7 +769,7 @@ public struct CanvasMutationRuntime: Sendable {
         self.historyCommands = historyCommands
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentCanvasMutationServices) {
         self.canvasCommands = services.canvasCommands
         self.historyCommands = services.historyCommands
     }
@@ -706,7 +835,7 @@ public struct LayerStructureEditingRuntime: Sendable {
         self.mutationWorkflow = mutationWorkflow
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentLayerStructureMutationServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
     }
@@ -752,7 +881,7 @@ public struct LayerContentEditingRuntime: Sendable {
         self.contentService = contentService
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentLayerContentMutationServices) {
         self.layerCommands = services.layerCommands
         self.contentService = services.contentService
     }
@@ -783,7 +912,7 @@ public struct TextLayerEditingRuntime: Sendable {
         self.textLayerService = textLayerService
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentTextLayerMutationServices) {
         self.layerCommands = services.layerCommands
         self.mutationWorkflow = services.mutationWorkflow
         self.contentService = services.contentService
@@ -804,7 +933,7 @@ public struct LayerSelectionEditingRuntime: Sendable {
         self.selectionWorkflow = selectionWorkflow
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentSelectionMutationServices) {
         self.selectionWorkflow = services.selectionWorkflow
     }
 
@@ -899,7 +1028,7 @@ public struct CanvasEditingRuntime: Sendable {
         self.canvasEditingWorkflow = canvasEditingWorkflow
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentCanvasEditingMutationServices) {
         self.canvasEditingWorkflow = services.canvasEditingWorkflow
     }
 
@@ -914,7 +1043,7 @@ public struct LayerPreviewLeaseRuntime: Sendable {
         self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentPreviewLeaseMutationServices) {
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }
 
@@ -958,13 +1087,13 @@ public struct LayerEditingRuntime: Sendable {
         mutationServices: DocumentMutationServices,
         previewServices: DocumentPreviewServices
     ) {
-        self.structure = LayerStructureEditingRuntime(services: mutationServices)
-        self.content = LayerContentEditingRuntime(services: mutationServices)
-        self.text = TextLayerEditingRuntime(services: mutationServices)
-        self.selection = LayerSelectionEditingRuntime(services: mutationServices)
+        self.structure = LayerStructureEditingRuntime(services: mutationServices.layerStructure)
+        self.content = LayerContentEditingRuntime(services: mutationServices.layerContent)
+        self.text = TextLayerEditingRuntime(services: mutationServices.textLayer)
+        self.selection = LayerSelectionEditingRuntime(services: mutationServices.selection)
         self.transform = LayerTransformEditingRuntime(services: previewServices)
-        self.canvasEditing = CanvasEditingRuntime(services: mutationServices)
-        self.previewLease = LayerPreviewLeaseRuntime(services: mutationServices)
+        self.canvasEditing = CanvasEditingRuntime(services: mutationServices.canvasEditing)
+        self.previewLease = LayerPreviewLeaseRuntime(services: mutationServices.previewLease)
     }
 
     public func addLayer(named name: String) -> DocumentCreatedLayerMutationResult { structure.addLayer(named: name) }
@@ -1087,7 +1216,7 @@ package struct CanvasStrokeRuntime: Sendable {
         self.canvasStrokeInteractionService = canvasStrokeInteractionService
     }
 
-    package init(services: DocumentMutationServices) {
+    package init(services: DocumentStrokeMutationServices) {
         self.strokeCommands = services.strokeCommands
         self.canvasStrokeInteractionService = services.canvasStrokeInteractionService
     }

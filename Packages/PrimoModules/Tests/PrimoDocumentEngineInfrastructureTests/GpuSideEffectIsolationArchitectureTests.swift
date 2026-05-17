@@ -2636,6 +2636,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         ].filter { FileManager.default.fileExists(atPath: $0.path) }
         let allowedGatewayConstructionFiles: Set<String> = [
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentContentServiceTests.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentInteractionServiceTests.swift",
             "Packages/PrimoModules/Tests/PrimoDocumentApplicationTests/DocumentMutationWorkflowServiceTests.swift",
@@ -3095,6 +3096,13 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
+        let gatewayFactories = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
 
         let layerIndexSet = try #require(Self.declarationBody(named: "LayerIndexSet", in: mutationContracts))
         #expect(layerIndexSet.contains("public let rawValues: Set<Int>"))
@@ -3122,7 +3130,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!validationContracts.contains("(0..<context.layerCount).contains"))
 
         #expect(workflowValidation.contains("layerIndexes: state.layerSidebar.layers.map(\\.index)"))
-        #expect(engineLive.contains("layerIndexes: presentation.layerRows.map(\\.index)"))
+        #expect((engineLive + gatewayFactories).contains("layerIndexes: presentation.layerRows.map"))
     }
 
     @Test
@@ -3388,11 +3396,14 @@ struct GpuSideEffectIsolationArchitectureTests {
         let live = try Self.sourceBody(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
+        let gatewayFactories = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineGatewayFactories.swift"
+        )
 
         #expect(runtime.contains("private let store: SwiftDocumentStore"))
         #expect(runtime.contains("private let presentationBuilder = DocumentPresentationBuilder()"))
         #expect(runtime.contains("private let dirtyUpdatePublisher = DirtyUpdatePublisher()"))
-        #expect(live.contains("LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>"))
+        #expect((live + gatewayFactories).contains("LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>"))
         #expect(live.contains("LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>"))
     }
 
