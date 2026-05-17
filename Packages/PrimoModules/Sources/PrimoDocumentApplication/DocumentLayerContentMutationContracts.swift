@@ -126,7 +126,7 @@ private extension CGRect {
 // Content commands join the same authoritative validation path as structure
 // and attribute commands: the use case emits revision-aware EditableLayerIndex
 // values, and the live gateway rejects stale indexes before raw mutation.
-package enum LayerContentMutationCommand: Equatable, Sendable {
+package enum UncheckedLayerContentMutationCommand: Equatable, Sendable {
     case replacePixels(index: Int, pixelData: LayerPixelData)
     case setTextLayer(index: Int, textLayer: TextLayerData)
     case clear(index: Int)
@@ -160,7 +160,7 @@ package struct LayerContentMutationCommandValidator: Sendable {
     package init() {}
 
     package func validated(
-        _ command: LayerContentMutationCommand,
+        _ command: UncheckedLayerContentMutationCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerContentMutationCommand, DocumentLayerMutationFailure> {
         switch command {
@@ -216,7 +216,7 @@ package struct LayerContentMutationUseCase: Sendable {
     }
 
     package func execute(
-        _ command: LayerContentMutationCommand,
+        _ command: UncheckedLayerContentMutationCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerContentGateway
     ) -> DocumentLayerMutationResult {

@@ -174,6 +174,30 @@ public struct DocumentTextLayerService: Sendable {
         self.clearTextLayerDataHandler = clearTextLayerData
     }
 
+    package init(
+        textLayerGateway: TextLayerGateway,
+        documentQueryGateway: DocumentQueryGateway,
+        documentEditingGateway: DocumentEditingGateway
+    ) {
+        self.init(
+            textLayerData: { index in
+                Self.requireCurrent(index, documentQueryGateway: documentQueryGateway)
+                    .flatMap { textLayerGateway.textLayerData($0.rawValue) }
+            },
+            setTextLayer: { index, textLayer in
+                Self.requireEditable(index, documentQueryGateway: documentQueryGateway)
+                    .flatMap { index in
+                        documentEditingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
+                            .map { _ in () }
+                    }
+            },
+            clearTextLayerData: { index in
+                Self.requireEditable(index, documentQueryGateway: documentQueryGateway)
+                    .flatMap { textLayerGateway.clearTextLayerData($0.rawValue) }
+            }
+        )
+    }
+
     public func textLayerData(_ index: ExistingLayerIndex) -> Result<TextLayerData?, DocumentMutationFailure> {
         textLayerDataHandler(index)
     }
@@ -184,6 +208,70 @@ public struct DocumentTextLayerService: Sendable {
 
     public func clearTextLayerData(_ index: EditableLayerIndex) -> DocumentMutationResult {
         clearTextLayerDataHandler(index)
+    }
+
+    private static func requireCurrent(
+        _ index: ExistingLayerIndex,
+        documentQueryGateway: DocumentQueryGateway
+    ) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
+        currentMutationContext(documentQueryGateway: documentQueryGateway).flatMap { context in
+            guard index.revision == context.revision else {
+                return .failure(
+                    .staleLayerIndex(
+                        index: index.rawValue,
+                        validationRevision: index.revision,
+                        currentRevision: context.revision
+                    )
+                )
+            }
+            guard let currentIndex = context.existingLayerIndex(index.rawValue) else {
+                return .failure(.invalidLayerIndex(index.rawValue))
+            }
+            return .success(currentIndex)
+        }
+    }
+
+    private static func requireEditable(
+        _ index: EditableLayerIndex,
+        documentQueryGateway: DocumentQueryGateway
+    ) -> Result<EditableLayerIndex, DocumentMutationFailure> {
+        currentMutationContext(documentQueryGateway: documentQueryGateway).flatMap { context in
+            guard index.revision == context.revision else {
+                return .failure(
+                    .staleLayerIndex(
+                        index: index.rawValue,
+                        validationRevision: index.revision,
+                        currentRevision: context.revision
+                    )
+                )
+            }
+            guard let currentIndex = context.editableLayerIndex(index.rawValue) else {
+                if context.containsLayerIndex(index.rawValue), context.isLayerLocked(index.rawValue) {
+                    return .failure(.layerLocked(index.rawValue))
+                }
+                return .failure(.invalidLayerIndex(index.rawValue))
+            }
+            return .success(currentIndex)
+        }
+    }
+
+    private static func currentMutationContext(
+        documentQueryGateway: DocumentQueryGateway
+    ) -> Result<DocumentLayerMutationContext, DocumentMutationFailure> {
+        documentQueryGateway.lightweightPresentation().map { presentation in
+            DocumentLayerMutationContext(
+                revision: presentation.revision,
+                layerIndexes: presentation.layerRows.map(\.index),
+                folderIDs: Set(presentation.layerSidebarRows.compactMap { row in
+                    if case let .folder(folder) = row { return folder.id }
+                    return nil
+                }),
+                canvasGeometry: presentation.geometry,
+                isLayerLocked: { rawValue in
+                    presentation.layerRows.first { $0.index == rawValue }?.isLocked == true
+                }
+            )
+        }
     }
 }
 
@@ -307,7 +395,7 @@ public struct DocumentRenderingWorkflow: Sendable {
         self.translatedPixelDataHandler = translatedPixelData
     }
 
-    public init(operations: DocumentRenderingOperations) {
+    package init(operations: DocumentRenderingOperations) {
         self.init(
             compositedPaperPreviewRGBA: operations.compositedPaperPreviewRGBA,
             compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in

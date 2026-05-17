@@ -98,7 +98,7 @@ struct DocumentEditorUseCaseTests {
         let plan = try result.get()
         #expect(plan == .structure(
             LayerStructureMutationPlan(
-                resultingIndex: 2,
+                result: .createdLayer(DocumentCreatedLayerIndex(2)),
                 lifecycleEvent: .addLayer(name: "Ink", index: 2)
             )
         ))

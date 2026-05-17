@@ -52,12 +52,9 @@ package extension DocumentMutationServices {
         )
         let selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
         let textLayerService = DocumentTextLayerService(
-            textLayerData: { index in composition.textLayerGateway.textLayerData(index.rawValue) },
-            setTextLayer: { index, textLayer in
-                composition.editingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
-                    .map { _ in () }
-            },
-            clearTextLayerData: { index in composition.textLayerGateway.clearTextLayerData(index.rawValue) }
+            textLayerGateway: composition.textLayerGateway,
+            documentQueryGateway: composition.queryGateway,
+            documentEditingGateway: composition.editingGateway
         )
         self.init(
             canvasCommands: canvasCommands,

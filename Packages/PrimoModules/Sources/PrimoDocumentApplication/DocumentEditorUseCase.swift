@@ -4,9 +4,9 @@ import Foundation
 // editing requests. App preflight may fail early for UX, but this boundary
 // always validates against a fresh mutation context before the gateway runs.
 package enum DocumentEditorRequest: Equatable, Sendable {
-    case structure(LayerStructureCommand)
-    case attribute(LayerAttributeCommand)
-    case content(LayerContentMutationCommand)
+    case structure(UncheckedLayerStructureCommand)
+    case attribute(UncheckedLayerAttributeCommand)
+    case content(UncheckedLayerContentMutationCommand)
 }
 
 public enum DocumentEditorResult: Equatable, Sendable {

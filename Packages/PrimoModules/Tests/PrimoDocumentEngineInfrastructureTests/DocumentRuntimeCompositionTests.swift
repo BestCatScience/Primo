@@ -176,7 +176,7 @@ struct DocumentRuntimeCompositionTests {
             Issue.record("Expected structure plan")
             return
         }
-        #expect(structurePlan.resultingIndex == 1)
+        #expect(structurePlan.result == .createdLayer(DocumentCreatedLayerIndex(1)))
 
         let renameResult = runtime.editingGateway.execute(
             .attribute(.setLayerName(index: 1, name: "Ink"))

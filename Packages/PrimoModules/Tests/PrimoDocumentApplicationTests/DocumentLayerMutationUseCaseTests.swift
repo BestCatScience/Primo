@@ -40,7 +40,7 @@ struct DocumentLayerMutationUseCaseTests {
         )
 
         let plan = try! result.get()
-        #expect(plan.resultingIndex == 5)
+        #expect(plan.result == .createdLayer(DocumentCreatedLayerIndex(5)))
         #expect(plan.indexMutation == .duplication(sourceIndex: 1, duplicatedIndex: 5))
         #expect(plan.lifecycleEvent == .duplicateLayer(index: 1, duplicatedIndex: 5, name: "Copy"))
     }
@@ -86,7 +86,7 @@ struct DocumentLayerMutationUseCaseTests {
         )
 
         let plan = try result.get()
-        #expect(plan.resultingIndex == 3)
+        #expect(plan.result == .createdLayer(DocumentCreatedLayerIndex(3)))
         #expect(plan.lifecycleEvent == .addLayer(name: "Ink", index: 3))
         #expect(gateway.addedLayerNames == ["Ink"])
     }

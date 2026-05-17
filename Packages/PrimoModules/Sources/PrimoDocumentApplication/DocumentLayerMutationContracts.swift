@@ -316,7 +316,7 @@ public struct ValidatedLayerOpacity: Equatable, Sendable {
     }
 }
 
-package enum LayerStructureCommand: Equatable, Sendable {
+package enum UncheckedLayerStructureCommand: Equatable, Sendable {
     case addLayer(name: String)
     case duplicateLayer(index: Int, name: String)
     case deleteLayer(index: Int)
@@ -326,7 +326,7 @@ package enum LayerStructureCommand: Equatable, Sendable {
     case assignLayerToFolder(index: Int, folderID: Int?)
 }
 
-package enum LayerAttributeCommand: Equatable, Sendable {
+package enum UncheckedLayerAttributeCommand: Equatable, Sendable {
     case setActiveLayer(index: Int)
     case setLayerName(index: Int, name: String)
     case setLayerVisibility(index: Int, isVisible: Bool)
@@ -389,17 +389,22 @@ public enum DocumentLayerIndexMutation: Equatable, Sendable {
     case move(sourceIndex: Int, destinationIndex: Int)
 }
 
+public enum LayerStructureMutationResult: Equatable, Sendable {
+    case createdLayer(DocumentCreatedLayerIndex)
+    case createdFolder(DocumentCreatedFolderID)
+}
+
 public struct LayerStructureMutationPlan: Equatable, Sendable {
-    public let resultingIndex: Int?
+    public let result: LayerStructureMutationResult?
     public let indexMutation: DocumentLayerIndexMutation?
     public let lifecycleEvent: DocumentLayerMutationEvent?
 
     public init(
-        resultingIndex: Int? = nil,
+        result: LayerStructureMutationResult? = nil,
         indexMutation: DocumentLayerIndexMutation? = nil,
         lifecycleEvent: DocumentLayerMutationEvent? = nil
     ) {
-        self.resultingIndex = resultingIndex
+        self.result = result
         self.indexMutation = indexMutation
         self.lifecycleEvent = lifecycleEvent
     }
@@ -454,7 +459,7 @@ package struct LayerStructureCommandValidator: Sendable {
     package init() {}
 
     package func validated(
-        _ command: LayerStructureCommand,
+        _ command: UncheckedLayerStructureCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerStructureCommand, DocumentLayerMutationFailure> {
         switch command {
@@ -512,7 +517,7 @@ package struct LayerStructureCommandValidator: Sendable {
     }
 
     package func validate(
-        _ command: LayerStructureCommand,
+        _ command: UncheckedLayerStructureCommand,
         in context: DocumentLayerMutationContext
     ) -> DocumentLayerMutationFailure? {
         validated(command, in: context).failure
@@ -523,7 +528,7 @@ package struct LayerAttributeCommandValidator: Sendable {
     package init() {}
 
     package func validated(
-        _ command: LayerAttributeCommand,
+        _ command: UncheckedLayerAttributeCommand,
         in context: DocumentLayerMutationContext
     ) -> Result<ValidatedLayerAttributeCommand, DocumentLayerMutationFailure> {
         switch command {
@@ -563,7 +568,7 @@ package struct LayerAttributeCommandValidator: Sendable {
     }
 
     package func validate(
-        _ command: LayerAttributeCommand,
+        _ command: UncheckedLayerAttributeCommand,
         in context: DocumentLayerMutationContext
     ) -> DocumentLayerMutationFailure? {
         validated(command, in: context).failure

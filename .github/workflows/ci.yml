@@ -36,6 +36,10 @@ jobs:
           grep -Fq ".iOS(\"${PACKAGE_IOS_DEPLOYMENT_TARGET}\")" Packages/PrimoModules/Package.swift
           grep -Fq ".macOS(.v${PACKAGE_MACOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
 
+      - name: Guard against new raw package overloads
+        working-directory: Packages/PrimoModules
+        run: swift test --filter GpuSideEffectIsolationArchitectureTests/deprecatedPackageRawRuntimeOverloadBaselineDoesNotGrowAndPlanStaysCurrent
+
       - name: Run package tests
         working-directory: Packages/PrimoModules
         run: swift test

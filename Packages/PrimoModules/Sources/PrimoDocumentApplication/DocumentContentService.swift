@@ -314,7 +314,7 @@ public struct DocumentContentService: Sendable {
         }
     }
 
-    private func executeContent(_ command: LayerContentMutationCommand) -> DocumentMutationResult {
+    private func executeContent(_ command: UncheckedLayerContentMutationCommand) -> DocumentMutationResult {
         documentEditingGateway.execute(.content(command)).map { _ in () }
     }
 

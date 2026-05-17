@@ -681,6 +681,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentMutationGateway should not expose public raw closure initializers"
         )
         #expect(
+            Self.initializerSignatures(accessLevel: "package", in: gatewayBody)
+                .contains(where: { $0.contains("resizeCanvas") && $0.contains("applyLayerProcessing") }),
+            "DocumentMutationGateway raw closure initializer should stay package-scoped"
+        )
+        #expect(
             Self.storedPropertyNames(accessLevel: "public", in: gatewayBody).isEmpty,
             "DocumentMutationGateway raw closure storage should not be public API"
         )
@@ -732,7 +737,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
 
         for token in [
-            "package enum LayerContentMutationCommand",
+            "package enum UncheckedLayerContentMutationCommand",
             "public enum ValidatedLayerContentMutationCommand",
             "public protocol LayerContentGateway",
             "package struct LayerContentMutationUseCase"
@@ -741,7 +746,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         }
 
         for token in [
-            "private func executeContent(_ command: LayerContentMutationCommand)",
+            "private func executeContent(_ command: UncheckedLayerContentMutationCommand)",
             "execute(.content(command))"
         ] {
             #expect(workflow.contains(token))
@@ -836,6 +841,10 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(
             publicRenderingInitializers.allSatisfy { !$0.contains("compositedPaperPreviewRGBA") },
             "DocumentRenderingWorkflow should not publicly accept raw rendering closure tables"
+        )
+        #expect(
+            publicRenderingInitializers.allSatisfy { !$0.contains("DocumentRenderingOperations") },
+            "DocumentRenderingWorkflow should not publicly accept raw rendering operations; live assembly owns the raw bridge"
         )
         #expect(
             Self.initializerSignatures(accessLevel: "package", in: renderingWorkflowBody)
@@ -1378,6 +1387,21 @@ struct GpuSideEffectIsolationArchitectureTests {
             publicTextLayerInitializers.allSatisfy { !$0.contains("Int") },
             "DocumentTextLayerService public initializer should accept typed layer index closures"
         )
+
+        let serviceAssembly = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimeServiceAssembly.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        #expect(
+            serviceAssembly.contains("DocumentTextLayerService(") &&
+                serviceAssembly.contains("textLayerGateway: composition.textLayerGateway"),
+            "Live mutation service assembly should route text-layer access through DocumentTextLayerService"
+        )
+        #expect(!serviceAssembly.contains("composition.textLayerGateway.textLayerData(index.rawValue)"))
+        #expect(!serviceAssembly.contains("composition.textLayerGateway.clearTextLayerData(index.rawValue)"))
     }
 
     @Test
@@ -1541,6 +1565,53 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(
             workflowRawPackage == expectedWorkflowRawPackage,
             "DocumentMutationWorkflowService raw package API should stay removed. Actual: \(workflowRawPackage.sorted())"
+        )
+    }
+
+    @Test
+    func deprecatedPackageRawRuntimeOverloadBaselineDoesNotGrowAndPlanStaysCurrent() throws {
+        let repoRoot = try Self.repoRoot()
+        let facadeBody = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let removalPlan = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "docs/DeprecatedRawPackageOverloadRemovalPlan.md",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+
+        let actual = Set(Self.deprecatedPackageRawRuntimeOverloadRecords(in: facadeBody))
+        let expected: Set<String> = [
+            "CanvasMutationRuntime.package func createCanvas(_ width: Int, _ height: Int)",
+            "CanvasMutationRuntime.package func resizeCanvas(_ width: Int, _ height: Int)",
+            "CanvasMutationRuntime.package func resizeCanvasExtent(_ width: Int, _ height: Int)",
+            "CanvasPreviewRuntime.package func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data)",
+            "CanvasPreviewRuntime.package func eyedropperLoupeSurface( sourcePixelData: Data, canvasWidth: Int, canvasHeight: Int, centerX: Int, centerY: Int, gridSize: Int, paperStyle: CanvasPaperStyle, blendWithPaper: Bool )",
+            "CanvasPreviewRuntime.package func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle)",
+            "CanvasPreviewRuntime.package func selectionOverlaySurface(maskData: Data, width: Int, height: Int)",
+            "DocumentPersistenceClient.package func newCanvas(_ width: Int, _ height: Int)",
+            "DocumentPersistenceRuntime.package func newCanvas(_ width: Int, _ height: Int)"
+        ]
+        #expect(
+            actual == expected,
+            "Deprecated package raw runtime overload baseline changed. Remove entries intentionally; do not add new raw overloads. Actual: \(actual.sorted())"
+        )
+        for record in expected {
+            #expect(
+                removalPlan.contains(record),
+                "Deprecated raw overload removal plan is missing baseline entry \(record)"
+            )
+        }
+        #expect(
+            removalPlan.contains("swift test") &&
+                removalPlan.contains("deprecatedPackageRawRuntimeOverloadBaselineDoesNotGrowAndPlanStaysCurrent"),
+            "Removal plan should document the CI guard that rejects new raw overloads"
         )
     }
 
@@ -2218,6 +2289,12 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(contentSignatures == expectedContentSignatures)
         #expect(layerAnchorIndex.contains("public let rawValue: Int?"))
         #expect(layerAnchorIndex.contains("public let revision: DocumentRevision"))
+        #expect(layerAnchorIndex.contains("package init(_ rawValue: Int?, revision: DocumentRevision)"))
+        #expect(body.contains("guard let rawValue else { return LayerAnchorIndex(nil, revision: revision) }"))
+        #expect(
+            body.contains("return existingLayerIndex(rawValue).map { LayerAnchorIndex($0) }"),
+            "LayerAnchorIndex should derive revision from validated ExistingLayerIndex"
+        )
         let gatewayCallables = [
             structureGateway,
             attributeGateway,
@@ -2323,14 +2400,17 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(engineLive.contains("Authoritative stale validation"))
         #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
         #expect(engineLive.contains("private func validateFreshLayerIndex(_ index: EditableLayerIndex)"))
-        #expect(layerContracts.contains("package enum LayerStructureCommand"))
-        #expect(layerContracts.contains("package enum LayerAttributeCommand"))
-        #expect(contentContracts.contains("package enum LayerContentMutationCommand"))
+        #expect(layerContracts.contains("package enum UncheckedLayerStructureCommand"))
+        #expect(layerContracts.contains("package enum UncheckedLayerAttributeCommand"))
+        #expect(contentContracts.contains("package enum UncheckedLayerContentMutationCommand"))
+        #expect(!layerContracts.contains("package enum LayerStructureCommand"))
+        #expect(!layerContracts.contains("package enum LayerAttributeCommand"))
+        #expect(!contentContracts.contains("package enum LayerContentMutationCommand"))
         #expect(editorUseCase.contains("package enum DocumentEditorRequest"))
         #expect(editingGateway.contains("package typealias DocumentEditingRequest"))
-        #expect(!layerContracts.contains("public enum LayerStructureCommand"))
-        #expect(!layerContracts.contains("public enum LayerAttributeCommand"))
-        #expect(!contentContracts.contains("public enum LayerContentMutationCommand"))
+        #expect(!layerContracts.contains("public enum UncheckedLayerStructureCommand"))
+        #expect(!layerContracts.contains("public enum UncheckedLayerAttributeCommand"))
+        #expect(!contentContracts.contains("public enum UncheckedLayerContentMutationCommand"))
         #expect(readme.contains("App validation は preflight、runtime validation は本契約"))
         #expect(readme.contains("authoritative validation"))
     }
@@ -3091,6 +3171,20 @@ struct GpuSideEffectIsolationArchitectureTests {
             "activeLayerIndex"
         ]
 
+        let layerMutationContracts = try String(
+            contentsOf: repoRoot.appendingPathComponent(
+                "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
+                isDirectory: false
+            ),
+            encoding: .utf8
+        )
+        let structurePlan = try #require(Self.typeBody(named: "LayerStructureMutationPlan", in: layerMutationContracts))
+        #expect(!structurePlan.contains("resultingIndex"), "LayerStructureMutationPlan should expose typed mutation results instead of raw resulting Int")
+        #expect(structurePlan.contains("public let result: LayerStructureMutationResult?"))
+        let structureResult = try #require(Self.typeBody(named: "LayerStructureMutationResult", in: layerMutationContracts))
+        #expect(structureResult.contains("case createdLayer(DocumentCreatedLayerIndex)"))
+        #expect(structureResult.contains("case createdFolder(DocumentCreatedFolderID)"))
+
         for file in checkedFiles {
             let body = try String(
                 contentsOf: repoRoot.appendingPathComponent(file, isDirectory: false),
@@ -3127,7 +3221,6 @@ struct GpuSideEffectIsolationArchitectureTests {
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentContentService.swift: package func replaceLayerPixels( _ layerIndex: Int, _ pixelData: Data )",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentContentService.swift: package func setTextLayer( _ layerIndex: Int, _ textLayer: TextLayerData )",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift: property public folderIDs: Set<Int>",
-            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift: property public resultingIndex: Int?",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public folderID: Int",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public folderIDs: Set<Int>",
             "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public index: Int",
@@ -3976,6 +4069,37 @@ struct GpuSideEffectIsolationArchitectureTests {
             .sorted()
     }
 
+    private static func deprecatedPackageRawRuntimeOverloadRecords(in source: String) -> [String] {
+        [
+            "DocumentPersistenceClient",
+            "CanvasMutationRuntime",
+            "DocumentPersistenceRuntime",
+            "CanvasPreviewRuntime"
+        ].flatMap { typeName -> [String] in
+            guard let body = typeBody(named: typeName, in: source) else { return [] }
+            return callables(accessLevel: "package", in: body)
+                .filter { $0.kind == "func" && isDeprecatedPackageRawRuntimeOverload($0) }
+                .map { "\(typeName).\(normalizedSignature($0.signature))" }
+        }
+        .sorted()
+    }
+
+    private static func isDeprecatedPackageRawRuntimeOverload(_ callable: ArchitectureSourceInspector.Callable) -> Bool {
+        let rawIndexNames: Set<String> = ["activeLayerIndex"]
+        let rawSurfacePayloadNames: Set<String> = ["sourcePixelData", "pixelData", "maskData", "adjustedActiveLayerPixels"]
+        let rawWidthNames: Set<String> = ["width", "canvasWidth"]
+        let rawHeightNames: Set<String> = ["height", "canvasHeight"]
+
+        if callable.parameters.contains(where: { rawIndexNames.contains($0.semanticName) && $0.type == "Int" }) {
+            return true
+        }
+        if callable.parameters.contains(where: { rawSurfacePayloadNames.contains($0.semanticName) && $0.type == "Data" }) {
+            return true
+        }
+        return callable.parameters.contains { rawWidthNames.contains($0.semanticName) && $0.type == "Int" } &&
+            callable.parameters.contains { rawHeightNames.contains($0.semanticName) && $0.type == "Int" }
+    }
+
     private static func rawLayerIntAPISurfaceRecords(repoRoot: URL, root: URL) throws -> [String] {
         let checkedAccessLevels: Set<String> = ["public", "package"]
         let rawLayerNames: Set<String> = [
@@ -3987,8 +4111,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "folderID",
             "folderIDs",
             "anchorLayerIndex",
-            "sourceIndex",
-            "resultingIndex"
+            "sourceIndex"
         ]
         let rawLayerCallableNames = [
             "layer",

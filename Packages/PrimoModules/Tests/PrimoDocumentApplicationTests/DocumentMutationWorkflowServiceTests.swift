@@ -19,7 +19,7 @@ struct DocumentMutationWorkflowServiceTests {
             documentEditingGateway: DocumentEditingGateway { request in
                 switch request {
                 case .structure(.duplicateLayer):
-                    return .success(.structure(LayerStructureMutationPlan(resultingIndex: 4)))
+                    return .success(.structure(LayerStructureMutationPlan(result: .createdLayer(DocumentCreatedLayerIndex(4)))))
                 default:
                     return .failure(.bridgeMutationFailed("unexpected"))
                 }
@@ -401,7 +401,7 @@ private extension DocumentEditingGateway {
 
     static func recordingContent(
         _ recorder: MutationRecorder,
-        result: @escaping @Sendable (LayerContentMutationCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
+        result: @escaping @Sendable (UncheckedLayerContentMutationCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
     ) -> DocumentEditingGateway {
         DocumentEditingGateway { request in
             guard case let .content(command) = request else {
@@ -414,7 +414,7 @@ private extension DocumentEditingGateway {
 
     static func recordingStructure(
         _ recorder: MutationRecorder,
-        result: @escaping @Sendable (LayerStructureCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
+        result: @escaping @Sendable (UncheckedLayerStructureCommand) -> Result<DocumentEditingResult, DocumentMutationFailure>
     ) -> DocumentEditingGateway {
         DocumentEditingGateway { request in
             guard case let .structure(command) = request else {
@@ -426,7 +426,7 @@ private extension DocumentEditingGateway {
     }
 }
 
-private extension LayerContentMutationCommand {
+private extension UncheckedLayerContentMutationCommand {
     var eventDescription: String {
         switch self {
         case let .replacePixels(index, _):
@@ -447,7 +447,7 @@ private extension LayerContentMutationCommand {
     }
 }
 
-private extension LayerStructureCommand {
+private extension UncheckedLayerStructureCommand {
     var eventDescription: String {
         switch self {
         case let .addLayer(name):

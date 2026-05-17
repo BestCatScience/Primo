@@ -9,7 +9,7 @@ package struct LayerStructureUseCase: Sendable {
     }
 
     package func execute(
-        _ command: LayerStructureCommand,
+        _ command: UncheckedLayerStructureCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerStructureGateway
     ) -> Result<LayerStructureMutationPlan, DocumentLayerMutationFailure> {
@@ -29,7 +29,7 @@ package struct LayerStructureUseCase: Sendable {
             case let .success(addedLayer):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: addedLayer.selectedIndex,
+                        result: .createdLayer(addedLayer.selectedLayerIndex),
                         lifecycleEvent: .addLayer(name: name.rawValue, index: addedLayer.selectedIndex)
                     )
                 )
@@ -42,7 +42,7 @@ package struct LayerStructureUseCase: Sendable {
             case let .success(duplicatedIndex):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: duplicatedIndex.rawValue,
+                        result: .createdLayer(duplicatedIndex),
                         indexMutation: .duplication(sourceIndex: index.rawValue, duplicatedIndex: duplicatedIndex.rawValue),
                         lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex.rawValue, name: name.rawValue)
                     )
@@ -82,7 +82,7 @@ package struct LayerStructureUseCase: Sendable {
             case let .success(folderID):
                 return .success(
                     LayerStructureMutationPlan(
-                        resultingIndex: folderID.rawValue,
+                        result: .createdFolder(folderID),
                         lifecycleEvent: .createFolder(
                             folderID: folderID.rawValue,
                             name: name.rawValue,
@@ -130,7 +130,7 @@ package struct LayerAttributeUseCase: Sendable {
     }
 
     package func execute(
-        _ command: LayerAttributeCommand,
+        _ command: UncheckedLayerAttributeCommand,
         in context: DocumentLayerMutationContext,
         gateway: any LayerAttributeGateway
     ) -> Result<LayerAttributeMutationPlan, DocumentLayerMutationFailure> {
