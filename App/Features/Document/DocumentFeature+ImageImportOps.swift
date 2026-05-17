@@ -14,12 +14,8 @@ extension DocumentFeature {
         let pixelData: Data
     }
 
-    static func pngData(fromLayerPixelData pixelData: Data, width: Int, height: Int) -> Data? {
-        DocumentRasterImageService.pngData(
-            fromLayerPixelData: pixelData,
-            width: width,
-            height: height
-        )
+    static func pngData(from surface: RgbaSurface) -> Data? {
+        DocumentRasterImageService.pngData(from: surface)
     }
 
     static func inpaintCrop(

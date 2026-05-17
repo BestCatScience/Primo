@@ -113,6 +113,8 @@ public struct PreviewStrokePoint: Identifiable, Equatable, Sendable {
     }
 }
 
+/// @unchecked Sendable: immutable preview value object; `CGColor` is carried across presentation boundaries without mutation.
+/// Concurrency test: previewStrokeSendableTypesStayImmutableValueObjects
 public struct PreviewStrokeStyle: Equatable, @unchecked Sendable {
     public let tipKind: BrushTipKind
     public let isEraser: Bool
@@ -159,6 +161,8 @@ public struct PreviewStrokeStyle: Equatable, @unchecked Sendable {
     }
 }
 
+/// @unchecked Sendable: immutable preview value object composed from sendable/value-style fields.
+/// Concurrency test: previewStrokeSendableTypesStayImmutableValueObjects
 public struct PreviewStrokeTrack: Identifiable, Equatable, @unchecked Sendable {
     public let id: UUID
     public let layerIndex: Int

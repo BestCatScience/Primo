@@ -21,13 +21,8 @@ struct DocumentRasterImageServiceTests {
             255, 255, 255, 255,
         ])
 
-        let pngData = try #require(
-            DocumentRasterImageService.pngData(
-                fromLayerPixelData: pixelData,
-                width: 2,
-                height: 2
-            )
-        )
+        let surface = try #require(RgbaSurface(width: 2, height: 2, data: pixelData))
+        let pngData = try #require(DocumentRasterImageService.pngData(from: surface))
         let roundTripped = try #require(
             DocumentRasterImageService.rawLayerPixelData(
                 fromPNGData: pngData,

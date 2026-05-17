@@ -143,6 +143,10 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 
 ### Core、domain
 
+- `PrimoCoreContracts`
+  operation contract など、Foundation live 実装を含まない最小 core contract
+- `PrimoSystemContracts`
+  file、date、UUID、HTTP、key-value store、secret store、security-scoped resource、main queue などの system client contract
 - `PrimoCoreTypes`
   file、date、UUID、HTTP、key-value store、secret store、security-scoped resource、main queue などの共通 client contract と operation contract
 - `PrimoSystemClients`
@@ -194,6 +198,10 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 
 - `PrimoDocumentRuntime`
   app-facing façade です。`DocumentRuntimeFactory.live()`、`DocumentRuntime`、command services、presentation reader、rendering workflow、preview renderer、timelapse export service などを公開します。
+- `PrimoDocumentAppSupport`
+  app support façade です。`PrimoDocumentRuntimeLive`、`PrimoWorkspaceRuntime`、`PrimoBrushRuntime`、`PrimoAIImageRuntime` と app-facing support をつなぎ、app target から live runtime product を隠します。
+- `PrimoCanvasPresentationRuntime`
+  canvas presentation infrastructure を app-facing runtime として公開する façade です。
 - `PrimoWorkspaceRuntime`
   workspace application services、document workspace client、document import client の live façade です。
 - `PrimoBrushRuntime`

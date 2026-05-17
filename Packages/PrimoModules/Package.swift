@@ -294,6 +294,8 @@ let package = Package(
         .target(
             name: "PrimoDocumentAppSupport",
             dependencies: [
+                "PrimoAIImageRuntime",
+                "PrimoBrushRuntime",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentPersistenceContracts",
@@ -301,6 +303,7 @@ let package = Package(
                 "PrimoDocumentRuntime",
                 "PrimoDocumentRuntimeLive",
                 "PrimoSystemClients",
+                "PrimoWorkspaceRuntime",
             ],
             path: "Sources/PrimoDocumentAppSupport"
         ),

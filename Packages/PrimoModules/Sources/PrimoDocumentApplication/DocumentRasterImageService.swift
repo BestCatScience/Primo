@@ -79,7 +79,21 @@ public enum DocumentRasterImageService {
     }
 
     public static func pngData(from surface: DocumentCompositeSurface) -> Data? {
-        pngData(fromLayerPixelData: surface.pixelData, width: surface.width, height: surface.height)
+        encodedData(
+            fromPixelData: surface.pixelData,
+            width: surface.width,
+            height: surface.height,
+            typeIdentifier: "public.png" as CFString
+        )
+    }
+
+    public static func pngData(from surface: RgbaSurface) -> Data? {
+        encodedData(
+            fromPixelData: surface.data,
+            width: surface.width,
+            height: surface.height,
+            typeIdentifier: "public.png" as CFString
+        )
     }
 
     public static func jpegData(
@@ -92,15 +106,6 @@ public enum DocumentRasterImageService {
             height: surface.height,
             typeIdentifier: "public.jpeg" as CFString,
             compressionQuality: compressionQuality
-        )
-    }
-
-    public static func pngData(fromLayerPixelData pixelData: Data, width: Int, height: Int) -> Data? {
-        encodedData(
-            fromPixelData: pixelData,
-            width: width,
-            height: height,
-            typeIdentifier: "public.png" as CFString
         )
     }
 

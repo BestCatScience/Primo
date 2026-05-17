@@ -1,5 +1,7 @@
 import PrimoDocumentPresentationContracts
 
+/// @unchecked Sendable: the handle is consumed or released exactly once through a `@Sendable` release closure.
+/// Concurrency test: gpuMutationPayloadLeaseSuppressesReleaseAfterTransferredOwnership
 final class GpuMutationPayloadLease: @unchecked Sendable {
     private var handle: MetalBufferHandle?
     private let releaseHandle: @Sendable (MetalBufferHandle?) -> Void

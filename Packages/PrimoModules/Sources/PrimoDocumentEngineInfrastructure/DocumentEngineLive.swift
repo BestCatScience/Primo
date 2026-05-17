@@ -1026,6 +1026,8 @@ private func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> Do
     DocumentLayerMutationFailure(coreFailure: failure.coreFailure)
 }
 
+/// @unchecked Sendable: replay state is held behind a `LockedDocumentRuntimeExecutor` and uses injected GPU services.
+/// Concurrency test: timelapseReplayServiceUsesLockedRuntimeExecutorForReplayState
 package final class DocumentTimelapseReplayService: @unchecked Sendable {
     private let stateExecutor: LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>
 

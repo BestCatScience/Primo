@@ -523,6 +523,36 @@ struct GpuSideEffectIsolationArchitectureTests {
                 "Primo app target should keep direct access only to App-facing product \(product)"
             )
         }
+
+        let pbxproj = try String(
+            contentsOf: repoRoot.appendingPathComponent("Primo.xcodeproj/project.pbxproj", isDirectory: false),
+            encoding: .utf8
+        )
+        let appProducts = try Self.pbxNativeTargetPackageProducts(named: "Primo", in: pbxproj)
+        let appTestProducts = try Self.pbxNativeTargetPackageProducts(named: "PrimoTests", in: pbxproj)
+        let bannedRuntimeProducts = Set(runtimeWiringProducts + ["PrimoDocumentRuntimeLive"])
+        #expect(appProducts.isDisjoint(with: bannedRuntimeProducts))
+        #expect(appTestProducts.isDisjoint(with: bannedRuntimeProducts))
+
+        let appTestBlock = try #require(Self.yamlTargetBlock(named: "PrimoTests", in: projectYML))
+        for product in bannedRuntimeProducts {
+            #expect(!Self.yamlBlock(appTestBlock, containsProduct: product))
+        }
+
+        #expect(
+            graph["PrimoDocumentRuntime"]?.contains("PrimoDocumentRuntimeLive") != true,
+            "SwiftPM app-facing runtime target should not depend on live runtime implementation"
+        )
+        #expect(
+            graph["PrimoDocumentAppSupport"]?.contains("PrimoDocumentRuntimeLive") == true,
+            "SwiftPM app support target should own live runtime implementation wiring"
+        )
+        for product in runtimeWiringProducts {
+            #expect(
+                graph["PrimoDocumentAppSupport"]?.contains(product) == true,
+                "SwiftPM app support target should own live runtime wiring for \(product)"
+            )
+        }
     }
 
     @Test
@@ -3083,6 +3113,119 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func publicAndPackageRawLayerIntAPIsAreAllowlisted() throws {
+        let repoRoot = try Self.repoRoot()
+        let sourceRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources",
+            isDirectory: true
+        )
+        let actual = try Set(Self.rawLayerIntAPISurfaceRecords(repoRoot: repoRoot, root: sourceRoot))
+        let allowed: Set<String> = [
+            "Packages/PrimoModules/Sources/PrimoCanvasPresentationDomain/CanvasPresentationDomain.swift: property public activeLayerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/CanvasEditingWorkflowService.swift: property public activeLayerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentContentService.swift: package func pixelDataForLayer(_ layerIndex: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentContentService.swift: package func replaceLayerPixels( _ layerIndex: Int, _ pixelData: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentContentService.swift: package func setTextLayer( _ layerIndex: Int, _ textLayer: TextLayerData )",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift: property public folderIDs: Set<Int>",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift: property public resultingIndex: Int?",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public folderID: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public folderIDs: Set<Int>",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: property public index: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: public static func folder(folderID: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: public static func layer(index: Int, requiresUnlocked: Bool = false)",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationContracts.swift: public static func layerAnchor(index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentMutationWorkflow.swift: property public index: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/SelectionWorkflowService.swift: package func makeAutoSelection( at point: CGPoint, snapshot: MetalDocumentSnapshot?, layerIndex: Int, thresholdMode: FillThresholdMode, opacityTolerance: Double, colorTolerance: Double, expansion: Int )",
+            "Packages/PrimoModules/Sources/PrimoDocumentGPUContracts/DocumentGPUContracts.swift: property public activeLayerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentGPUContracts/DocumentGPUContracts.swift: property public layerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeContext.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerBufferHandle: MetalBufferHandle, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeContext.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeContext.swift: public func compositedPreviewPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeContext.swift: public func rasterizedStrokePixelData( basePixelData: Data, baseBufferHandle: MetalBufferHandle? = nil, canvasWidth: Int, canvasHeight: Int, samples: [StylusSample], brush: BrushRuntimeSettings, mode: PrimoMetalStrokeExecutionMode = .commit, snapshotRevision: Int? = nil, activeLayerIndex: Int? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedBufferHandle( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerBufferHandle: MetalBufferHandle?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedBufferHandle( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerPixels: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerPixels: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerBufferHandle: MetalBufferHandle, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func compositedPreviewPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/MetalRuntimeServices.swift: public func rasterizedStrokePixelData( basePixelData: Data, baseBufferHandle: MetalBufferHandle? = nil, canvasWidth: Int, canvasHeight: Int, samples: [StylusSample], brush: BrushRuntimeSettings, mode: PrimoMetalStrokeExecutionMode = .commit, snapshotRevision: Int? = nil, activeLayerIndex: Int? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: property public activeLayerIndex: Int?",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedBufferHandle( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerBufferHandle: MetalBufferHandle?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedBufferHandle( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerPixels: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int?, adjustedActiveLayerPixels: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerBufferHandle: MetalBufferHandle, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func compositedPreviewPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift: public func rasterizedStrokePixelData( basePixelData: Data, baseBufferHandle: MetalBufferHandle? = nil, canvasWidth: Int, canvasHeight: Int, samples: [StylusSample], brush: BrushRuntimeSettings, mode: PrimoMetalStrokeExecutionMode = .commit, snapshotRevision: Int? = nil, activeLayerIndex: Int? = nil )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift: public func makeCommittedPixels( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, samples: [StylusSample], brush: BrushRuntimeSettings, preserveAlphaLockedPixels: Bool )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift: public func makeCommittedSurface( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, samples: [StylusSample], brush: BrushRuntimeSettings, preserveAlphaLockedPixels: Bool )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift: public func makePreviewSurface( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, basePixelData: Data, baseBufferHandle: MetalBufferHandle? = nil, samples: [StylusSample], brush: BrushRuntimeSettings, preserveAlphaLockedPixels: Bool, usesResponsivePreview: Bool = false )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift: public func stageCommittedSnapshot( baseSnapshot: MetalDocumentSnapshot, committedPixels: Data, lastCommittedRenderRevision: Int, activeLayerIndex: Int, stagedCompositePixelData: Data? )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/MetalStrokeGpuServices.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerBufferHandle: MetalBufferHandle, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/MetalStrokeGpuServices.swift: public func compositedPreviewIncrementalUpdate( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int) )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/MetalStrokeGpuServices.swift: public func compositedPreviewPixelData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func applyLayerMask(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func applyLayerMutation(_ index: Int, _ payload: DocumentLayerMutationPayload)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func applyLayerProcessing(_ index: Int, _ request: LayerProcessingRequest)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func applyLayerSurfaceMutation(_ index: Int, _ payload: GpuLayerMutationPayload)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func applyTextLayerMutation(_ index: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func clearLayer(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func clearLayerMask(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func deleteLayer(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func mergeLayerDown(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func replaceLayerMask(_ index: Int, _ mask: Data)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func replaceLayerPixels(_ index: Int, _ pixelData: Data)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func replaceLayerPixelsInRect(_ index: Int, _ rect: LayerPixelRect, _ pixelData: Data)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func revealLayerForEditing(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func setActiveLayer(_ index: Int)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func setLayerName(_ index: Int, _ name: String)",
+            "Packages/PrimoModules/Sources/PrimoDocumentMutationContracts/DocumentMutationRuntimeContracts.swift: package func setLayerVisibility(_ index: Int, _ visible: Bool)",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift: property public layerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: package static func unsafeUnchecked( id: UUID = UUID(), layerIndex: Int, originX: Int, originY: Int, width: Int, height: Int, transferKind: MetalSnapshotTransferKind = .dirtyRect, gpuBufferHandle: MetalBufferHandle? = nil, pixelData: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: package static func unsafeUnchecked( index: Int, opacity: Float, visible: Bool, isClipped: Bool, blendMode: LayerBlendMode, thumbnailSurface: DocumentCompositeSurface? = nil, thumbnailData: Data?, gpuBufferHandle: MetalBufferHandle? = nil, pixelData: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: property public activeLayerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: property public anchorLayerIndex: Int?",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: property public folderID: Int?",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: property public index: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/DocumentPresentationModels.swift: property public layerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/GpuCanvasPresentationServices.swift: public func compositePreviewImageData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/GpuCanvasPresentationServices.swift: public func sampledColor( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, source: EyedropperSamplingSource, point: CGPoint, paperStyle: CanvasPaperStyle )",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift: package func compositePreviewImageData(snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data)",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/GpuCanvasEyedropperSamplerAdapter.swift: package func sampledColor( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, source: EyedropperSamplingSource, point: CGPoint, paperStyle: CanvasPaperStyle )",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/GpuCanvasPreviewRendererAdapter.swift: package func compositePreviewImageData( snapshot: MetalDocumentSnapshot, activeLayerIndex: Int, adjustedActiveLayerPixels: Data )",
+            "Packages/PrimoModules/Sources/PrimoDocumentStrokeApplication/DocumentStrokeApplication.swift: property public activeLayerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentStrokeApplication/StrokeSessionState.swift: property public layerIndex: Int",
+            "Packages/PrimoModules/Sources/PrimoDocumentTimelapseInfrastructure/PaintDocumentTimelapseOperation.swift: public func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live)"
+        ]
+
+        #expect(
+            actual == allowed,
+            "Raw layer/folder Int public/package API changed. Prefer typed layer/folder tokens; update this allowlist only for reviewed boundary/raw projection APIs. Actual: \(actual.sorted())"
+        )
+    }
+
+    @Test
+    func publicRawPixelDataWidthHeightAPIsAreAbsentAcrossProducts() throws {
+        let repoRoot = try Self.repoRoot()
+        let package = try String(
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift"),
+            encoding: .utf8
+        )
+        let productNames = PackageManifestProductParser.libraryProductNames(in: package)
+        let sourceRoots = productNames.map {
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources/\($0)", isDirectory: true)
+        }
+        let actual = try sourceRoots
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .flatMap { try Self.publicRawPixelDimensionAPISurfaceRecords(repoRoot: repoRoot, root: $0) }
+
+        #expect(
+            actual.isEmpty,
+            "Public product operation APIs should use RgbaSurface/MaskSurface/PixelGeometry style value objects instead of raw Data + width + height triples. Actual: \(actual)"
+        )
+    }
+
+    @Test
     func uncheckedSendableIsAllowlisted() throws {
         let repoRoot = try Self.repoRoot()
         let roots = [
@@ -3106,17 +3249,136 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
 
         var actual: Set<String> = []
+        var declarations: [UncheckedSendableDeclaration] = []
         for root in roots {
             for source in try Self.swiftSources(under: root) {
                 let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
                 let body = try String(contentsOf: source, encoding: .utf8)
                 for declaration in Self.uncheckedSendableDeclarations(in: body) {
-                    actual.insert("\(relativePath):\(declaration)")
+                    let identity = "\(relativePath):\(declaration.name)"
+                    actual.insert(identity)
+                    declarations.append(declaration.withIdentity(identity))
                 }
             }
         }
 
         #expect(actual == allowed, "Update this allowlist only when the unchecked Sendable ownership/locking rationale is reviewed. Actual: \(actual.sorted())")
+
+        let testFunctionNames = try Self.testFunctionNames(repoRoot: repoRoot)
+        for declaration in declarations {
+            #expect(
+                declaration.hasReasonComment,
+                "\(declaration.identity) must have a nearby '@unchecked Sendable:' reason comment"
+            )
+            #expect(
+                !declaration.concurrencyTestNames.isEmpty,
+                "\(declaration.identity) must reference at least one 'Concurrency test:' comment"
+            )
+            for testName in declaration.concurrencyTestNames {
+                #expect(
+                    testFunctionNames.contains(testName),
+                    "\(declaration.identity) references missing concurrency test \(testName)"
+                )
+            }
+        }
+    }
+
+    @Test
+    func registeredFontURLRegistrySerializesMutableStateWithLock() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoBrushInfrastructure/TextFontLibraryClient.swift"
+        )
+        let registry = try #require(Self.typeBody(named: "RegisteredFontURLRegistry", in: body))
+
+        #expect(registry.contains("private let lock = NSLock()"))
+        #expect(registry.contains("private var values = Set<String>()"))
+        #expect(Self.functionBody(named: "needsRegistration", in: registry)?.contains("lock.lock()") == true)
+        #expect(Self.functionBody(named: "markRegistered", in: registry)?.contains("lock.lock()") == true)
+    }
+
+    @Test
+    func uncheckedSendableRuntimeCollaboratorsStayExecutorConfined() throws {
+        let runtime = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift"
+        )
+        let live = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+
+        #expect(runtime.contains("private let store: SwiftDocumentStore"))
+        #expect(runtime.contains("private let presentationBuilder = DocumentPresentationBuilder()"))
+        #expect(runtime.contains("private let dirtyUpdatePublisher = DirtyUpdatePublisher()"))
+        #expect(live.contains("LockedDocumentRuntimeExecutor<SwiftDocumentRuntime>"))
+        #expect(live.contains("LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>"))
+    }
+
+    @Test
+    func timelapseReplayServiceUsesLockedRuntimeExecutorForReplayState() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
+        )
+        let service = try #require(Self.typeBody(named: "DocumentTimelapseReplayService", in: body))
+
+        #expect(service.contains("private let stateExecutor: LockedDocumentRuntimeExecutor<DocumentTimelapseReplayState>"))
+        #expect(service.contains("self.stateExecutor = LockedDocumentRuntimeExecutor("))
+        #expect(!service.contains("DocumentTimelapseReplayState(") || service.contains("runtime: SwiftDocumentRuntime("))
+    }
+
+    @Test
+    func gpuResourceLeaseRetainsAndReleasesThroughInjectedGpuServices() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift"
+        )
+        let lease = try #require(Self.typeBody(named: "GpuResourceLease", in: body))
+
+        #expect(lease.contains("guard let handle, services.retain(handle) else { return nil }"))
+        #expect(lease.contains("self.releaseHandle = services.release"))
+        #expect(lease.contains("deinit"))
+        #expect(lease.contains("releaseHandle(handle)"))
+    }
+
+    @Test
+    func primoMetalDocumentProcessingClientSerializesMutableCaches() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift"
+        )
+        let client = try #require(Self.typeBody(named: "PrimoMetalDocumentProcessingClient", in: body))
+
+        #expect(client.contains("private let cacheLock = NSRecursiveLock()"))
+        for mutableCache in ["cachedSignature", "cachedLayerTexture", "cachedStrokeExecution", "cachedBuffers", "cachedScaledBrushTips"] {
+            #expect(client.contains("private var \(mutableCache)"))
+        }
+        #expect(client.contains("private func withCacheLock<T>("))
+        #expect(client.contains("cacheLock.lock()"))
+        #expect(client.contains("defer { cacheLock.unlock() }"))
+    }
+
+    @Test
+    func previewStrokeSendableTypesStayImmutableValueObjects() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentPresentationContracts/CanvasPresentationTypes.swift"
+        )
+
+        for typeName in ["PreviewStrokeStyle", "PreviewStrokeTrack"] {
+            let type = try #require(Self.typeBody(named: typeName, in: body))
+            #expect(!type.contains("public var "))
+            #expect(!type.contains("private var "))
+            #expect(type.contains("public let "))
+        }
+    }
+
+    @Test
+    func documentRuntimePresentationBroadcasterSerializesContinuationMutation() throws {
+        let body = try Self.sourceBody(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntimeLive/DocumentRuntimePresentationBroadcaster.swift"
+        )
+        let broadcaster = try #require(Self.typeBody(named: "DocumentRuntimePresentationBroadcaster", in: body))
+
+        #expect(broadcaster.contains("private let lock = NSLock()"))
+        #expect(broadcaster.contains("private var continuations"))
+        #expect(Self.functionBody(matching: "func stream()", in: broadcaster)?.contains("lock.lock()") == true)
+        #expect(Self.functionBody(matching: "private func publish(", in: broadcaster)?.contains("lock.lock()") == true)
+        #expect(Self.functionBody(matching: "private func removeContinuation(", in: broadcaster)?.contains("lock.lock()") == true)
     }
 
     @Test
@@ -3257,6 +3519,73 @@ struct GpuSideEffectIsolationArchitectureTests {
                 "PrimoSystemClients should own live system-client implementation token \(token)"
             )
         }
+    }
+
+    @Test
+    func liveSideEffectAPIsStayInsideInfrastructureOrLiveTargets() throws {
+        let repoRoot = try Self.repoRoot()
+        let roots = [
+            repoRoot.appendingPathComponent("App", isDirectory: true),
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Sources", isDirectory: true),
+        ]
+        let bannedTokens = [
+            "FileManager.default",
+            "URLSession.shared",
+            "import Security",
+            "MTLDevice",
+        ]
+        let allowedPathFragments = [
+            "/App/Support/",
+            "/PrimoSystemClients/",
+            "Infrastructure/",
+            "/RuntimeLive/",
+        ]
+
+        for root in roots {
+            for source in try Self.swiftSources(under: root) {
+                let path = source.path
+                let isAllowed = allowedPathFragments.contains { path.contains($0) }
+                let body = try String(contentsOf: source, encoding: .utf8)
+                for token in bannedTokens where body.contains(token) {
+                    #expect(
+                        isAllowed,
+                        "\(path) contains side-effect API \(token); keep it in infrastructure/live targets"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    func readmeArchitectureTargetsMatchPackageProductGraph() throws {
+        let repoRoot = try Self.repoRoot()
+        let readme = try String(
+            contentsOf: repoRoot.appendingPathComponent("README.md", isDirectory: false),
+            encoding: .utf8
+        )
+        let package = try String(
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false),
+            encoding: .utf8
+        )
+        let productNames = Set(PackageManifestProductParser.libraryProductNames(in: package))
+        let documentedTargets = Set(Self.readmeBacktickedPrimoModuleNames(in: readme))
+
+        #expect(
+            productNames.isSubset(of: documentedTargets),
+            "README architecture description is missing package products: \(productNames.subtracting(documentedTargets).sorted())"
+        )
+        #expect(
+            documentedTargets.subtracting(productNames).allSatisfy {
+                $0 == "PrimoDocumentRuntimeLive" ||
+                    $0 == "Primo" ||
+                    $0 == "PrimoApp" ||
+                    $0 == "PrimoModules" ||
+                    $0 == "PrimoModuleExports" ||
+                    $0 == "PrimoRootFeature" ||
+                    $0.hasSuffix("Infrastructure")
+            },
+            "README architecture description mentions non-product targets without an explicit exception: \(documentedTargets.subtracting(productNames).sorted())"
+        )
     }
 
     @Test
@@ -3469,6 +3798,63 @@ struct GpuSideEffectIsolationArchitectureTests {
         return String(yaml[range.lowerBound..<bodyEnd])
     }
 
+    private static func yamlBlock(_ block: String, containsProduct product: String) -> Bool {
+        block.components(separatedBy: .newlines)
+            .contains { $0.trimmingCharacters(in: .whitespaces) == "product: \(product)" }
+    }
+
+    private static func pbxNativeTargetPackageProducts(named targetName: String, in pbxproj: String) throws -> Set<String> {
+        let marker = "/* \(targetName) */ = {"
+        guard let markerRange = pbxproj.range(of: marker),
+              let blockEnd = matchingClosingBrace(in: pbxproj, openingBrace: pbxproj.index(before: markerRange.upperBound)) else {
+            return []
+        }
+        let block = String(pbxproj[markerRange.lowerBound...blockEnd])
+        guard let dependencyRange = block.range(of: "packageProductDependencies = (") else { return [] }
+        let dependencyBody = block[dependencyRange.upperBound...]
+        guard let closing = dependencyBody.firstIndex(of: ")") else { return [] }
+        let dependencyBlock = String(dependencyBody[..<closing])
+        return Set(
+            dependencyBlock
+                .components(separatedBy: .newlines)
+                .compactMap { line in
+                    guard let commentStart = line.range(of: "/* "),
+                          let commentEnd = line[commentStart.upperBound...].range(of: " */") else {
+                        return nil
+                    }
+                    return String(line[commentStart.upperBound..<commentEnd.lowerBound])
+                }
+        )
+    }
+
+    private static func readmeBacktickedPrimoModuleNames(in readme: String) -> [String] {
+        readme.components(separatedBy: "`")
+            .enumerated()
+            .compactMap { index, token in
+                guard index.isMultiple(of: 2) == false,
+                      token.hasPrefix("Primo"),
+                      token.allSatisfy({ $0.isLetter || $0.isNumber }) else {
+                    return nil
+                }
+                return token
+            }
+    }
+
+    private static func matchingClosingBrace(in text: String, openingBrace: String.Index) -> String.Index? {
+        var depth = 0
+        var index = openingBrace
+        while index < text.endIndex {
+            if text[index] == "{" {
+                depth += 1
+            } else if text[index] == "}" {
+                depth -= 1
+                if depth == 0 { return index }
+            }
+            index = text.index(after: index)
+        }
+        return nil
+    }
+
     private static func publicTopLevelSymbols(in source: String) -> [String] {
         ArchitectureSourceInspector(source: source).topLevelDeclarations
             .filter { $0.accessLevel == "public" }
@@ -3590,6 +3976,133 @@ struct GpuSideEffectIsolationArchitectureTests {
             .sorted()
     }
 
+    private static func rawLayerIntAPISurfaceRecords(repoRoot: URL, root: URL) throws -> [String] {
+        let checkedAccessLevels: Set<String> = ["public", "package"]
+        let rawLayerNames: Set<String> = [
+            "index",
+            "layerIndex",
+            "activeLayerIndex",
+            "destinationIndex",
+            "duplicatedIndex",
+            "folderID",
+            "folderIDs",
+            "anchorLayerIndex",
+            "sourceIndex",
+            "resultingIndex"
+        ]
+        let rawLayerCallableNames = [
+            "layer",
+            "folder",
+            "Layer",
+            "Folder",
+            "Index",
+            "index"
+        ]
+
+        var records: [String] = []
+        for source in try swiftSources(under: root) {
+            let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let inspector = ArchitectureSourceInspector(source: body)
+            for property in inspector.properties
+                where checkedAccessLevels.contains(property.accessLevel)
+            {
+                guard rawLayerNames.contains(property.name),
+                      let type = property.type,
+                      isRawLayerIntAPIType(type)
+                else { continue }
+                records.append("\(relativePath): property \(property.accessLevel) \(property.name): \(type)")
+            }
+            for callable in inspector.callables
+                where checkedAccessLevels.contains(callable.accessLevel)
+            {
+                let rawParameters = callable.parameters.filter { parameter in
+                    let semanticName = parameter.semanticName
+                    return rawLayerNames.contains(semanticName) &&
+                        isRawLayerIntAPIType(parameter.type)
+                }
+                let rawClosureParameters = callable.parameters.filter { parameter in
+                    rawLayerCallableNames.contains(where: callable.name.contains) &&
+                        isRawLayerIntClosureType(parameter.type)
+                }
+                guard !rawParameters.isEmpty || !rawClosureParameters.isEmpty else { continue }
+                records.append("\(relativePath): \(Self.normalizedSignature(callable.signature))")
+            }
+        }
+        return records.sorted()
+    }
+
+    private static func isRawLayerIntAPIType(_ type: String) -> Bool {
+        let normalized = type.replacingOccurrences(of: " ", with: "")
+        return normalized == "Int" ||
+            normalized == "Int?" ||
+            normalized == "Set<Int>" ||
+            normalized == "[Int]" ||
+            normalized == "[Int]?"
+    }
+
+    private static func isRawLayerIntClosureType(_ type: String) -> Bool {
+        let normalized = type.replacingOccurrences(of: " ", with: "")
+        return normalized.contains("(Int)") ||
+            normalized.contains("(Int,") ||
+            normalized.contains(",Int)") ||
+            normalized.contains(",Int,") ||
+            normalized.contains("(Int?)") ||
+            normalized.contains("(Int?,") ||
+            normalized.contains(",Int?)") ||
+            normalized.contains(",Int?,")
+    }
+
+    private static func publicRawPixelDimensionAPISurfaceRecords(repoRoot: URL, root: URL) throws -> [String] {
+        var records: [String] = []
+        for source in try swiftSources(under: root) {
+            let relativePath = source.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let inspector = ArchitectureSourceInspector(source: body)
+            for callable in inspector.callables
+                where callable.accessLevel == "public" && exposesRawPixelDataWidthHeight(callable)
+            {
+                records.append("\(relativePath): \(Self.normalizedSignature(callable.signature))")
+            }
+        }
+        return records.sorted()
+    }
+
+    private static func exposesRawPixelDataWidthHeight(_ callable: ArchitectureSourceInspector.Callable) -> Bool {
+        let hasRawData = callable.parameters.contains { parameter in
+            isRawPixelDataParameter(name: parameter.semanticName, type: parameter.type)
+        }
+        guard hasRawData else { return false }
+        return callable.parameters.contains { parameter in
+            isWidthParameter(name: parameter.semanticName, type: parameter.type)
+        } && callable.parameters.contains { parameter in
+            isHeightParameter(name: parameter.semanticName, type: parameter.type)
+        }
+    }
+
+    private static func isRawPixelDataParameter(name: String, type: String) -> Bool {
+        let normalizedType = type.replacingOccurrences(of: " ", with: "")
+        guard normalizedType == "Data" || normalizedType == "Foundation.Data" else { return false }
+        return [
+            "data",
+            "pixelData",
+            "rgba",
+            "bytes",
+            "maskData",
+            "adjustedActiveLayerPixels",
+            "basePixelData",
+            "committedPixels"
+        ].contains(name)
+    }
+
+    private static func isWidthParameter(name: String, type: String) -> Bool {
+        (name == "width" || name == "canvasWidth") && type == "Int"
+    }
+
+    private static func isHeightParameter(name: String, type: String) -> Bool {
+        (name == "height" || name == "canvasHeight") && type == "Int"
+    }
+
     private static func normalizedSignature(_ signature: String) -> String {
         signature
             .split(whereSeparator: \.isNewline)
@@ -3676,17 +4189,98 @@ struct GpuSideEffectIsolationArchitectureTests {
         return visited
     }
 
-    private static func uncheckedSendableDeclarations(in source: String) -> [String] {
-        let pattern = #"(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*@unchecked\s+Sendable|(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*:\s*@unchecked\s+Sendable"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let nsRange = NSRange(source.startIndex..<source.endIndex, in: source)
-        return regex.matches(in: source, range: nsRange).compactMap { match in
-            for index in 1..<match.numberOfRanges {
-                guard let range = Range(match.range(at: index), in: source) else { continue }
-                return String(source[range])
-            }
-            return nil
+    private struct UncheckedSendableDeclaration {
+        let identity: String
+        let name: String
+        let hasReasonComment: Bool
+        let concurrencyTestNames: [String]
+
+        func withIdentity(_ identity: String) -> Self {
+            Self(
+                identity: identity,
+                name: name,
+                hasReasonComment: hasReasonComment,
+                concurrencyTestNames: concurrencyTestNames
+            )
         }
+    }
+
+    private static func uncheckedSendableDeclarations(in source: String) -> [UncheckedSendableDeclaration] {
+        let lines = source.components(separatedBy: .newlines)
+        return lines.enumerated().compactMap { lineNumber, line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"),
+                  trimmed.contains("@unchecked"),
+                  trimmed.contains("Sendable"),
+                  let name = uncheckedSendableTypeName(in: line)
+            else { return nil }
+
+            let commentWindow = lines[max(lineNumber - 6, 0)..<lineNumber]
+            let hasReasonComment = commentWindow.contains {
+                $0.contains("@unchecked Sendable:")
+            }
+            let testNames = commentWindow.flatMap { line -> [String] in
+                guard let range = line.range(of: "Concurrency test:") else { return [] }
+                return line[range.upperBound...]
+                    .split(separator: ",")
+                    .map {
+                        $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                            .trimmingCharacters(in: CharacterSet(charactersIn: "`"))
+                    }
+                    .filter { !$0.isEmpty }
+            }
+
+            return UncheckedSendableDeclaration(
+                identity: name,
+                name: name,
+                hasReasonComment: hasReasonComment,
+                concurrencyTestNames: testNames
+            )
+        }
+    }
+
+    private static func uncheckedSendableTypeName(in line: String) -> String? {
+        let pattern = #"(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*@unchecked\s+Sendable|(?:public|package|private|fileprivate|internal)?\s*(?:final\s+)?(?:class|struct|actor)\s+([A-Za-z_][A-Za-z0-9_]*)[^{\n]*:\s*@unchecked\s+Sendable"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsRange = NSRange(line.startIndex..<line.endIndex, in: line)
+        guard let match = regex.firstMatch(in: line, range: nsRange) else { return nil }
+        for index in 1..<match.numberOfRanges {
+            guard let range = Range(match.range(at: index), in: line) else { continue }
+            return String(line[range])
+        }
+        return nil
+    }
+
+    private static func testFunctionNames(repoRoot: URL) throws -> Set<String> {
+        let testRoots = [
+            repoRoot.appendingPathComponent("Packages/PrimoModules/Tests", isDirectory: true),
+            repoRoot.appendingPathComponent("PrimoTests", isDirectory: true)
+        ].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let pattern = #"func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("#
+        let regex = try NSRegularExpression(pattern: pattern)
+        var names: Set<String> = []
+        for root in testRoots {
+            for source in try swiftSources(under: root) {
+                let body = try String(contentsOf: source, encoding: .utf8)
+                let nsRange = NSRange(body.startIndex..<body.endIndex, in: body)
+                for match in regex.matches(in: body, range: nsRange) {
+                    guard let range = Range(match.range(at: 1), in: body) else { continue }
+                    names.insert(String(body[range]))
+                }
+            }
+        }
+        return names
+    }
+
+    private static func sourceBody(_ relativePath: String) throws -> String {
+        try String(
+            contentsOf: repoRoot().appendingPathComponent(relativePath),
+            encoding: .utf8
+        )
+    }
+
+    private static func functionBody(named functionName: String, in source: String) -> String? {
+        Self.functionBody(matching: "func \(functionName)", in: source)
     }
 
     private static let cachedPackageTargetGraph: Result<[String: Set<String>], Error> = Result {

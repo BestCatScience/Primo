@@ -447,11 +447,10 @@ struct ContentView: View {
         guard let surface = aiImageInputPreviewSurface else {
             return nil
         }
-        return DocumentFeature.pngData(
-            fromLayerPixelData: surface.pixelData,
-            width: surface.width,
-            height: surface.height
-        )
+        guard let rgbaSurface = RgbaSurface(width: surface.width, height: surface.height, data: surface.pixelData) else {
+            return nil
+        }
+        return DocumentFeature.pngData(from: rgbaSurface)
     }
 
     @MainActor

@@ -476,6 +476,8 @@ private struct PrimoMetalBufferPair {
     var scratch: MTLBuffer
 }
 
+/// @unchecked Sendable: Metal objects are shared read-only and mutable caches are guarded by `cacheLock`.
+/// Concurrency test: primoMetalDocumentProcessingClientSerializesMutableCaches
 public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     public static let shared = PrimoMetalDocumentProcessingClient()
 

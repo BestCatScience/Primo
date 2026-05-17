@@ -409,6 +409,8 @@ struct DocumentCommandRecord: Equatable, Sendable {
     }
 }
 
+/// @unchecked Sendable: the store is mutable runtime state and is only reached through `SwiftDocumentRuntime` behind `LockedDocumentRuntimeExecutor`.
+/// Concurrency test: uncheckedSendableRuntimeCollaboratorsStayExecutorConfined
 final class SwiftDocumentStore: @unchecked Sendable {
     var snapshot: SwiftDocumentStoreSnapshot
 

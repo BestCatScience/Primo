@@ -2,6 +2,8 @@ import Foundation
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
+/// @unchecked Sendable: continuation storage is guarded by `lock`; presentation reads use a `@Sendable` provider.
+/// Concurrency test: documentRuntimePresentationBroadcasterSerializesContinuationMutation
 final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable {
     private let lock = NSLock()
     private let currentPresentation: @Sendable () -> Result<PaintDocumentPresentation, DocumentMutationFailure>

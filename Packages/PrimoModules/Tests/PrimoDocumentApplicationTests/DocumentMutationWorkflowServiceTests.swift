@@ -191,6 +191,33 @@ struct DocumentMutationWorkflowServiceTests {
     }
 
     @Test
+    func staleLayerIndexesAreRejectedAfterStructureMutationSequencesAndProjectLoad() throws {
+        let recorder = MutationRecorder()
+        let service = DocumentMutationWorkflowService(
+            documentQueryGateway: queryGateway(layerCount: 3, revision: { DocumentRevision(2) }),
+            documentEditingGateway: .recordingStructure(recorder) { _ in .success(.structure(LayerStructureMutationPlan())) },
+            documentLayerEffectsGateway: .unused
+        )
+        let staleIndex = try #require(existingLayerIndex(1, revision: DocumentRevision(1), layerCount: 3))
+        let currentDestination = try #require(existingLayerIndex(2, revision: DocumentRevision(2), layerCount: 3))
+        let expected = DocumentMutationFailure.staleLayerIndex(
+            index: 1,
+            validationRevision: DocumentRevision(1),
+            currentRevision: DocumentRevision(2)
+        )
+
+        expectFailure(service.deleteLayer(staleIndex), expected)
+        expectFailure(service.duplicateLayer(staleIndex, named: "Copy"), expected)
+        expectFailure(service.moveLayer(staleIndex, to: currentDestination), expected)
+        expectFailure(service.setActiveLayer(staleIndex), expected)
+
+        #expect(
+            recorder.events.isEmpty,
+            "delete / duplicate / move / load-project revision changes must reject stale validated indexes before mutation"
+        )
+    }
+
+    @Test
     func typedCreateFolderRejectsStaleAnchorBeforeRawMutation() throws {
         let recorder = MutationRecorder()
         let service = DocumentMutationWorkflowService(

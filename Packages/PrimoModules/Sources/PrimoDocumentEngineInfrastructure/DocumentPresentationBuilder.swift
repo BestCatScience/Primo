@@ -4,6 +4,8 @@ import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 
+/// @unchecked Sendable: thumbnail cache mutation stays private to `SwiftDocumentRuntime` behind `LockedDocumentRuntimeExecutor`.
+/// Concurrency test: uncheckedSendableRuntimeCollaboratorsStayExecutorConfined
 final class DocumentPresentationBuilder: @unchecked Sendable {
     private var thumbnailSurfaceCache: [Int: DocumentCompositeSurface] = [:]
 

@@ -192,6 +192,8 @@ private struct TextFontLibraryStorage {
     }
 }
 
+/// @unchecked Sendable: mutable registered-font paths are guarded by `lock`.
+/// Concurrency test: registeredFontURLRegistrySerializesMutableStateWithLock
 private final class RegisteredFontURLRegistry: @unchecked Sendable {
     private let lock = NSLock()
     private var values = Set<String>()

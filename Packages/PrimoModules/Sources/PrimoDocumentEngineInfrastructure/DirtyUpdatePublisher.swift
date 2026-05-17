@@ -3,6 +3,8 @@ import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
 
+/// @unchecked Sendable: instances are owned by `SwiftDocumentRuntime`, whose live access is serialized by `LockedDocumentRuntimeExecutor`.
+/// Concurrency test: uncheckedSendableRuntimeCollaboratorsStayExecutorConfined
 final class DirtyUpdatePublisher: @unchecked Sendable {
     private var pendingDirtyUpdate: IncrementalLayerUpdate?
 

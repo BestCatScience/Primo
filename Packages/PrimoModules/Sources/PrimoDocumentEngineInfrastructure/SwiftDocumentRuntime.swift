@@ -69,6 +69,8 @@ struct RuntimeBlurPlan: Sendable {
     let gpuServices: DocumentRuntimeGpuServices
 }
 
+/// @unchecked Sendable: the retained handle is immutable after init and released exactly once in deinit through a `@Sendable` release closure.
+/// Concurrency test: gpuResourceLeaseRetainsAndReleasesThroughInjectedGpuServices
 final class GpuResourceLease: @unchecked Sendable {
     private let handle: MetalBufferHandle?
     private let releaseHandle: @Sendable (MetalBufferHandle?) -> Void
@@ -84,6 +86,8 @@ final class GpuResourceLease: @unchecked Sendable {
     }
 }
 
+/// @unchecked Sendable: live runtime access is serialized by `LockedDocumentRuntimeExecutor`; the runtime keeps mutable collaborators private.
+/// Concurrency test: uncheckedSendableRuntimeCollaboratorsStayExecutorConfined
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 

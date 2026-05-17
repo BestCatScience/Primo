@@ -215,16 +215,10 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentGPUContracts
       - package: PrimoModules
-        product: PrimoBrushRuntime
-      - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
         product: PrimoAIImageApplication
       - package: PrimoModules
         product: PrimoAIImageDomain
       - package: PrimoModules
-        product: PrimoAIImageRuntime
-      - package: PrimoModules
         product: PrimoWorkspaceApplication
-      - package: PrimoModules
-        product: PrimoWorkspaceRuntime

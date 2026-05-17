@@ -107,6 +107,115 @@ struct PaintDocumentPersistenceServiceTests {
         }
     }
 
+    @Test(arguments: [-0.01, 1.01])
+    func validateProjectPackageRejectsFuzzedInvalidOpacity(opacity: Double) throws {
+        let projectURL = try makeProjectPackage(layers: [
+            StoredPrimoDocument.Layer(
+                index: .unchecked(0),
+                name: "Layer 1",
+                visible: true,
+                locked: false,
+                alphaLocked: false,
+                clipped: false,
+                opacity: opacity,
+                blendMode: "normal",
+                folderID: nil,
+                textLayer: nil,
+                pixelFilename: "Layers/layer0.rgba",
+                maskFilename: nil
+            ),
+        ])
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+
+        #expect(throws: Error.self) {
+            try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+        }
+    }
+
+    @Test(arguments: [0, TextContent.maxLength + 1])
+    func validateProjectPackageRejectsFuzzedInvalidLayerCounts(layerCount: Int) throws {
+        let layers = (0..<layerCount).map { index in
+            StoredPrimoDocument.Layer(
+                index: .unchecked(index),
+                name: "Layer \(index)",
+                visible: true,
+                locked: false,
+                alphaLocked: false,
+                clipped: false,
+                opacity: 1,
+                blendMode: "normal",
+                folderID: nil,
+                textLayer: nil,
+                pixelFilename: "Layers/layer0.rgba",
+                maskFilename: nil
+            )
+        }
+        let projectURL = try makeProjectPackage(layers: layers)
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+
+        #expect(throws: Error.self) {
+            try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+        }
+    }
+
+    @Test(arguments: [0, 2, 8])
+    func validateProjectPackageRejectsFuzzedInvalidMaskSizes(maskByteCount: Int) throws {
+        let maskFilename = "Layers/layer0.mask"
+        let projectURL = try makeProjectPackage(layers: [
+            StoredPrimoDocument.Layer(
+                index: .unchecked(0),
+                name: "Layer 1",
+                visible: true,
+                locked: false,
+                alphaLocked: false,
+                clipped: false,
+                opacity: 1,
+                blendMode: "normal",
+                folderID: nil,
+                textLayer: nil,
+                pixelFilename: "Layers/layer0.rgba",
+                maskFilename: maskFilename
+            ),
+        ])
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        try Data(repeating: 0xff, count: maskByteCount).write(
+            to: projectURL.appendingPathComponent(maskFilename, isDirectory: false)
+        )
+
+        #expect(throws: Error.self) {
+            try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+        }
+    }
+
+    @Test(arguments: [0.0, -1.0])
+    func validateProjectPackageRejectsFuzzedInvalidTextAttributes(fontSize: Double) throws {
+        let projectURL = try makeProjectPackage()
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        let manifestURL = projectURL.appendingPathComponent("manifest.json", isDirectory: false)
+        var manifest = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
+        var layers = try #require(manifest["layers"] as? [[String: Any]])
+        layers[0]["textLayer"] = [
+            "text": "Text",
+            "positionX": 0,
+            "positionY": 0,
+            "fontPostScriptName": "Helvetica",
+            "fontDisplayName": "Helvetica",
+            "fontSize": fontSize,
+            "scale": 1,
+            "rotationDegrees": 0,
+            "red": 1,
+            "green": 1,
+            "blue": 1,
+            "alpha": 1,
+        ]
+        manifest["layers"] = layers
+        try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL)
+
+        #expect(throws: Error.self) {
+            try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+        }
+    }
+
     @Test
     func validateProjectPackageRejectsInvalidManifestLayerReferencesAndAttributes() throws {
         let invalidPackages = try [

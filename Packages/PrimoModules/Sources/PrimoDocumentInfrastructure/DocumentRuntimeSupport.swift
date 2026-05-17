@@ -25,6 +25,8 @@ public struct DocumentProjectPreview: Equatable, Sendable {
 /// under the lock, executed outside it, then applied under the lock again.
 /// Keep `Runtime` mutations inside the result-returning executor methods; move
 /// this boundary to an actor only if the gateway surface becomes async end-to-end.
+/// @unchecked Sendable: `NSRecursiveLock` serializes access and reentrant entry is rejected at the boundary.
+/// Concurrency test: lockedRuntimeExecutorSerializesSimultaneousMutationsWithoutOverlap
 package final class LockedDocumentRuntimeExecutor<Runtime>: @unchecked Sendable {
     package static var reentrantAccessMessage: String { "Reentrant document runtime access" }
 
