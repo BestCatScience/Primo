@@ -6,33 +6,10 @@ import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
-import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
-
-protocol PresentationReadable: Sendable {
-    func lightweightPresentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure>
-    func presentation() -> Result<PaintDocumentPresentation, DocumentMutationFailure>
-}
-
-protocol DirtyRefreshRequesting: Sendable {
-    func setPaperStyle(_ paperStyle: CanvasPaperStyle)
-    func prewarmDrawingResources()
-}
-
-protocol WorkspaceSnapshotRendering: Sendable {
-    var exportGateway: DocumentExportGateway { get }
-    var renderingWorkflow: DocumentRenderingWorkflow { get }
-}
-
-typealias PresentationWorkflowAccess = PresentationReadable & DirtyRefreshRequesting & WorkspaceSnapshotRendering
-struct DocumentCanvasMutationCapability: Sendable {
-    let canvasMutationRuntime: CanvasMutationRuntime
-    let presentationRuntime: DocumentPresentationRuntime
-    let persistenceRuntime: DocumentPersistenceRuntime
-}
 
 struct DocumentLayerMutationCapability: Sendable {
     let layerStructureRuntime: LayerStructureEditingRuntime
@@ -49,60 +26,6 @@ struct LayerWorkflowEnvironment: Sendable {
     let selectionRuntime: LayerSelectionEditingRuntime
     let presentationRuntime: DocumentPresentationRuntime
     let strokeRuntime: StrokeEditingRuntime
-}
-
-protocol StrokePreviewLeasing: Sendable {
-    func cancel() -> GpuStrokeSessionOutcome
-    func discardPreviewLease(_ lease: StrokePreviewLease)
-    func previewLease(for mutation: GpuCommitMutation) -> StrokePreviewLease
-}
-
-protocol StrokePreviewResolving: Sendable {
-    func beginPreview(
-        sample: StylusSample,
-        baseSnapshot: MetalDocumentSnapshot?,
-        context: DocumentStrokeContext,
-        usesResponsivePreview: Bool
-    ) -> GpuStrokeSessionOutcome
-
-    func appendPreview(
-        baseSnapshot: MetalDocumentSnapshot?,
-        renderSnapshot: MetalDocumentSnapshot?,
-        renderState: StrokeSessionRenderState?,
-        samples: [StylusSample],
-        fullSamples: [StylusSample],
-        context: DocumentStrokeContext,
-        usesResponsivePreview: Bool
-    ) -> GpuStrokeSessionOutcome
-
-    func finish(
-        renderState: StrokeSessionRenderState?,
-        baseSnapshot: MetalDocumentSnapshot?,
-        renderSnapshot: MetalDocumentSnapshot?,
-        samples: [StylusSample],
-        context: DocumentStrokeContext,
-        allowsApproximatePreviewCommit: Bool,
-        refreshViaDirtyPresentation: Bool
-    ) -> GpuStrokeSessionOutcome
-}
-
-protocol StrokePreviewPort: StrokePreviewLeasing, StrokePreviewResolving {}
-
-protocol StrokeMutationSubmitting: Sendable {
-    func cancelStroke()
-    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult
-    func endBlurStroke() -> DocumentMutationResult
-    func cancelBlurStroke()
-    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult
-    func fill(_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
-}
-
-protocol StrokeCommitPort: Sendable {
-    func cancelStroke()
-    func blurStroke(_ command: ValidatedBlurStrokeMutationCommand) -> DocumentMutationResult
-    func endBlurStroke() -> DocumentMutationResult
-    func cancelBlurStroke()
-    func fill(_ command: ValidatedFillMutationCommand) -> DocumentMutationResult
 }
 
 protocol LayerMutationWorkflowSubmitting: Sendable {
@@ -157,12 +80,6 @@ protocol LayerContentSubmitting: Sendable {
 
 protocol LayerContentPort: LayerContentSubmitting {}
 
-protocol CanvasEditingExecuting: Sendable {
-    func execute(_ command: CanvasEditingCommand, state context: CanvasEditingContext) -> CanvasEditingOutcome
-}
-
-protocol CanvasTransformPort: CanvasEditingExecuting, LayerTransformProcessing {}
-
 protocol SelectionWorkflowRequesting: Sendable {
     func invertedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, mode: SelectionToolMode) -> CanvasSelection?
     func adjustedSelection(_ selection: CanvasSelection?, canvasGeometry: PixelGeometry, expansion: Int, isInverted: Bool) -> CanvasSelection?
@@ -184,24 +101,3 @@ protocol SelectionWorkflowRequesting: Sendable {
 }
 
 protocol SelectionProcessingPort: SelectionWorkflowRequesting {}
-
-protocol CanvasEditingPresentationPort: Sendable {
-    var renderingWorkflow: DocumentRenderingWorkflow { get }
-    var presentationReader: DocumentPresentationReader { get }
-}
-
-protocol PaperStylePort: Sendable {
-    func setPaperStyle(_ paperStyle: CanvasPaperStyle)
-}
-
-struct DocumentExportCapability: Sendable {
-    let exportRuntime: DocumentExportRuntime
-}
-
-struct DocumentPersistenceCapability: Sendable {
-    let persistenceRuntime: DocumentPersistenceRuntime
-}
-
-struct DocumentPreviewRenderingCapability: Sendable {
-    let previewRuntime: CanvasPreviewRuntime
-}

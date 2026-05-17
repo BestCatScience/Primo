@@ -1810,13 +1810,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        let capabilityAccess = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/DocumentRuntimeCapabilities.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
+        let capabilityAccess = try Self.documentRuntimeCapabilitySources(repoRoot: repoRoot)
         let adapters = try Self.documentRuntimeAdapterSources(repoRoot: repoRoot)
         let validation = try String(
             contentsOf: repoRoot.appendingPathComponent(
@@ -1889,13 +1883,7 @@ struct GpuSideEffectIsolationArchitectureTests {
     @Test
     func canvasEditingReducerUsesNarrowPortsInsteadOfBroadWorkflowAccess() throws {
         let repoRoot = try Self.repoRoot()
-        let capabilities = try String(
-            contentsOf: repoRoot.appendingPathComponent(
-                "App/Features/Document/DocumentRuntimeCapabilities.swift",
-                isDirectory: false
-            ),
-            encoding: .utf8
-        )
+        let capabilities = try Self.documentRuntimeCapabilitySources(repoRoot: repoRoot)
         let reducer = try String(
             contentsOf: repoRoot.appendingPathComponent(
                 "App/Features/Document/CanvasEditingWorkflowReducer.swift",
@@ -4036,6 +4024,22 @@ struct GpuSideEffectIsolationArchitectureTests {
             "App/Features/Document/DocumentRuntimeAdapters+PersistenceExport.swift",
             "App/Features/Document/DocumentRuntimeAdapters+PreviewRendering.swift",
             "App/Features/Document/DocumentRuntimeAdapters+Stroke.swift"
+        ].map { relativePath in
+            try String(
+                contentsOf: repoRoot.appendingPathComponent(relativePath, isDirectory: false),
+                encoding: .utf8
+            )
+        }.joined(separator: "\n")
+    }
+
+    private static func documentRuntimeCapabilitySources(repoRoot: URL) throws -> String {
+        try [
+            "App/Features/Document/DocumentRuntimeCapabilities+PresentationWorkflow.swift",
+            "App/Features/Document/DocumentRuntimeCapabilities+Canvas.swift",
+            "App/Features/Document/DocumentRuntimeCapabilities+Layer.swift",
+            "App/Features/Document/DocumentRuntimeCapabilities+PersistenceExport.swift",
+            "App/Features/Document/DocumentRuntimeCapabilities+PreviewRendering.swift",
+            "App/Features/Document/DocumentRuntimeCapabilities+Stroke.swift"
         ].map { relativePath in
             try String(
                 contentsOf: repoRoot.appendingPathComponent(relativePath, isDirectory: false),
