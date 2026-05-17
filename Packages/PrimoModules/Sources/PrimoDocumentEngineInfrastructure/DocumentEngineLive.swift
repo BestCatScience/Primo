@@ -348,11 +348,11 @@ struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
 }
 
 func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure {
-    DocumentMutationFailure(coreFailure: failure.coreFailure)
+    failure
 }
 
 func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLayerMutationFailure {
-    DocumentLayerMutationFailure(coreFailure: failure.coreFailure)
+    failure
 }
 
 /// @unchecked Sendable: replay state is held behind a `LockedDocumentRuntimeExecutor` and uses injected GPU services.

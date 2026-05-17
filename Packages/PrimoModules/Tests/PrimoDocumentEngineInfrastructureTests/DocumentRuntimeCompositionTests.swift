@@ -1053,7 +1053,11 @@ struct DocumentRuntimeCompositionTests {
         let factoryURL = repoRoot.appendingPathComponent(
             "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift"
         )
+        let layerContractsURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift"
+        )
         let body = try String(contentsOf: factoryURL, encoding: .utf8)
+        let layerContractsBody = try String(contentsOf: layerContractsURL, encoding: .utf8)
 
         let coreFailures: [DocumentMutationCoreFailure] = [
             .alphaLocked(1),
@@ -1069,8 +1073,13 @@ struct DocumentRuntimeCompositionTests {
             #expect(DocumentLayerMutationFailure(coreFailure: coreFailure).coreFailure == coreFailure)
         }
 
-        #expect(body.contains("DocumentMutationFailure(coreFailure: failure.coreFailure)"))
-        #expect(body.contains("DocumentLayerMutationFailure(coreFailure: failure.coreFailure)"))
+        #expect(layerContractsBody.contains("public typealias DocumentLayerMutationFailure = DocumentMutationFailure"))
+        #expect(!layerContractsBody.contains("public enum DocumentLayerMutationFailure"))
+        #expect(body.contains("func mapDocumentEditorFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure"))
+        #expect(body.contains("func mapDocumentRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLayerMutationFailure"))
+        #expect(body.contains("failure\n}"))
+        #expect(!body.contains("DocumentMutationFailure(coreFailure: failure.coreFailure)"))
+        #expect(!body.contains("DocumentLayerMutationFailure(coreFailure: failure.coreFailure)"))
         #expect(!body.contains("bridgeMutationFailed(\"alphaLocked\")"))
         #expect(!body.contains("bridgeMutationFailed(\"invalidCanvasSize\")"))
         #expect(!body.contains("bridgeMutationFailed(\"emptyInput\")"))
