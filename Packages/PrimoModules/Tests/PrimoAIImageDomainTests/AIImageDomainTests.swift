@@ -36,6 +36,17 @@ struct AIImageDomainTests {
     }
 
     @Test
+    func entitlementTokenAcceptsStoreKitJWSLength() {
+        let header = String(repeating: "a", count: 1200)
+        let payload = String(repeating: "b", count: 3600)
+        let signature = String(repeating: "c", count: 1200)
+        let jws = "\(header).\(payload).\(signature)"
+
+        #expect(AIImageEntitlementToken(jws)?.rawValue == jws)
+        #expect(AIImageEntitlementToken(String(repeating: "x", count: AIImageEntitlementToken.maxCharacterCount + 1)) == nil)
+    }
+
+    @Test
     func openAIDirectEditModelsAreConfigDrivenAndDocsAligned() {
         #expect(AIImageModel.defaultOpenAIDirectEditModel == .gptImage15)
         #expect(AIImageModel.openAIDirectEditModels == [

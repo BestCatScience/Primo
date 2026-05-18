@@ -133,6 +133,36 @@ struct AIImageApplicationTests {
     }
 
     @Test
+    func commandBuilderUsesEntitlementJWSRatherThanClientActiveFlagForAppManagedCommand() throws {
+        let draft = AIImageDraft(
+            prompt: "refine shadows",
+            accessMode: .appManaged,
+            model: .flashImage31Preview,
+            inputLayerIndex: 1,
+            editScope: .wholeLayer,
+            outputMode: .replaceCurrentLayer
+        )
+        let snapshot = AIImageCommerceSnapshot(
+            isSubscriptionActive: false,
+            latestEntitlementJWS: "signed-entitlement",
+            proxyEndpoint: "https://proxy.bestcatscience.com/edit"
+        )
+
+        let result = AIImageCommandBuilder().build(
+            draft: draft,
+            apiKey: "",
+            openAIAPIKey: "",
+            commerce: snapshot
+        )
+
+        let command = try result.get()
+        #expect(command.executionConfig == .appManaged(
+            entitlement: AIImageEntitlementToken("signed-entitlement")!,
+            endpoint: ProxyEndpoint("https://proxy.bestcatscience.com/edit")!
+        ))
+    }
+
+    @Test
     func editUseCaseRetriesAcrossPromptsAndModels() async throws {
         let command = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(

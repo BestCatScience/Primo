@@ -193,6 +193,7 @@ struct AIImageRemoteEditClientTests {
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         let body = String(decoding: try #require(recorder.body), as: UTF8.self)
         #expect(body.contains("\"image_base64\":\"\(inputPNGData.base64EncodedString())\""))
+        #expect(!body.contains("isSubscriptionActive"))
     }
 
     @Test

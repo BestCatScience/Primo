@@ -110,7 +110,7 @@ public struct AIImageAPIKey: Equatable, Sendable {
 }
 
 public struct AIImageEntitlementToken: Equatable, Sendable {
-    public static let maxCharacterCount = 512
+    public static let maxCharacterCount = 8192
     public let rawValue: String
 
     public init?(_ rawValue: String) {
@@ -340,7 +340,9 @@ public struct AIImageCommerceSnapshot: Equatable, Sendable {
 
     public var primaryProduct: ProductSummary?
     public var isLoading: Bool
+    /// UI-only StoreKit status. App-managed proxy authorization must verify `latestEntitlementJWS` server-side.
     public var isSubscriptionActive: Bool
+    /// StoreKit signed entitlement sent to the app-managed proxy as the client-provided credential.
     public var latestEntitlementJWS: String
     public var purchaseErrorMessage: String?
     public var manageSubscriptionsURL: URL?
