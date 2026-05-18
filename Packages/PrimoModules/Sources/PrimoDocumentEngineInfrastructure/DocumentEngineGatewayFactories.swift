@@ -680,20 +680,21 @@ enum DocumentEngineEditingGatewayFactory {
 }
 
 struct DocumentEngineLayerEffects {
-    let duplicateLayer: @Sendable (Int, String) -> DocumentCreatedLayerMutationResult
-    let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
+    let duplicateLayer: @Sendable (ExistingLayerIndex, String) -> DocumentCreatedLayerMutationResult
+    let moveLayer: @Sendable (ExistingLayerIndex, ExistingLayerIndex) -> DocumentMutationResult
     let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentCreatedFolderMutationResult
-    let deleteFolder: @Sendable (Int) -> DocumentMutationResult
-    let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
-    let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
+    let deleteFolder: @Sendable (ExistingFolderID) -> DocumentMutationResult
+    let setFolderVisibility: @Sendable (ExistingFolderID, Bool) -> DocumentMutationResult
+    let setFolderName: @Sendable (ExistingFolderID, String) -> DocumentMutationResult
+    let setFolderExpanded: @Sendable (ExistingFolderID, Bool) -> DocumentMutationResult
     let assignLayerToFolder: @Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult
-    let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
-    let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
-    let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    let setLayerLocked: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    let setLayerAlphaLocked: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    let setLayerClipped: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    let setLayerOpacity: @Sendable (ExistingLayerIndex, Double) -> DocumentMutationResult
+    let setLayerBlendMode: @Sendable (ExistingLayerIndex, LayerBlendMode) -> DocumentMutationResult
+    let mergeLayerDown: @Sendable (ExistingLayerIndex) -> DocumentMutationResult
+    let mergeLayerDownUnchecked: @Sendable (Int) -> DocumentMutationResult
 }
 
 enum DocumentEngineLayerEffectsFactory {
@@ -702,13 +703,13 @@ enum DocumentEngineLayerEffectsFactory {
     ) -> DocumentEngineLayerEffects {
         DocumentEngineLayerEffects(
             duplicateLayer: { index, name in
-                runtimeExecutor.performResult(operation: "duplicateLayer") {
-                    $0.duplicateLayer(index: index, name: name)
+                runtimeExecutor.performResult(operation: "duplicateLayer") { runtime in
+                    editorGateway(for: runtime).duplicateLayer(index: index, name: name)
                 }
             },
             moveLayer: { index, destination in
-                runtimeExecutor.performResult(operation: "moveLayer") {
-                    $0.moveLayer(from: index, to: destination)
+                runtimeExecutor.performResult(operation: "moveLayer") { runtime in
+                    editorGateway(for: runtime).moveLayer(from: index, to: destination)
                 }
             },
             createFolder: { name, anchor in
@@ -722,60 +723,79 @@ enum DocumentEngineLayerEffectsFactory {
                 }
             },
             deleteFolder: { folderID in
-                runtimeExecutor.performResult(operation: "deleteFolder") {
-                    $0.deleteFolder(folderID: folderID)
+                runtimeExecutor.performResult(operation: "deleteFolder") { runtime in
+                    editorGateway(for: runtime).deleteFolder(id: folderID)
                 }
             },
             setFolderVisibility: { folderID, isVisible in
-                runtimeExecutor.performResult(operation: "setFolderVisibility") {
-                    $0.setFolderVisibility(folderID: folderID, isVisible: isVisible)
+                runtimeExecutor.performResult(operation: "setFolderVisibility") { runtime in
+                    editorGateway(for: runtime).setFolderVisible(isVisible, folderID: folderID)
                 }
             },
             setFolderName: { folderID, name in
-                runtimeExecutor.performResult(operation: "setFolderName") {
-                    $0.setFolderName(folderID: folderID, name: name)
+                runtimeExecutor.performResult(operation: "setFolderName") { runtime in
+                    editorGateway(for: runtime).setFolderName(name, folderID: folderID)
                 }
             },
             setFolderExpanded: { folderID, isExpanded in
-                runtimeExecutor.performResult(operation: "setFolderExpanded") {
-                    $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)
+                runtimeExecutor.performResult(operation: "setFolderExpanded") { runtime in
+                    editorGateway(for: runtime).setFolderExpanded(isExpanded, folderID: folderID)
                 }
             },
             assignLayerToFolder: { index, folderID in
-                runtimeExecutor.performResult(operation: "assignLayerToFolder") {
-                    $0.assignLayerToFolder(index: index, folderID: folderID)
+                runtimeExecutor.performResult(operation: "assignLayerToFolder") { runtime in
+                    editorGateway(for: runtime).assignLayer(index: index, toFolder: folderID)
                 }
             },
             setLayerLocked: { index, isLocked in
-                runtimeExecutor.performResult(operation: "setLayerLocked") {
-                    $0.setLayerLocked(index: index, isLocked: isLocked)
+                runtimeExecutor.performResult(operation: "setLayerLocked") { runtime in
+                    editorGateway(for: runtime).setLayerLocked(isLocked, index: index)
                 }
             },
             setLayerAlphaLocked: { index, isAlphaLocked in
-                runtimeExecutor.performResult(operation: "setLayerAlphaLocked") {
-                    $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
+                runtimeExecutor.performResult(operation: "setLayerAlphaLocked") { runtime in
+                    editorGateway(for: runtime).setLayerAlphaLocked(isAlphaLocked, index: index)
                 }
             },
             setLayerClipped: { index, isClipped in
-                runtimeExecutor.performResult(operation: "setLayerClipped") {
-                    $0.setLayerClipped(index: index, isClipped: isClipped)
+                runtimeExecutor.performResult(operation: "setLayerClipped") { runtime in
+                    editorGateway(for: runtime).setLayerClipped(isClipped, index: index)
                 }
             },
             setLayerOpacity: { index, opacity in
-                runtimeExecutor.performResult(operation: "setLayerOpacity") {
-                    $0.setLayerOpacity(index: index, opacity: opacity)
+                guard (0...1).contains(opacity) else {
+                    return .failure(.invalidOpacity(opacity))
+                }
+                return runtimeExecutor.performResult(operation: "setLayerOpacity") { runtime in
+                    editorGateway(for: runtime).setLayerOpacity(ValidatedLayerOpacity(opacity), index: index)
                 }
             },
             setLayerBlendMode: { index, blendMode in
-                runtimeExecutor.performResult(operation: "setLayerBlendMode") {
-                    $0.setLayerBlendMode(index: index, blendMode: blendMode)
+                runtimeExecutor.performResult(operation: "setLayerBlendMode") { runtime in
+                    editorGateway(for: runtime).setLayerBlendMode(blendMode, index: index)
                 }
             },
             mergeLayerDown: { index in
-                runtimeExecutor.performResult(operation: "mergeLayerDown") {
+                runtimeExecutor.performResult(operation: "mergeLayerDown") { runtime in
+                    let gateway = editorGateway(for: runtime)
+                    if let failure = gateway.validateFreshLayerIndexForLayerEffects(index) {
+                        return .failure(failure)
+                    }
+                    return runtime.mergeLayerDown(index: index.rawValue)
+                }
+            },
+            mergeLayerDownUnchecked: { index in
+                runtimeExecutor.performResult(operation: "mergeLayerDownUnchecked") {
                     $0.mergeLayerDown(index: index)
                 }
             }
+        )
+    }
+
+    private static func editorGateway(for runtime: SwiftDocumentRuntime) -> RuntimeDocumentEditorGateway {
+        RuntimeDocumentEditorGateway(
+            runtime: runtime,
+            currentPresentation: runtime.lightweightPresentation()
         )
     }
 }

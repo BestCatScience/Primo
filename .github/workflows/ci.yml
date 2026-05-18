@@ -165,6 +165,9 @@ jobs:
       - name: Patch SwiftNavigation manifest
         run: scripts/patch-swift-navigation-package.sh
 
+      - name: Verify SwiftNavigation manifest patch
+        run: scripts/patch-swift-navigation-package.sh --check
+
       - name: Pick simulator
         id: simulator
         run: |

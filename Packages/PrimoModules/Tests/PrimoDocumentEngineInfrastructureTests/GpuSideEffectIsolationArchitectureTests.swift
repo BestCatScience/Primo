@@ -2475,7 +2475,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             encoding: .utf8
         )
         #expect(engineLive.contains("@Sendable (String, LayerAnchorIndex) -> DocumentCreatedFolderMutationResult"))
-        #expect(engineLive.contains("@Sendable (Int, String) -> DocumentCreatedLayerMutationResult"))
+        #expect(engineLive.contains("@Sendable (ExistingLayerIndex, String) -> DocumentCreatedLayerMutationResult"))
         #expect(engineLive.contains("@Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult"))
 
         let runtimeComposition = try String(

@@ -7,15 +7,18 @@ export DEPENDENCY_FORKS_MANIFEST="${DEPENDENCY_FORKS_MANIFEST:-$ROOT_DIR/docs/de
 export DEPENDENCY_FORKS_PROJECT_YML="${DEPENDENCY_FORKS_PROJECT_YML:-$ROOT_DIR/project.yml}"
 export DEPENDENCY_FORKS_PACKAGE_RESOLVED="${DEPENDENCY_FORKS_PACKAGE_RESOLVED:-$ROOT_DIR/Primo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved}"
 export DEPENDENCY_FORKS_DOC="${DEPENDENCY_FORKS_DOC:-$ROOT_DIR/docs/DependencyForks.md}"
+export DEPENDENCY_FORKS_ROOT="${DEPENDENCY_FORKS_ROOT:-$ROOT_DIR}"
 
 ruby <<'RUBY'
 require "json"
 require "yaml"
+require "digest"
 
 manifest_path = ENV.fetch("DEPENDENCY_FORKS_MANIFEST")
 project_path = ENV.fetch("DEPENDENCY_FORKS_PROJECT_YML")
 resolved_path = ENV.fetch("DEPENDENCY_FORKS_PACKAGE_RESOLVED")
 doc_path = ENV.fetch("DEPENDENCY_FORKS_DOC")
+root_path = ENV.fetch("DEPENDENCY_FORKS_ROOT")
 
 def fail_with(message)
   warn "Fork dependency guard failed: #{message}"
@@ -83,6 +86,29 @@ forks.each do |fork|
     "fork URL #{fork_url}" => fork_url,
     "upstream URL #{upstream_url}" => upstream_url,
     "reason ID #{reason_id}" => reason_id,
+  }.each do |label, value|
+    errors << "#{doc_path} does not mention #{label}" unless doc.include?(value)
+  end
+
+  next unless fork.key?("buildTimePatch")
+
+  patch = fork.fetch("buildTimePatch")
+  patch_id = patch.fetch("id")
+  patch_script = patch.fetch("script")
+  expected_sha256 = patch.fetch("sha256")
+  patch_path = File.expand_path(patch_script, root_path)
+
+  if !File.file?(patch_path)
+    errors << "build-time patch #{patch_id} script is missing at #{patch_script}"
+  else
+    actual_sha256 = Digest::SHA256.file(patch_path).hexdigest
+    errors << "build-time patch #{patch_id} sha256 is #{actual_sha256.inspect}; expected #{expected_sha256.inspect}" unless actual_sha256 == expected_sha256
+  end
+
+  {
+    "build-time patch ID #{patch_id}" => patch_id,
+    "build-time patch script #{patch_script}" => patch_script,
+    "build-time patch sha256 #{expected_sha256}" => expected_sha256,
   }.each do |label, value|
     errors << "#{doc_path} does not mention #{label}" unless doc.include?(value)
   end

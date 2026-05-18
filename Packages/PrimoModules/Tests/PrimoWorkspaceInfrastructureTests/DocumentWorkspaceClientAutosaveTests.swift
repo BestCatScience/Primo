@@ -163,6 +163,117 @@ struct DocumentWorkspaceClientAutosaveTests {
     }
 
     @Test
+    func loadSavedProjectsSkipsProjectWhenPreviewFails() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let projectsDirectory = documents.appendingPathComponent("primo-projects", isDirectory: true)
+        let goodProjectURL = projectsDirectory.appendingPathComponent("good.atelier", isDirectory: true)
+        let brokenProjectURL = projectsDirectory.appendingPathComponent("broken.atelier", isDirectory: true)
+        try writeMinimalProject(at: goodProjectURL, byte: 0x40)
+        try writeMinimalProject(at: brokenProjectURL, byte: 0x50)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let recorder = PreviewCallRecorder()
+        let client = DocumentWorkspaceClient.infrastructureLive(
+            fileClient: fileClient(documentsDirectory: documents),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000777")! }),
+            previewGateway: DocumentWorkspacePreviewGateway(
+                loadProjectPreview: { packageURL in
+                    recorder.record(packageURL.fileURL)
+                    if packageURL.fileURL.standardizedFileURL == brokenProjectURL.standardizedFileURL {
+                        throw DocumentWorkspaceCatalogError.projectLoadFailed("preview unavailable")
+                    }
+                    return DocumentWorkspacePreview(
+                        canvasSize: CGSize(width: 8, height: 6),
+                        layerCount: 2,
+                        previewSurface: nil,
+                        previewImageData: nil
+                    )
+                }
+            )
+        )
+
+        let projects = try client.loadSavedProjects()
+
+        #expect(projects.map(\.url.fileURL.standardizedFileURL) == [goodProjectURL.standardizedFileURL])
+        #expect(projects.first?.canvasSize == CGSize(width: 8, height: 6))
+        #expect(projects.first?.layerCount == 2)
+        #expect(Set(recorder.urls.map(\.standardizedFileURL)) == Set([
+            goodProjectURL.standardizedFileURL,
+            brokenProjectURL.standardizedFileURL,
+        ]))
+    }
+
+    @Test
+    func autosaveIdentifierUsesBackfilledWorkspaceIDInsteadOfProjectPathHash() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let projectsDirectory = documents.appendingPathComponent("primo-projects", isDirectory: true)
+        let sourceURL = projectsDirectory.appendingPathComponent("source.atelier", isDirectory: true)
+        let movedSourceURL = projectsDirectory.appendingPathComponent("Moved", isDirectory: true)
+            .appendingPathComponent("source.atelier", isDirectory: true)
+        let backingURL = root.appendingPathComponent("backing.atelier", isDirectory: true)
+        try writeMinimalProject(at: sourceURL, byte: 0x10)
+        try writeMinimalProject(at: backingURL, byte: 0x20)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let generatedIDs = UUIDSequence([
+            UUID(uuidString: "00000000-0000-0000-0000-000000000901")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000902")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000903")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000904")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000905")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000906")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000907")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000908")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000909")!,
+        ])
+        let client = DocumentWorkspaceClient.infrastructureLive(
+            fileClient: fileClient(documentsDirectory: documents),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { generatedIDs.next() }),
+            previewGateway: previewGateway()
+        )
+        let tab = OpenDocumentTab(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000777")!,
+            title: "Source",
+            backingStoreURL: DocumentProjectPath(backingURL),
+            sourceProjectURL: DocumentProjectPath(sourceURL),
+            canvasSize: CGSize(width: 1, height: 1),
+            isDirty: true,
+            pane: .primary,
+            previewImageData: nil
+        )
+
+        try client.persistAutosaveSnapshot(DocumentProjectPath(backingURL), tab)
+        try client.persistSaveHistorySnapshot(DocumentProjectPath(backingURL), tab, .manualSave)
+        let workspaceID = "workspace-00000000-0000-0000-0000-000000000901"
+        #expect(try manifestWorkspaceID(at: sourceURL) == workspaceID)
+        #expect(FileManager.default.fileExists(atPath: autosaveDirectory(in: documents, id: workspaceID).path))
+        #expect(FileManager.default.fileExists(atPath: saveHistoryDirectory(in: documents, id: workspaceID).path))
+
+        _ = try client.moveSavedProject(
+            DocumentProjectPath(sourceURL),
+            try RelativeProjectFolderPath(validating: "Moved")
+        )
+        var movedTab = tab
+        movedTab.sourceProjectURL = DocumentProjectPath(movedSourceURL)
+        try client.persistAutosaveSnapshot(DocumentProjectPath(backingURL), movedTab)
+        try client.persistSaveHistorySnapshot(DocumentProjectPath(backingURL), movedTab, .manualSave)
+
+        let autosaveRoot = projectsDirectory.appendingPathComponent(".primo-autosaves", isDirectory: true)
+        let autosaveEntryNames = try FileManager.default.contentsOfDirectory(atPath: autosaveRoot.path)
+        let saveHistoryRoot = projectsDirectory.appendingPathComponent(".primo-save-history", isDirectory: true)
+        let saveHistoryEntryNames = try FileManager.default.contentsOfDirectory(atPath: saveHistoryRoot.path)
+        #expect(try manifestWorkspaceID(at: movedSourceURL) == workspaceID)
+        #expect(autosaveEntryNames == [workspaceID])
+        #expect(saveHistoryEntryNames == [workspaceID])
+    }
+
+    @Test
     func persistProjectSnapshotCopyFailurePreservesExistingDestination() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -376,6 +487,27 @@ struct DocumentWorkspaceClientAutosaveTests {
         try manifest.data(using: .utf8)!.write(
             to: url.appendingPathComponent("manifest.json", isDirectory: false)
         )
+    }
+
+    private func manifestWorkspaceID(at projectURL: URL) throws -> String? {
+        let manifestURL = projectURL.appendingPathComponent("manifest.json", isDirectory: false)
+        let data = try Data(contentsOf: manifestURL)
+        let object = try JSONSerialization.jsonObject(with: data)
+        return (object as? [String: Any])?["workspaceID"] as? String
+    }
+
+    private func autosaveDirectory(in documents: URL, id: String) -> URL {
+        documents
+            .appendingPathComponent("primo-projects", isDirectory: true)
+            .appendingPathComponent(".primo-autosaves", isDirectory: true)
+            .appendingPathComponent(id, isDirectory: true)
+    }
+
+    private func saveHistoryDirectory(in documents: URL, id: String) -> URL {
+        documents
+            .appendingPathComponent("primo-projects", isDirectory: true)
+            .appendingPathComponent(".primo-save-history", isDirectory: true)
+            .appendingPathComponent(id, isDirectory: true)
     }
 
     private func fileFingerprint(at root: URL) throws -> [String: Data] {

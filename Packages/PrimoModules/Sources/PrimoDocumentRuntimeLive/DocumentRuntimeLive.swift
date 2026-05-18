@@ -1,5 +1,7 @@
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 
 private extension Result where Success == DocumentCommandOutcome, Failure == DocumentMutationFailure {
@@ -65,7 +67,11 @@ package extension DocumentRuntime {
             case let .layer(command):
                 switch command {
                 case let .mergeExistingLayerDown(index):
-                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index.rawValue).map { .completed })
+                    return mutationOutcome(
+                        requireCurrent(index, queryGateway: composition.queryGateway)
+                            .flatMap { composition.layerEffectsGateway.mergeLayerDown($0.rawValue) }
+                            .map { DocumentMutationSuccess.completed }
+                    )
                 case let .setEditableTextLayer(index, textLayer):
                     return mutationOutcome(
                         composition.editingGateway.execute(.content(.setTextLayer(index: index.rawValue, textLayer: textLayer)))
@@ -127,5 +133,27 @@ package extension DocumentRuntime {
                 presentationBroadcaster.stream()
             }
         )
+    }
+}
+
+private func requireCurrent(
+    _ index: ExistingLayerIndex,
+    queryGateway: DocumentQueryGateway
+) -> Result<ExistingLayerIndex, DocumentMutationFailure> {
+    switch queryGateway.lightweightPresentation() {
+    case let .failure(failure):
+        return .failure(failure)
+    case let .success(presentation):
+        guard index.revision == presentation.revision else {
+            return .failure(.staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: presentation.revision
+            ))
+        }
+        guard presentation.layerRows.contains(where: { $0.index == index.rawValue }) else {
+            return .failure(.invalidLayerIndex(index.rawValue))
+        }
+        return .success(index)
     }
 }

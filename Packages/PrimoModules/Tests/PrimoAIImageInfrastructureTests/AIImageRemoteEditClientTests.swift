@@ -123,6 +123,52 @@ struct AIImageRemoteEditClientTests {
     }
 
     @Test
+    func openAIDirectEditModelRejectsURLOnlyImageResponse() async throws {
+        let httpClient = HTTPClient { request in
+            let responseData = """
+            {
+              "created": 0,
+              "data": [
+                {
+                  "url": "https://api.openai.com/v1/images/generated.png"
+                }
+              ],
+              "output_format": "png"
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (responseData, response)
+        }
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
+                prompt: NonEmptyPrompt("Improve lettering")!,
+                accessMode: .userAPIKey,
+                model: AIImageModel.defaultOpenAIDirectEditModel,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("openai-key")!)
+        )
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: command),
+            "Edit the supplied image",
+            AIImageModel.defaultOpenAIDirectEditModel
+        )
+
+        #expect(result == .failure(.missingImageData(
+            "OpenAI image editing returned a URL response, which is unsupported; expected b64_json image bytes."
+        )))
+    }
+
+    @Test
     func unsupportedOpenAIModelDoesNotUseDirectOpenAIEditPath() async throws {
         let httpClient = HTTPClient { request in
             Issue.record("Unsupported direct OpenAI model should fail before sending \(request)")

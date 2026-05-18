@@ -16,7 +16,13 @@
       "revision": "86539f79492bd7188da219a96dc0053a6e3a327b",
       "upstreamURL": "https://github.com/pointfreeco/swift-navigation",
       "reasonID": "adds-casepathscore-target-dependency",
-      "reason": "The fork adds the CasePathsCore product dependency needed by the pinned package graph."
+      "reason": "The fork adds the CasePathsCore product dependency needed by the pinned package graph.",
+      "buildTimePatch": {
+        "id": "swift-navigation-app-manifest-dependencies-v1",
+        "script": "scripts/patch-swift-navigation-package.sh",
+        "sha256": "a1b5fbaffb2d03a9189214527ed2442f025d352b4ca07af5a3a4db1024153748",
+        "description": "Adds the extra SwiftNavigation/UIKitNavigation manifest dependencies required by the app build after package resolution."
+      }
     }
   ]
 }

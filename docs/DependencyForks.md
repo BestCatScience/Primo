@@ -14,7 +14,7 @@ files in the same change whenever a fork is added, removed, or bumped.
 | Package | Fork revision | Upstream | Reason ID | Why the fork is used |
 | --- | --- | --- | --- | --- |
 | `ComposableArchitecture` / `swift-composable-architecture` | `8970b5088dbcde3c4e8d2c88e52f46a74f2f6071` | `https://github.com/pointfreeco/swift-composable-architecture` | `pins-swift-navigation-fork` | The `https://github.com/BestCatScience/swift-composable-architecture` fork's `Package.swift` points its `swift-navigation` dependency at the Primo `BestCatScience/swift-navigation` fork revision. |
-| `SwiftNavigation` / `swift-navigation` | `86539f79492bd7188da219a96dc0053a6e3a327b` | `https://github.com/pointfreeco/swift-navigation` | `adds-casepathscore-target-dependency` | The `https://github.com/BestCatScience/swift-navigation` fork adds the missing `CasePathsCore` product dependency to `SwiftNavigation` so the project resolves and builds with the pinned package graph. |
+| `SwiftNavigation` / `swift-navigation` | `86539f79492bd7188da219a96dc0053a6e3a327b` | `https://github.com/pointfreeco/swift-navigation` | `adds-casepathscore-target-dependency` | The `https://github.com/BestCatScience/swift-navigation` fork adds the missing `CasePathsCore` product dependency to `SwiftNavigation`; the app build still applies the audited build-time patch below until that full manifest delta is moved into the fork. |
 
 ## Upstream Differences
 
@@ -26,6 +26,11 @@ files in the same change whenever a fork is added, removed, or bumped.
   changes only `Package.swift` from the checked-out revision: it adds
   `.product(name: "CasePathsCore", package: "swift-case-paths")` to the
   `SwiftNavigation` target dependencies.
+- The current app build also applies `scripts/patch-swift-navigation-package.sh`
+  after Xcode resolves packages. That patch adds the full app-required
+  manifest dependency set for `SwiftNavigation` / `UIKitNavigation`, including
+  `XCTestDynamicOverlay`, `CasePaths`, `CasePathsCore`, `CustomDump`,
+  `OrderedCollections`, `Perception`, and `PerceptionCore`.
 
 When either fork is bumped, verify the difference with:
 
@@ -40,6 +45,11 @@ git -C build/SourcePackages/checkouts/swift-navigation show --stat --patch HEAD 
   touches `project.yml`, `Package.resolved`, fork documentation, or fork pins.
 - CI runs the same script so a fork bump cannot update only one of
   `project.yml`, `Package.resolved`, `docs/dependency-forks.json`, or this file.
+- `scripts/verify-forked-dependencies.sh` also checks the audited hash of
+  `scripts/patch-swift-navigation-package.sh` while the build-time patch remains.
+- The app CI applies `scripts/patch-swift-navigation-package.sh` after package
+  resolution and then runs `scripts/patch-swift-navigation-package.sh --check`
+  against the resolved checkout.
 - The fork repositories should stay as small manifest-only forks. Do not carry
   app behavior changes in these forks.
 - Keep the fork revision pin at an audited commit. Avoid floating branches and
@@ -48,6 +58,12 @@ git -C build/SourcePackages/checkouts/swift-navigation show --stat --patch HEAD 
 
 ## Rebase and Patch Policy
 
+- Preferred fix: move the build-time SwiftNavigation manifest delta into the
+  `BestCatScience/swift-navigation` fork and pin `project.yml` to that commit.
+- Until then, the audited build-time patch is
+  `swift-navigation-app-manifest-dependencies-v1` at
+  `scripts/patch-swift-navigation-package.sh` with SHA-256
+  `a1b5fbaffb2d03a9189214527ed2442f025d352b4ca07af5a3a4db1024153748`.
 - Prefer rebasing each fork on the matching upstream release or commit, with the
   local manifest delta reapplied as a minimal patch.
 - If a security fix must land before a clean rebase is practical, cherry-pick

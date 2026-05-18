@@ -358,6 +358,11 @@ public extension AIImageRemoteEditClient {
                     return decodedImage
                 }
             }
+            if decoded.data.contains(where: { $0.url != nil }) {
+                throw AIImageEditFailure.missingImageData(
+                    "OpenAI image editing returned a URL response, which is unsupported; expected b64_json image bytes."
+                )
+            }
         }
 
         if let decoded = decodeGenerateContentResponse(from: data) {

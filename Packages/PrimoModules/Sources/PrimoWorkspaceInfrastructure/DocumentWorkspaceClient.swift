@@ -48,6 +48,7 @@ private struct DocumentWorkspaceStorage: Sendable {
     private static let projectDirectoryName = "project.atelier"
     private static let metadataFilename = "metadata.json"
     private static let manifestFilename = "manifest.json"
+    private static let workspaceIDManifestKey = "workspaceID"
     private static let saveHistoryLimit = 20
 
     private let fileClient: FileClient
@@ -101,19 +102,23 @@ private struct DocumentWorkspaceStorage: Sendable {
 
         var summaries: [SavedProjectSummary] = []
         for projectURL in projectURLs {
-            let preview = try loadProjectPreview(from: projectURL, label: "saved project")
-            summaries.append(
-                SavedProjectSummary(
-                    url: DocumentProjectPath(projectURL),
-                    name: DocumentProjectPath(projectURL).displayName,
-                    relativeFolderPath: try relativeFolderPath(for: projectURL, rootDirectory: rootDirectory),
-                    modifiedAt: try contentModificationDate(for: projectURL),
-                    canvasSize: preview.canvasSize,
-                    layerCount: preview.layerCount,
-                    previewSurface: preview.previewSurface,
-                    previewImageData: preview.previewImageData
+            do {
+                let preview = try loadProjectPreview(from: projectURL, label: "saved project")
+                summaries.append(
+                    SavedProjectSummary(
+                        url: DocumentProjectPath(projectURL),
+                        name: DocumentProjectPath(projectURL).displayName,
+                        relativeFolderPath: try relativeFolderPath(for: projectURL, rootDirectory: rootDirectory),
+                        modifiedAt: try contentModificationDate(for: projectURL),
+                        canvasSize: preview.canvasSize,
+                        layerCount: preview.layerCount,
+                        previewSurface: preview.previewSurface,
+                        previewImageData: preview.previewImageData
+                    )
                 )
-            )
+            } catch {
+                continue
+            }
         }
         return summaries.sorted { $0.modifiedAt > $1.modifiedAt }
     }
@@ -216,7 +221,11 @@ private struct DocumentWorkspaceStorage: Sendable {
         to preferredDestinationURL: DocumentProjectPath?
     ) throws -> DocumentProjectPath {
         let destinationURL = try preferredDestinationURL ?? createProjectURL()
+        let preservedWorkspaceID = try preferredDestinationURL.flatMap {
+            try projectWorkspaceIdentifierIfPresent(at: $0.fileURL)
+        }
         try replaceProjectDirectory(from: sourceProjectURL.fileURL, to: destinationURL.fileURL)
+        _ = try ensureProjectWorkspaceIdentifier(at: destinationURL.fileURL, preferredIdentifier: preservedWorkspaceID)
         return destinationURL
     }
 
@@ -356,11 +365,25 @@ private struct DocumentWorkspaceStorage: Sendable {
         storageIdentifier(for: tab)
     }
 
-    private func storageIdentifier(for sourceProjectURL: URL) -> WorkspaceItemID {
+    private func legacyStorageIdentifier(for sourceProjectURL: URL) -> WorkspaceItemID {
         let stableIdentifier = sourceProjectURL.standardizedFileURL.path.utf8.reduce(UInt64(14_695_981_039_346_656_037)) {
             (($0 ^ UInt64($1)) &* 1_099_511_628_211)
         }
         return WorkspaceItemID(unchecked: String(format: "saved-%016llx", stableIdentifier))
+    }
+
+    private func storageIdentifier(for sourceProjectURL: URL) -> WorkspaceItemID {
+        let fallbackIdentifier = legacyStorageIdentifier(for: sourceProjectURL)
+        do {
+            let identifier = try ensureProjectWorkspaceIdentifier(at: sourceProjectURL)
+            try relocateLegacyWorkspaceArtifactsIfNeeded(
+                from: fallbackIdentifier,
+                to: identifier
+            )
+            return identifier
+        } catch {
+            return fallbackIdentifier
+        }
     }
 
     private func storageIdentifier(for tab: OpenDocumentTab) -> WorkspaceItemID {
@@ -495,7 +518,7 @@ private struct DocumentWorkspaceStorage: Sendable {
     }
 
     private func relocateWorkspaceArtifacts(from sourceProjectURL: URL, to destinationProjectURL: URL) throws {
-        let sourceIdentifier = storageIdentifier(for: sourceProjectURL)
+        let sourceIdentifier = legacyStorageIdentifier(for: sourceProjectURL)
         let destinationIdentifier = storageIdentifier(for: destinationProjectURL)
         guard sourceIdentifier != destinationIdentifier else { return }
 
@@ -506,6 +529,64 @@ private struct DocumentWorkspaceStorage: Sendable {
         let historySource = try saveHistoryDirectory().appendingPathComponent(sourceIdentifier.rawValue, isDirectory: true)
         let historyDestination = try saveHistoryDirectory().appendingPathComponent(destinationIdentifier.rawValue, isDirectory: true)
         try moveDirectoryIfPresent(from: historySource, to: historyDestination)
+    }
+
+    private func relocateLegacyWorkspaceArtifactsIfNeeded(
+        from legacyIdentifier: WorkspaceItemID,
+        to workspaceIdentifier: WorkspaceItemID
+    ) throws {
+        guard legacyIdentifier != workspaceIdentifier else { return }
+
+        let autosaveSource = try autosavesDirectory().appendingPathComponent(legacyIdentifier.rawValue, isDirectory: true)
+        let autosaveDestination = try autosavesDirectory().appendingPathComponent(workspaceIdentifier.rawValue, isDirectory: true)
+        try moveDirectoryIfPresent(from: autosaveSource, to: autosaveDestination)
+
+        let historySource = try saveHistoryDirectory().appendingPathComponent(legacyIdentifier.rawValue, isDirectory: true)
+        let historyDestination = try saveHistoryDirectory().appendingPathComponent(workspaceIdentifier.rawValue, isDirectory: true)
+        try moveDirectoryIfPresent(from: historySource, to: historyDestination)
+    }
+
+    private func ensureProjectWorkspaceIdentifier(
+        at projectURL: URL,
+        preferredIdentifier: WorkspaceItemID? = nil
+    ) throws -> WorkspaceItemID {
+        if let existingIdentifier = try projectWorkspaceIdentifierIfPresent(at: projectURL) {
+            return existingIdentifier
+        }
+
+        let identifier = try preferredIdentifier ?? workspaceIdentifier(for: uuidClient.generate())
+        let manifestURL = manifestURL(for: projectURL)
+        let data = try fileClient.readData(manifestURL)
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard var manifest = object as? [String: Any] else {
+            throw DocumentWorkspaceCatalogError.metadataDecodeFailed(
+                "Could not decode project manifest workspace metadata."
+            )
+        }
+        manifest[Self.workspaceIDManifestKey] = identifier.rawValue
+        let updatedData = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
+        try fileClient.writeData(updatedData, manifestURL, .atomic)
+        return identifier
+    }
+
+    private func projectWorkspaceIdentifierIfPresent(at projectURL: URL) throws -> WorkspaceItemID? {
+        let manifestURL = manifestURL(for: projectURL)
+        guard fileClient.fileExists(manifestURL.path) else { return nil }
+        let data = try fileClient.readData(manifestURL)
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard let manifest = object as? [String: Any] else {
+            throw DocumentWorkspaceCatalogError.metadataDecodeFailed(
+                "Could not decode project manifest workspace metadata."
+            )
+        }
+        guard let rawIdentifier = manifest[Self.workspaceIDManifestKey] as? String else {
+            return nil
+        }
+        return try workspaceItemID(validating: rawIdentifier, label: "project workspace metadata")
+    }
+
+    private func workspaceIdentifier(for uuid: UUID) throws -> WorkspaceItemID {
+        try WorkspaceItemID(validating: "workspace-\(uuid.uuidString)")
     }
 
     private func projectURL(in entryDirectory: URL) -> URL {
@@ -550,8 +631,12 @@ private struct DocumentWorkspaceStorage: Sendable {
     }
 
     private func containsProjectManifest(at url: URL) throws -> Bool {
-        let manifestURL = url.appendingPathComponent(Self.manifestFilename, isDirectory: false)
+        let manifestURL = manifestURL(for: url)
         return fileClient.fileExists(manifestURL.path)
+    }
+
+    private func manifestURL(for projectURL: URL) -> URL {
+        projectURL.appendingPathComponent(Self.manifestFilename, isDirectory: false)
     }
 
     private func isDirectory(_ url: URL) throws -> Bool {

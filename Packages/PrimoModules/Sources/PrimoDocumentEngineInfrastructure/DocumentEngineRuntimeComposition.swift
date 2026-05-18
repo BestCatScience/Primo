@@ -93,7 +93,7 @@ package enum DocumentEngineRuntimeCompositionFactory {
             exportGateway: runtime.exportGateway,
             textLayerGateway: runtime.textLayerGateway,
             layerEffectsGateway: DocumentLayerEffectsGateway(
-                mergeLayerDown: runtime.mergeLayerDown
+                mergeLayerDown: runtime.mergeLayerDownUnchecked
             ),
             editingGateway: runtime.editingGateway,
             strokeSessionUseCase: strokeUseCases.session,

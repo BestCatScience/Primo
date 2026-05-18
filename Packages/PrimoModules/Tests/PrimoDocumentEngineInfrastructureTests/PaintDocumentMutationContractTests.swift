@@ -93,8 +93,9 @@ struct PaintDocumentMutationContractTests {
     func folderRenameAndExpandedStateAreUndoable() throws {
         let runtime = DocumentEngineFactory.live()
         let folderID = try #require(createdFolderID(in: runtime, name: "Group"))
+        var existingFolder = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingFolderID(folderID))
 
-        expectSuccess(runtime.setFolderName(folderID, "References"))
+        expectSuccess(runtime.setFolderName(existingFolder, "References"))
         #expect(folder(in: runtime, id: folderID)?.name == "References")
 
         expectSuccess(runtime.historyGateway.undo())
@@ -103,7 +104,8 @@ struct PaintDocumentMutationContractTests {
         expectSuccess(runtime.historyGateway.redo())
         #expect(folder(in: runtime, id: folderID)?.name == "References")
 
-        expectSuccess(runtime.setFolderExpanded(folderID, false))
+        existingFolder = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingFolderID(folderID))
+        expectSuccess(runtime.setFolderExpanded(existingFolder, false))
         #expect(folder(in: runtime, id: folderID)?.isExpanded == false)
 
         expectSuccess(runtime.historyGateway.undo())
@@ -118,7 +120,8 @@ struct PaintDocumentMutationContractTests {
         defer { try? FileManager.default.removeItem(at: projectURL) }
 
         expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
-        expectSuccess(runtime.setFolderName(folderID, "References"))
+        let existingFolder = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingFolderID(folderID))
+        expectSuccess(runtime.setFolderName(existingFolder, "References"))
         try runtime.persistenceGateway.saveProject(WritableProjectLocation(projectURL), .default)
 
         let loaded = DocumentEngineFactory.live()
@@ -134,8 +137,10 @@ struct PaintDocumentMutationContractTests {
         let folderID = try #require(createdFolderID(in: runtime, name: "Group"))
 
         expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
-        expectSuccess(runtime.setFolderName(folderID, "References"))
-        expectSuccess(runtime.setFolderExpanded(folderID, false))
+        var existingFolder = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingFolderID(folderID))
+        expectSuccess(runtime.setFolderName(existingFolder, "References"))
+        existingFolder = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingFolderID(folderID))
+        expectSuccess(runtime.setFolderExpanded(existingFolder, false))
 
         guard case let .operations(operations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")
@@ -176,16 +181,18 @@ struct PaintDocumentMutationContractTests {
     }
 
     @Test
-    func clearLayerRejectsLockedLayer() {
+    func clearLayerRejectsLockedLayer() throws {
         let runtime = DocumentEngineFactory.live()
-        expectSuccess(runtime.setLayerLocked(0, true))
+        let index = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingLayerIndex(0))
+        expectSuccess(runtime.setLayerLocked(index, true))
         expectFailure(runtime.mutationGateway.clearLayer(0), .layerLocked(0))
     }
 
     @Test
-    func setLayerOpacityRejectsInvalidOpacity() {
+    func setLayerOpacityRejectsInvalidOpacity() throws {
         let runtime = DocumentEngineFactory.live()
-        expectFailure(runtime.setLayerOpacity(0, 1.4), .invalidOpacity(1.4))
+        let index = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingLayerIndex(0))
+        expectFailure(runtime.setLayerOpacity(index, 1.4), .invalidOpacity(1.4))
     }
 
     @Test
@@ -263,6 +270,29 @@ struct PaintDocumentMutationContractTests {
                 ))
             }
         }
+    }
+
+    @Test
+    func liveLayerEffectsRejectStaleLayerIndexesAfterDelete() throws {
+        let runtime = DocumentEngineFactory.live()
+        _ = try runtime.mutationGateway.addLayer("Layer 2").get()
+        _ = try runtime.mutationGateway.addLayer("Layer 3").get()
+        let capturedPresentation = try runtime.queryGateway.lightweightPresentation().get()
+        let capturedContext = mutationContext(from: capturedPresentation)
+        let staleIndex = try #require(capturedContext.existingLayerIndex(1))
+
+        try runtime.mutationGateway.deleteLayer(0).get()
+        let currentRevision = try runtime.queryGateway.lightweightPresentation().get().revision
+        let expected = DocumentMutationFailure.staleLayerIndex(
+            index: staleIndex.rawValue,
+            validationRevision: capturedPresentation.revision,
+            currentRevision: currentRevision
+        )
+
+        expectFailure(runtime.assignLayerToFolder(staleIndex, nil), expected)
+        expectFailure(runtime.setLayerLocked(staleIndex, true), expected)
+        expectFailure(runtime.setLayerOpacity(staleIndex, 0.5), expected)
+        expectFailure(runtime.setLayerBlendMode(staleIndex, .screen), expected)
     }
 
     @Test
@@ -344,7 +374,8 @@ struct PaintDocumentMutationContractTests {
         switch runtime.mutationGateway.addLayer("Upper") {
         case let .success(index):
             expectSuccess(runtime.mutationGateway.replaceLayerPixels(index.rawValue, upper))
-            let result = runtime.mergeLayerDown(index.rawValue)
+            let upperIndex = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingLayerIndex(index.rawValue))
+            let result = runtime.mergeLayerDown(upperIndex)
             if PrimoMetalDocumentProcessingClient.shared.isAvailable {
                 expectSuccess(result)
                 let merged = try runtime.renderGateway.pixelDataForLayer(0).get()
@@ -378,12 +409,13 @@ struct PaintDocumentMutationContractTests {
             return
         }
         expectSuccess(runtime.mutationGateway.replaceLayerPixels(upperIndex, upper))
+        let existingUpperIndex = try #require(mutationContext(from: runtime.queryGateway.lightweightPresentation().get()).existingLayerIndex(upperIndex))
         guard case let .operations(beforeOperations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")
             return
         }
 
-        expectSuccess(runtime.mergeLayerDown(upperIndex))
+        expectSuccess(runtime.mergeLayerDown(existingUpperIndex))
 
         guard case let .operations(afterOperations) = try runtime.exportGateway.timelapseCapture().get().capture?.source else {
             Issue.record("Expected operation-backed timelapse capture")

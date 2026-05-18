@@ -21,20 +21,21 @@ package struct DocumentEngineLive: Sendable {
     package let textLayerGateway: TextLayerGateway
     package let editingGateway: DocumentEditingGateway
 
-    package let duplicateLayer: @Sendable (Int, String) -> DocumentCreatedLayerMutationResult
-    package let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
+    package let duplicateLayer: @Sendable (ExistingLayerIndex, String) -> DocumentCreatedLayerMutationResult
+    package let moveLayer: @Sendable (ExistingLayerIndex, ExistingLayerIndex) -> DocumentMutationResult
     package let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentCreatedFolderMutationResult
-    package let deleteFolder: @Sendable (Int) -> DocumentMutationResult
-    package let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    package let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
-    package let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let deleteFolder: @Sendable (ExistingFolderID) -> DocumentMutationResult
+    package let setFolderVisibility: @Sendable (ExistingFolderID, Bool) -> DocumentMutationResult
+    package let setFolderName: @Sendable (ExistingFolderID, String) -> DocumentMutationResult
+    package let setFolderExpanded: @Sendable (ExistingFolderID, Bool) -> DocumentMutationResult
     package let assignLayerToFolder: @Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult
-    package let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    package let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    package let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
-    package let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
-    package let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
-    package let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    package let setLayerLocked: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    package let setLayerAlphaLocked: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    package let setLayerClipped: @Sendable (ExistingLayerIndex, Bool) -> DocumentMutationResult
+    package let setLayerOpacity: @Sendable (ExistingLayerIndex, Double) -> DocumentMutationResult
+    package let setLayerBlendMode: @Sendable (ExistingLayerIndex, LayerBlendMode) -> DocumentMutationResult
+    package let mergeLayerDown: @Sendable (ExistingLayerIndex) -> DocumentMutationResult
+    package let mergeLayerDownUnchecked: @Sendable (Int) -> DocumentMutationResult
 }
 
 package enum DocumentEngineFactory {
@@ -114,7 +115,8 @@ package enum DocumentEngineFactory {
             setLayerClipped: layerEffects.setLayerClipped,
             setLayerOpacity: layerEffects.setLayerOpacity,
             setLayerBlendMode: layerEffects.setLayerBlendMode,
-            mergeLayerDown: layerEffects.mergeLayerDown
+            mergeLayerDown: layerEffects.mergeLayerDown,
+            mergeLayerDownUnchecked: layerEffects.mergeLayerDownUnchecked
         )
     }
 }
@@ -309,6 +311,10 @@ struct RuntimeDocumentEditorGateway: DocumentEditorGateway {
             return .layerLocked(index.rawValue)
         }
         return nil
+    }
+
+    func validateFreshLayerIndexForLayerEffects(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
+        validateFreshLayerIndex(index)
     }
 
     private func validateFreshFolderID(_ folderID: ExistingFolderID) -> DocumentLayerMutationFailure? {
