@@ -1,0 +1,22 @@
+{
+  "forks": [
+    {
+      "package": "ComposableArchitecture",
+      "identity": "swift-composable-architecture",
+      "forkURL": "https://github.com/BestCatScience/swift-composable-architecture",
+      "revision": "8970b5088dbcde3c4e8d2c88e52f46a74f2f6071",
+      "upstreamURL": "https://github.com/pointfreeco/swift-composable-architecture",
+      "reasonID": "pins-swift-navigation-fork",
+      "reason": "The fork keeps TCA resolving against Primo's pinned BestCatScience swift-navigation fork."
+    },
+    {
+      "package": "SwiftNavigation",
+      "identity": "swift-navigation",
+      "forkURL": "https://github.com/BestCatScience/swift-navigation",
+      "revision": "86539f79492bd7188da219a96dc0053a6e3a327b",
+      "upstreamURL": "https://github.com/pointfreeco/swift-navigation",
+      "reasonID": "adds-casepathscore-target-dependency",
+      "reason": "The fork adds the CasePathsCore product dependency needed by the pinned package graph."
+    }
+  ]
+}

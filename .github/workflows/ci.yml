@@ -11,8 +11,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-fork-guard:
+    name: Forked Dependency Guard
+    runs-on: macos-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify forked dependencies
+        run: scripts/verify-forked-dependencies.sh
+
   package-tests:
     name: Swift 6 Package Tests (iOS 26.0/macOS 13)
+    needs: dependency-fork-guard
     runs-on: macos-latest
     timeout-minutes: 20
     env:
@@ -49,6 +62,7 @@ jobs:
     # SwiftPM's `swift test` exercises the macOS path. Run the package through
     # xcodebuild on an iOS simulator so package-local UIKit/Metal presentation
     # code is compiled and tested before the app target is involved.
+    needs: dependency-fork-guard
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -117,6 +131,7 @@ jobs:
     # The app target deploys to iOS 26.0, so keep this on macos-26 for matching
     # Xcode and simulator runtimes. Do not relax to macos-latest without
     # confirming that image still includes an iOS 26+ simulator.
+    needs: dependency-fork-guard
     runs-on: macos-26
     timeout-minutes: 35
     env:
