@@ -169,18 +169,27 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func pixelDataForLayer(index: Int) -> Result<Data, DocumentMutationFailure> {
         guard store.snapshot.layers.indices.contains(index) else { return .failure(.invalidLayerIndex(index)) }
-        return .success(currentPixelData(for: index))
+        return strictCurrentPixelData(for: index)
     }
 
-    func materializedSnapshot() -> SwiftDocumentStoreSnapshot {
+    func materializedSnapshot() -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
         var snapshot = store.snapshot
         guard let geometry = snapshot.pixelGeometry else {
-            return snapshot
+            return .success(snapshot)
         }
         for index in snapshot.layers.indices {
-            snapshot.layers[index].replacePixelData(currentPixelData(for: index), geometry: geometry)
+            let pixelData: Data
+            switch strictCurrentPixelData(for: index) {
+            case let .success(data):
+                pixelData = data
+            case let .failure(failure):
+                return .failure(failure)
+            }
+            guard snapshot.layers[index].replacePixelData(pixelData, geometry: geometry) else {
+                return .failure(.gpu(.resourceHandleInvalid))
+            }
         }
-        return snapshot
+        return .success(snapshot)
     }
 
     private func undoSnapshot() -> SwiftDocumentStoreSnapshot {
@@ -188,14 +197,19 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func gpuBackedMaterializedSnapshot() -> SwiftDocumentStoreSnapshot {
-        gpuLayerRepository.materializedSnapshot(
+        switch gpuLayerRepository.materializedSnapshot(
             from: store.snapshot,
             rgbaByteCount: rgbaByteCount,
             services: gpuServices
-        )
+        ) {
+        case let .success(snapshot):
+            return snapshot
+        case .failure:
+            return store.snapshot
+        }
     }
 
-    private func materializeGpuBackedLayerPixels() {
+    private func materializeGpuBackedLayerPixels() -> DocumentMutationResult {
         gpuLayerRepository.materializeGpuBackedLayerPixels(
             in: store,
             rgbaByteCount: rgbaByteCount,
@@ -214,7 +228,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func undo() -> DocumentMutationResult {
         let currentRevision = store.snapshot.revision
         let previous: SwiftDocumentStoreSnapshot
-        switch undoHistory.restoreUndo(current: undoSnapshot()) {
+        let current: SwiftDocumentStoreSnapshot
+        switch materializedSnapshot() {
+        case let .success(snapshot):
+            current = snapshot
+        case let .failure(failure):
+            return .failure(failure)
+        }
+        switch undoHistory.restoreUndo(current: current) {
         case let .success(snapshot):
             previous = snapshot
         case let .failure(failure):
@@ -239,7 +260,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func redo() -> DocumentMutationResult {
         let currentRevision = store.snapshot.revision
         let next: SwiftDocumentStoreSnapshot
-        switch undoHistory.restoreRedo(current: undoSnapshot()) {
+        let current: SwiftDocumentStoreSnapshot
+        switch materializedSnapshot() {
+        case let .success(snapshot):
+            current = snapshot
+        case let .failure(failure):
+            return .failure(failure)
+        }
+        switch undoHistory.restoreRedo(current: current) {
         case let .success(snapshot):
             next = snapshot
         case let .failure(failure):
@@ -357,6 +385,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.inconsistentComposition(operation: "addLayer", reason: "invalid store geometry"))
         }
         var insertedIndex: Int?
+        if case let .failure(failure) = materializeGpuBackedLayerPixels() {
+            return .failure(failure)
+        }
         guard store.update({ snapshot in
             snapshot.layers.append(layer)
             let index = snapshot.layers.count - 1
@@ -366,7 +397,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }), let index = insertedIndex else {
             return .failure(.rawAPIUnavailable(operation: "addLayer"))
         }
-        materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .addLayer(name: name))
         return .success(DocumentCreatedLayerIndex(index))
@@ -387,6 +417,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
+        if case let .failure(failure) = materializeGpuBackedLayerPixels() {
+            return .failure(failure)
+        }
         let before = undoSnapshot()
         guard store.update({
             $0.layers[index].name = name
@@ -973,13 +1006,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             nextPixelData = materializedPixelData(from: payload, existing: current)
             nextHandle = nil
         }
-        setLayerPixelState(
+        guard setLayerPixelState(
             index: plan.layerIndex,
             pixelData: nextPixelData,
-            gpuBufferHandle: nextHandle
-        )
-        guard updateLayerTextLayer(index: plan.layerIndex, textLayer: nil) else {
-            gpuServices.release(nextHandle)
+            gpuBufferHandle: nextHandle,
+            textLayerUpdate: .set(nil)
+        ) else {
             return .failure(.inconsistentComposition(operation: "blurStroke", reason: "target layer is text"))
         }
         invalidateThumbnail(for: plan.layerIndex)
@@ -1020,6 +1052,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         layer.name = name
         let duplicatedIndex = index + 1
+        if case let .failure(failure) = materializeGpuBackedLayerPixels() {
+            return .failure(failure)
+        }
         guard store.update({
             $0.layers.insert(layer, at: duplicatedIndex)
             $0.activeLayerIndex = duplicatedIndex
@@ -1028,7 +1063,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.rawAPIUnavailable(operation: "duplicateLayer"))
         }
         remapFoldersAfterInsertion(at: duplicatedIndex)
-        materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
         return .success(DocumentCreatedLayerIndex(duplicatedIndex))
@@ -1038,6 +1072,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers.count > 1 else { return .failure(.rawAPIUnavailable(operation: "deleteLayer")) }
         let before = undoSnapshot()
+        if case let .failure(failure) = materializeGpuBackedLayerPixels() {
+            return .failure(failure)
+        }
         guard deleteLayerUnchecked(index: index) else {
             return .failure(.rawAPIUnavailable(operation: "deleteLayer"))
         }
@@ -1050,7 +1087,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(destinationIndex) { return .failure(failure) }
         guard index != destinationIndex else { return .success(()) }
         let before = undoSnapshot()
-        materializeGpuBackedLayerPixels()
+        if case let .failure(failure) = materializeGpuBackedLayerPixels() {
+            return .failure(failure)
+        }
         let movedLayerWasActive = store.snapshot.activeLayerIndex == index
         guard store.update({ snapshot in
             let layer = snapshot.layers.remove(at: index)
@@ -1285,20 +1324,37 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         ) else {
             return .failure(.rawAPIUnavailable(operation: "mergeLayerDown"))
         }
-        let before = undoSnapshot()
-        setLayerPixelState(
-            index: index - 1,
-            pixelData: preserveExistingAlphaIfNeeded(
-                merged,
-                existing: lower.pixelData,
-                isAlphaLocked: lower.alphaLocked
-            ),
-            gpuBufferHandle: nil
+        let mergedPixelData = preserveExistingAlphaIfNeeded(
+            merged,
+            existing: lower.pixelData,
+            isAlphaLocked: lower.alphaLocked
         )
-        guard updateLayerTextLayer(index: index - 1, textLayer: nil),
-              deleteLayerUnchecked(index: index) else {
+        let before = undoSnapshot()
+        guard store.update({ snapshot in
+            guard snapshot.layers.indices.contains(index),
+                  snapshot.layers.indices.contains(index - 1),
+                  let geometry = snapshot.pixelGeometry,
+                  snapshot.layers[index - 1].replacePixelData(mergedPixelData, geometry: geometry) else {
+                return false
+            }
+            snapshot.layers[index - 1].textLayer = nil
+            snapshot.layers.remove(at: index)
+            snapshot.activeLayerIndex = min(snapshot.activeLayerIndex, snapshot.layers.count - 1)
+            for folderIndex in snapshot.folders.indices {
+                if let anchor = snapshot.folders[folderIndex].anchorLayerIndex {
+                    if anchor == index {
+                        snapshot.folders[folderIndex].anchorLayerIndex = nil
+                    } else if anchor > index {
+                        snapshot.folders[folderIndex].anchorLayerIndex = anchor - 1
+                    }
+                }
+            }
+            return true
+        }) else {
             return .failure(.rawAPIUnavailable(operation: "mergeLayerDown"))
         }
+        invalidateAllThumbnails()
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .mergeLayerDown(index: .unchecked(index)))
         return .success(())
     }
@@ -1458,8 +1514,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
     }
 
-    func projectSaveSnapshot(paperStyle: CanvasPaperStyle) -> SwiftDocumentProjectSaveSnapshot {
-        SwiftDocumentProjectSaveSnapshot(snapshot: materializedSnapshot(), paperStyle: paperStyle)
+    func projectSaveSnapshot(paperStyle: CanvasPaperStyle) throws -> SwiftDocumentProjectSaveSnapshot {
+        SwiftDocumentProjectSaveSnapshot(snapshot: try materializedSnapshot().get(), paperStyle: paperStyle)
     }
 
     static func compositeSurface(
@@ -1631,6 +1687,12 @@ extension SwiftDocumentRuntime {
         uuidClient: UUIDClient = .live,
         gpuServices: DocumentRuntimeGpuServices
     ) throws -> SwiftDocumentRuntime {
+        try PaintDocumentPersistenceService(
+            fileClient: fileClient,
+            uuidClient: uuidClient
+        )
+        .validateProjectPackage(at: url)
+
         let runtime = SwiftDocumentRuntime(
             width: 1,
             height: 1,
@@ -1886,7 +1948,6 @@ extension SwiftDocumentRuntime {
     }
 
     private func deleteLayerUnchecked(index: Int) -> Bool {
-        materializeGpuBackedLayerPixels()
         guard store.update({ snapshot in
             snapshot.layers.remove(at: index)
             snapshot.activeLayerIndex = min(snapshot.activeLayerIndex, snapshot.layers.count - 1)
@@ -1914,8 +1975,7 @@ extension SwiftDocumentRuntime {
             existing: currentPixelData(for: index),
             isAlphaLocked: store.snapshot.layers[index].alphaLocked
         )
-        setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil)
-        guard updateLayerTextLayer(index: index, textLayer: nil) else {
+        guard setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil, textLayerUpdate: .set(nil)) else {
             return .failure(.inconsistentComposition(operation: "replaceLayerPixels", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
@@ -1978,8 +2038,7 @@ extension SwiftDocumentRuntime {
             adjusted = materializedPixelData(from: payload, existing: existing)
             nextHandle = nil
         }
-        setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
-        guard updateLayerTextLayer(index: index, textLayer: nil) else {
+        guard setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle, textLayerUpdate: .set(nil)) else {
             return .failure(.inconsistentComposition(operation: "applyLayerMutation", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
@@ -2024,12 +2083,12 @@ extension SwiftDocumentRuntime {
             )))
         }
         let before = undoSnapshot()
-        setLayerPixelState(
+        guard setLayerPixelState(
             index: index,
             pixelData: materializedPixelData(from: payload, existing: currentPixelData(for: index)),
-            gpuBufferHandle: payloadLease.adoptHandle()
-        )
-        guard updateLayerTextLayer(index: index, textLayer: textLayer) else {
+            gpuBufferHandle: payloadLease.adoptHandle(),
+            textLayerUpdate: .set(textLayer)
+        ) else {
             return .failure(.inconsistentComposition(operation: "applyTextLayerMutation", reason: "target layer is text"))
         }
         invalidateThumbnail(for: index)
@@ -2071,11 +2130,18 @@ extension SwiftDocumentRuntime {
         return output
     }
 
-    private func setLayerPixelState(index: Int, pixelData: Data, gpuBufferHandle: MetalBufferHandle?) {
+    @discardableResult
+    private func setLayerPixelState(
+        index: Int,
+        pixelData: Data,
+        gpuBufferHandle: MetalBufferHandle?,
+        textLayerUpdate: GpuLayerRepository.TextLayerUpdate = .unchanged
+    ) -> Bool {
         gpuLayerRepository.setLayerPixelState(
             index: index,
             pixelData: pixelData,
             gpuBufferHandle: gpuBufferHandle,
+            textLayerUpdate: textLayerUpdate,
             in: store,
             services: gpuServices
         )
@@ -2095,7 +2161,16 @@ extension SwiftDocumentRuntime {
     }
 
     private func currentPixelData(for index: Int) -> Data {
-        gpuLayerRepository.currentPixelData(
+        gpuLayerRepository.bestEffortCurrentPixelData(
+            for: index,
+            in: store.snapshot,
+            rgbaByteCount: rgbaByteCount,
+            services: gpuServices
+        )
+    }
+
+    private func strictCurrentPixelData(for index: Int) -> Result<Data, DocumentMutationFailure> {
+        gpuLayerRepository.strictCurrentPixelData(
             for: index,
             in: store.snapshot,
             rgbaByteCount: rgbaByteCount,

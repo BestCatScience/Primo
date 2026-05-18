@@ -9,6 +9,57 @@ import PrimoDocumentRuntimeLive
 
 struct DocumentProjectPreviewLoaderTests {
     @Test
+    func loadProjectValidatesPackageBeforeReadingManifestReferences() throws {
+        let outsideURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primo-outside-\(UUID().uuidString).rgba", isDirectory: false)
+        try Data([1, 2, 3, 4]).write(to: outsideURL)
+        defer { try? FileManager.default.removeItem(at: outsideURL) }
+
+        let projectURLs = try [
+            makeProjectPackage(layers: [layer(pixelFilename: "../outside.rgba")]),
+            makeProjectPackage(layers: [layer(pixelFilename: outsideURL.path)]),
+            makeSymlinkLayerProject(outsideURL: outsideURL),
+            makeProjectPackage(layers: [
+                layer(index: 0, pixelFilename: "Layers/layer0.rgba"),
+                layer(index: 0, pixelFilename: "Layers/layer0.rgba"),
+            ]),
+            makeProjectPackage(layers: [layer(index: 1, pixelFilename: "Layers/layer0.rgba")]),
+            makeProjectPackage(layers: [layer(folderID: 99)]),
+            makeProjectPackage(folders: [
+                folder(id: 1, anchorLayerIndex: 2),
+            ]),
+            makeOversizedLayerBudgetProject(),
+            makeOversizedTimelapsePayloadProject(),
+        ]
+        defer {
+            for projectURL in projectURLs {
+                try? FileManager.default.removeItem(at: projectURL)
+            }
+        }
+
+        for projectURL in projectURLs {
+            #expect(throws: Error.self, "Expected validation failure for \(projectURL.lastPathComponent)") {
+                _ = try SwiftDocumentRuntime.loadProject(
+                    from: projectURL,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                )
+            }
+        }
+    }
+
+    @Test
+    func loadPreviewRejectsInvalidPackageThroughRuntimeValidator() throws {
+        let projectURL = try makeProjectPackage(layers: [
+            layer(pixelFilename: "../outside.rgba"),
+        ])
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+
+        #expect(throws: Error.self) {
+            _ = try DocumentProjectPreviewLoader.loadPreview(from: projectURL)
+        }
+    }
+
+    @Test
     func loadPreviewReadsProjectWithoutReplacingActiveRuntime() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -130,6 +181,117 @@ struct DocumentProjectPreviewLoaderTests {
                 try data.write(to: url, options: options)
             }
         )
+    }
+
+    private func makeProjectPackage(
+        canvasWidth: Int = 1,
+        canvasHeight: Int = 1,
+        activeLayerIndex: Int = 0,
+        layers: [[String: Any]]? = nil,
+        folders: [[String: Any]] = [],
+        timelapseOperations: [[String: Any]] = []
+    ) throws -> URL {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primo-package-\(UUID().uuidString).primo", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: projectURL.appendingPathComponent("Layers", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: projectURL.appendingPathComponent("TimelapseData", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data([0, 0, 0, 0]).write(
+            to: projectURL.appendingPathComponent("Layers/layer0.rgba", isDirectory: false)
+        )
+
+        let manifest: [String: Any] = [
+            "version": 1,
+            "canvasWidth": canvasWidth,
+            "canvasHeight": canvasHeight,
+            "activeLayerIndex": activeLayerIndex,
+            "paperStyle": [
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "alpha": 1,
+                "isTransparent": false,
+            ],
+            "layers": layers ?? [layer()],
+            "folders": folders,
+            "timelapseFrames": [],
+            "timelapseOperations": timelapseOperations,
+        ]
+        let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+        try manifestData.write(to: projectURL.appendingPathComponent("manifest.json", isDirectory: false))
+        return projectURL
+    }
+
+    private func makeSymlinkLayerProject(outsideURL: URL) throws -> URL {
+        let projectURL = try makeProjectPackage()
+        try FileManager.default.removeItem(
+            at: projectURL.appendingPathComponent("Layers/layer0.rgba", isDirectory: false)
+        )
+        try FileManager.default.createSymbolicLink(
+            at: projectURL.appendingPathComponent("Layers/layer0.rgba", isDirectory: false),
+            withDestinationURL: outsideURL
+        )
+        return projectURL
+    }
+
+    private func makeOversizedLayerBudgetProject() throws -> URL {
+        let layers = (0..<5).map {
+            layer(index: $0, pixelFilename: "Layers/layer0.rgba")
+        }
+        return try makeProjectPackage(canvasWidth: 8192, canvasHeight: 8192, layers: layers)
+    }
+
+    private func makeOversizedTimelapsePayloadProject() throws -> URL {
+        let projectURL = try makeProjectPackage(timelapseOperations: [
+            [
+                "kind": "replaceLayerPixels",
+                "layerIndex": 0,
+                "dataFilename": "TimelapseData/payload.bin",
+            ],
+        ])
+        let payloadURL = projectURL.appendingPathComponent("TimelapseData/payload.bin", isDirectory: false)
+        FileManager.default.createFile(atPath: payloadURL.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: payloadURL)
+        try handle.truncate(atOffset: UInt64(512 * 1024 * 1024 + 1))
+        try handle.close()
+        return projectURL
+    }
+
+    private func layer(
+        index: Int = 0,
+        folderID: Int? = nil,
+        pixelFilename: String = "Layers/layer0.rgba"
+    ) -> [String: Any] {
+        var value: [String: Any] = [
+            "index": index,
+            "name": "Layer \(index)",
+            "visible": true,
+            "locked": false,
+            "alphaLocked": false,
+            "clipped": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "pixelFilename": pixelFilename,
+        ]
+        if let folderID {
+            value["folderID"] = folderID
+        }
+        return value
+    }
+
+    private func folder(id: Int, anchorLayerIndex: Int) -> [String: Any] {
+        [
+            "id": id,
+            "name": "Folder \(id)",
+            "visible": true,
+            "expanded": true,
+            "anchorLayerIndex": anchorLayerIndex,
+        ]
     }
 
     private func fileFingerprint(at root: URL) throws -> [String: Data] {

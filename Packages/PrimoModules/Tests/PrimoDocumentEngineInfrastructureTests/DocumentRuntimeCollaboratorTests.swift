@@ -25,7 +25,48 @@ struct DocumentRuntimeCollaboratorTests {
         repository.setLayerPixelState(index: 0, pixelData: secondPixels, gpuBufferHandle: secondHandle, in: store, services: services)
 
         #expect(box.releasedHandles == [firstHandle])
-        #expect(repository.materializedSnapshot(from: store.snapshot, rgbaByteCount: 16, services: services).layers[0].pixelData == secondPixels)
+        let snapshot = try repository.materializedSnapshot(from: store.snapshot, rgbaByteCount: 16, services: services).get()
+        #expect(snapshot.layers[0].pixelData == secondPixels)
+    }
+
+    @Test
+    func gpuLayerRepositoryAppliesPixelAndTextUpdatesAtomically() throws {
+        let box = CollaboratorGpuBox()
+        let services = box.services()
+        let store = SwiftDocumentStore(width: 2, height: 2)
+        var repository = GpuLayerRepository()
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        let textLayer = try #require(TextLayerData(
+            validatingText: "Draft",
+            positionX: 0,
+            positionY: 0,
+            fontPostScriptName: "Helvetica",
+            fontDisplayName: "Helvetica",
+            fontSize: 12,
+            red: 1,
+            green: 1,
+            blue: 1,
+            alpha: 1
+        ))
+        let originalPixels = store.snapshot.layers[0].pixelData
+        store.update {
+            $0.layers[0].textLayer = textLayer
+            return true
+        }
+
+        let didApply = repository.setLayerPixelState(
+            index: 0,
+            pixelData: Data([0xff]),
+            gpuBufferHandle: handle,
+            textLayerUpdate: .set(nil),
+            in: store,
+            services: services
+        )
+
+        #expect(!didApply)
+        #expect(store.snapshot.layers[0].pixelData == originalPixels)
+        #expect(store.snapshot.layers[0].textLayer == textLayer)
+        #expect(box.releasedHandles == [handle])
     }
 
     @Test

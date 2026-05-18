@@ -80,6 +80,11 @@ struct NonEmptyLayerStack: Equatable, Sendable {
 }
 
 struct SwiftDocumentLayerRecord: Equatable, Sendable {
+    enum PixelDataAuthority: Equatable, Sendable {
+        case authoritative
+        case staleGpuBacked
+    }
+
     var name: String
     var visible: Bool
     var locked: Bool
@@ -90,6 +95,7 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
     var folderID: Int?
     var textLayer: TextLayerData?
     private(set) var pixelData: Data
+    private(set) var pixelDataAuthority: PixelDataAuthority
     private(set) var maskData: Data?
 
     var opacity: Double {
@@ -161,6 +167,7 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
         self.folderID = folderID
         self.textLayer = textLayer
         self.pixelData = pixelBuffer.data
+        self.pixelDataAuthority = .authoritative
         self.maskData = maskBuffer?.data
     }
 
@@ -179,7 +186,12 @@ struct SwiftDocumentLayerRecord: Equatable, Sendable {
             return false
         }
         pixelData = pixelBuffer.data
+        pixelDataAuthority = .authoritative
         return true
+    }
+
+    mutating func markPixelDataStaleGpuBacked() {
+        pixelDataAuthority = .staleGpuBacked
     }
 
     @discardableResult

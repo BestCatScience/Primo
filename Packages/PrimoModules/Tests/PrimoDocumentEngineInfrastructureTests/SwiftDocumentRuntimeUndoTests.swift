@@ -29,6 +29,60 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func gpuBackedLayerMaterializationFailsClosedForSaveAndPixelReads() throws {
+        let strokePixels = Data(repeating: 0x7a, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels], materializationFails: true)
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+
+        guard case .failure(.gpu(.resourceHandleInvalid)) = runtime.materializedSnapshot() else {
+            Issue.record("Expected strict materialized snapshot to reject missing GPU pixels")
+            return
+        }
+        guard case .failure(.gpu(.resourceHandleInvalid)) = runtime.pixelDataForLayer(index: 0) else {
+            Issue.record("Expected public layer pixel read to reject stale CPU fallback")
+            return
+        }
+        guard case .failure(.gpu(.resourceHandleInvalid)) = runtime.undo() else {
+            Issue.record("Expected undo to reject missing GPU pixels for current snapshot")
+            return
+        }
+        #expect(throws: DocumentMutationFailure.self) {
+            _ = try runtime.projectSaveSnapshot(paperStyle: .default)
+        }
+    }
+
+    @Test
+    func nextMutationFailsBeforeChangingStateWhenGpuBackedMaterializationFails() throws {
+        let strokePixels = Data(repeating: 0x7b, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels], materializationFails: true)
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+
+        guard case .failure(.gpu(.resourceHandleInvalid)) = runtime.setLayerName(index: 0, name: "Changed") else {
+            Issue.record("Expected metadata mutation to fail before changing stale GPU-backed layer state")
+            return
+        }
+        #expect(runtime.lightweightPresentation().layerRows.first?.name == "Layer 1")
+    }
+
+    @Test
+    func gpuBackedLayerMaterializationSuccessReturnsLatestPixels() throws {
+        let strokePixels = Data(repeating: 0x7c, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+
+        let snapshot = try runtime.materializedSnapshot().get()
+        #expect(snapshot.layers[0].pixelData == strokePixels)
+        #expect(try runtime.pixelDataForLayer(index: 0).get() == strokePixels)
+        #expect(try runtime.projectSaveSnapshot(paperStyle: .default).snapshot.layers[0].pixelData == strokePixels)
+    }
+
+    @Test
     func redundantLayerVisibilityChangeDoesNotCreateUndoStep() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x33, count: 16)])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
@@ -502,7 +556,7 @@ struct SwiftDocumentRuntimeUndoTests {
         gpu.clearMaterializedHandles()
         _ = try runtime.undo().get()
 
-        #expect(gpu.materializedHandleValues == [handle])
+        #expect(gpu.materializedHandleValues.isEmpty)
         #expect(try runtime.pixelDataForLayer(index: 0).get() == gpuPixels)
     }
 
@@ -954,11 +1008,18 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private var blurSourceBufferHandles: [MetalBufferHandle?] = []
     private var materializedHandles: [MetalBufferHandle] = []
     private var retainSucceeds = true
+    private let materializationFails: Bool
 
-    init(strokeOutputs: [Data], blurOutputs: [Data] = [], blurReturnsNil: Bool = false) {
+    init(
+        strokeOutputs: [Data],
+        blurOutputs: [Data] = [],
+        blurReturnsNil: Bool = false,
+        materializationFails: Bool = false
+    ) {
         self.strokeOutputs = strokeOutputs
         self.blurOutputs = blurOutputs
         self.blurReturnsNil = blurReturnsNil
+        self.materializationFails = materializationFails
     }
 
     func makeHandle(width: Int, height: Int, pixelData: Data) -> MetalBufferHandle {
@@ -1038,6 +1099,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             _materializedPixelData: { handle in
                 self.lock.withLock {
                     self.materializedHandles.append(handle)
+                    guard !self.materializationFails else { return nil }
                     return self.pixelDataByHandle[handle]
                 }
             },

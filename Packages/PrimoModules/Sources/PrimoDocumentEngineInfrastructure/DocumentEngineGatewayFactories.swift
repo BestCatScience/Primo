@@ -37,7 +37,7 @@ enum DocumentEngineRenderGatewayFactory {
     ) -> DocumentRenderGateway {
         DocumentRenderGateway(
             compositePixelData: {
-                runtimeExecutor.performValue(operation: "compositePixelData") {
+                runtimeExecutor.performResult(operation: "compositePixelData") {
                     $0.materializedSnapshot()
                 }.map {
                     SwiftDocumentRuntime.compositeSurface(
@@ -47,7 +47,7 @@ enum DocumentEngineRenderGatewayFactory {
                 }
             },
             compositeSurface: {
-                runtimeExecutor.performValue(operation: "compositeSurface") {
+                runtimeExecutor.performResult(operation: "compositeSurface") {
                     $0.materializedSnapshot()
                 }.map {
                     SwiftDocumentRuntime.compositeSurface(
@@ -519,7 +519,7 @@ enum DocumentEnginePersistenceGatewayFactory {
                 let snapshot = try runtimeExecutor.performThrowing(
                     operation: "saveProject"
                 ) {
-                    $0.projectSaveSnapshot(paperStyle: paperStyle)
+                    try $0.projectSaveSnapshot(paperStyle: paperStyle)
                 }
                 try snapshot.write(to: location.fileURL, fileClient: fileClient, uuidClient: uuidClient)
             },
@@ -560,7 +560,7 @@ enum DocumentEnginePersistenceGatewayFactory {
                 )
             },
             prewarmDrawingResources: {
-                runtimeExecutor.performValue(operation: "prewarmDrawingResources") {
+                runtimeExecutor.performResult(operation: "prewarmDrawingResources") {
                     $0.materializedSnapshot()
                 }.map {
                     _ = SwiftDocumentRuntime.compositeSurface(
@@ -580,7 +580,7 @@ enum DocumentEngineExportGatewayFactory {
     ) -> DocumentExportGateway {
         DocumentExportGateway(
             compositeSurface: { style in
-                runtimeExecutor.performValue(operation: "exportCompositeSurface") {
+                runtimeExecutor.performResult(operation: "exportCompositeSurface") {
                     $0.materializedSnapshot()
                 }.map {
                     guard let surface = SwiftDocumentRuntime.compositeExportSurface(
@@ -594,7 +594,7 @@ enum DocumentEngineExportGatewayFactory {
                 }
             },
             compositePNGData: { style in
-                runtimeExecutor.performValue(operation: "compositePNGData") {
+                runtimeExecutor.performResult(operation: "compositePNGData") {
                     $0.materializedSnapshot()
                 }.map {
                     guard let data = SwiftDocumentRuntime.compositePNGData(
