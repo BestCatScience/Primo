@@ -93,6 +93,89 @@ Primo は、アプリ層を SwiftUI / TCA の orchestration 層に寄せ、docum
 - `GpuCanvasPreviewRenderer` は eyedropper loupe、selection overlay、preview surface など canvas 表示補助を担当します。
 - `DocumentExportGateway` は paper style を反映した composite surface、PNG data、timelapse capture を返します。
 
+### 描画の仕組み
+
+Canvas の表示は、SwiftUI / TCA 側の `CanvasFeature.State` を `CanvasPresentationState` に写し、UIKit の `CanvasPresentationContainerView` が Metal surface、入力、overlay をまとめて更新します。主 canvas は `RenderFrameUpdate` として snapshot / incremental update / viewport / paper style を受け取り、`PrimoMetalCanvasView` が paper と layer texture を描画します。
+
+```mermaid
+flowchart TD
+    subgraph App["App / SwiftUI / TCA"]
+        DocumentFeature["DocumentFeature"]
+        CanvasState["CanvasFeature.State<br/>renderSnapshot<br/>pending incremental update<br/>selection / text / viewport"]
+        CanvasView["CanvasView<br/>UIViewRepresentable"]
+    end
+
+    subgraph Presentation["PrimoCanvasPresentationInfrastructure"]
+        Container["CanvasPresentationContainerView"]
+        Input["CanvasInputHandler<br/>Pencil / touch / gesture"]
+        Surface["CanvasRenderSurfaceView"]
+        Driver["CanvasRenderSurfaceDriver<br/>CanvasRenderSession"]
+        Overlay["Selection / shape / text / eyedropper overlay"]
+    end
+
+    subgraph MetalView["PrimoDocumentMetalRuntimeInfrastructure"]
+        MetalCanvas["PrimoMetalCanvasView<br/>MTKView"]
+        ResourceStore["MetalResourceStore"]
+        Shaders["PaintShaders.metal<br/>paper / layer pipeline"]
+    end
+
+    DocumentFeature --> CanvasState
+    CanvasState --> CanvasView
+    CanvasView -->|"CanvasPresentationState"| Container
+    Container --> Surface
+    Container --> Input
+    Container --> Overlay
+    Surface -->|"RenderFrameUpdate"| Driver
+    Driver -->|"snapshot / viewport / paper"| MetalCanvas
+    Driver -->|"IncrementalLayerUpdate"| MetalCanvas
+    MetalCanvas --> ResourceStore
+    MetalCanvas --> Shaders
+    MetalCanvas -->|"draw()"| Screen["iPad screen"]
+    Input -->|"CanvasPresentationAction"| CanvasView
+    CanvasView -->|"CanvasFeature.Action"| DocumentFeature
+```
+
+Stroke 中は、入力をすぐ GPU preview / incremental update に変換して canvas に反映し、stroke end で runtime 側の正式な commit を行います。正式な presentation refresh が届くまでの間は、`pendingCommittedSnapshot` や preview surface を次の base として使い、連続 stroke の見た目が途切れないようにしています。
+
+```mermaid
+sequenceDiagram
+    participant Pencil as Pencil / touch
+    participant Container as CanvasPresentationContainerView
+    participant Canvas as CanvasFeature
+    participant Workflow as CanvasEditingWorkflowReducer
+    participant StrokeApp as CanvasStrokeInteractionService
+    participant Runtime as DocumentStrokeCommandService / StrokeInputGateway
+    participant Engine as DocumentEngineLive / SwiftDocumentRuntime
+    participant Metal as Metal stroke / rendering services
+    participant Surface as PrimoMetalCanvasView
+
+    Pencil->>Container: touch samples
+    Container->>Canvas: strokeUpdated / strokeEnded
+    Canvas->>Workflow: delegate stroke action
+    Workflow->>StrokeApp: begin / append preview session
+    StrokeApp->>Runtime: preview lease / stroke input
+    Runtime->>Engine: beginStroke / appendStroke / endStroke
+    Engine->>Metal: execute stroke preview or commit
+    Metal-->>Engine: GpuLayerSurface / dirty region
+    Engine-->>Runtime: StrokePreviewResult or commit contract
+    Runtime-->>Workflow: preview outcome / commit resolution
+    Workflow->>Canvas: apply live preview or pending committed snapshot
+    Canvas->>Container: CanvasPresentationState
+    Container->>Surface: RenderFrameUpdate
+    Surface->>Surface: apply snapshot or IncrementalLayerUpdate
+    Engine-->>Workflow: dirty update / presentation refresh
+    Workflow->>Canvas: replace render snapshot
+```
+
+更新単位は次の3種類を使い分けます。
+
+- **Full snapshot**
+  document load、preview reset、構造変更などで `MetalDocumentSnapshot` を丸ごと差し替えます。
+- **Incremental update**
+  stroke preview や軽量な dirty region 更新では `IncrementalLayerUpdate` を既存 texture に部分適用します。
+- **Preview surface**
+  selection overlay、shape preview、eyedropper loupe、text transform など、document 本体をまだ変えない表示補助を別 surface / overlay として重ねます。
+
 ### Timelapse
 
 - `SwiftDocumentRuntime` は stroke、blur、fill、paper style、layer/folder mutation などの timelapse operation と frame data を記録します。
